@@ -1,0 +1,174 @@
+================================================================================
+
+                       F A Z E N D A   3 7   ° C
+        A pele como sistema natural de controle térmico
+                     ~ Manual do Jogador ~
+
+                   Jogo educativo de histologia
+
+================================================================================
+
+
+  SOBRE O JOGO
+  ------------------------------------------------------------------------------
+  Fazenda 37 °C é um jogo de fazenda em pixel-art onde você cuida da terra e
+  dos animais e observa temperatura, hidratação e energia do personagem.
+  O número 37 °C é uma referência didática da simulação; a temperatura real
+  varia entre pessoas, horários e locais de medição.
+
+  Ambiente, esforço, roupa e repouso mudam o balanço do modelo. A pele participa
+  da troca de calor: o suor pode perder calor por evaporação e os vasos mudam o
+  fluxo na superfície. Tremor muscular e arrepios são respostas diferentes;
+  não trate a piloereção como aquecimento significativo do corpo humano.
+
+  O VALE DOS TRÊS VENTOS começa com uma carta de sua avó Rosa. Você ajuda a
+  reabrir a Casa das Sementes e reúne pessoas da fazenda, montanha e oásis.
+  A arte atual inclui moradores animados, retratos e materiais de cada bioma.
+
+
+  COMO COMEÇAR  (versão navegador)
+  ------------------------------------------------------------------------------
+  OPÇÃO A — Arquivo único (mais fácil):
+     1. Dê duplo-clique em  "Fazenda37C-standalone.html".
+     2. Clique em COMEÇAR NOVO JOGO, escolha personagem e um apelido.
+     3. Deixe código de turma vazio para jogar localmente e clique COMEÇAR.
+
+  OPÇÃO B — Pacote ZIP:
+     1. EXTRAIA o conteúdo do .zip para uma pasta (botão direito > Extrair).
+     2. Abra a pasta e dê duplo-clique em  "index.html".
+     3. Mantenha os arquivos do site juntos. O áudio é gerado pelo jogo.
+
+  > O som só começa após o primeiro clique ou tecla (regra dos navegadores).
+  > O progresso é salvo sozinho, no próprio navegador.
+
+
+  CONTROLES
+  ------------------------------------------------------------------------------
+        W A S D  .... mover o personagem
+        SHIFT    .... correr (gasta mais energia)
+        E        .... conversar com moradores; interagir com portas e recursos
+        Q        .... plantar semente
+        F        .... regar a plantação
+        C        .... colher
+        R        .... descansar / recuperar energia
+        I        .... abrir o inventário
+        H        .... VISÃO DA PELE (modo histologia)
+        J        .... CADERNO de Histologia
+        G        .... abrir / fechar o mapa do vale
+        Z        .... alternar visão próxima / ampla do mundo
+        V        .... vestir / retirar casaco
+        1 a 6    .... usar atalhos da mochila
+        B        .... construir espantalho (2 lenhas + 1 feno)
+        ESC      .... pausa; configurações e Progresso e relatório
+        ESPAÇO   .... pular a cutscene de abertura
+
+  Clique em JORNADA DO VALE na HUD ou use ESC > Jornada do Vale para abrir
+  capítulo, mapa dos moradores, carta, objetivos, vínculo e memórias.
+  Em diálogo, clique ou use TAB / ENTER. ESC fecha e devolve os controles.
+  Clique no minimapa ou aperte G para ver sua posição, biomas, construções
+  e moradores. Escolha um destino para orientar sua caminhada; G / ESC fecha.
+  O mapa pausa o mundo durante a consulta.
+  Conversa e diário pausam o mundo, assim como quiz, caderno, mochila, loja
+  e relatório. A Visão da Pele acompanha a simulação ao vivo; H / ESC fecha.
+
+
+  FAZENDA, CUIDADO, HISTOLOGIA E COMUNIDADE
+  ------------------------------------------------------------------------------
+  1) CUIDE DA FAZENDA
+     Plante, regue, colha e venda produtos. Cuide das ovelhas, vacas e galinhas.
+     Cada estação (quente e fria) muda o que cresce e o que o corpo sente.
+     Use Q sobre solo arado; F rega a planta sob seus pés. Regue novamente
+     quando ela precisar; C só colhe plantas maduras. Na caixa, E abre a loja
+     e a aba Vender troca produção por moedas.
+
+  2) OBSERVE SEU CORPO
+     Fique de olho nos medidores:
+        • Temperatura corporal  — alvo: perto de 37 °C
+        • Hidratação            — beba água, evite o sol forte
+        • Energia               — descanse e se alimente
+     Sol, frio, esforço, roupas e descanso empurram esses valores para cima
+     ou para baixo. Deixe qualquer um no vermelho por muito tempo e há risco.
+
+  3) APRENDA HISTOLOGIA
+     Aperte  H  para a VISÃO DA PELE e veja as camadas em ação:
+        • Epiderme           — a barreira externa
+        • Derme              — vasos e terminações
+        • Glândulas sudoríparas — produzem suor para esfriar
+        • Vasos dérmicos     — dilatam no calor, contraem no frio
+     O CADERNO ( J ) reúne os conceitos que você desbloqueia jogando.
+
+  4) REENCONTRE A COMUNIDADE
+     Comece com E perto de Rosa, abaixo da casa. Lia é a bióloga, Tomás o
+     marceneiro, Inês a guia da montanha, Caio o agricultor do oásis e Nico
+     o aprendiz curioso. Cada um tem voz própria, assuntos, falas da estação
+     e lembranças das conversas; o vínculo fica guardado na partida local.
+
+     Os seis capítulos passam por encontros, horta, cuidado, frio, água do
+     oásis e reunião da comunidade. Aceite a etapa antes de agir e volte ao
+     responsável para concluir. O arco paga uma vez, somando 140 moedas.
+
+     Pedidos de cada morador renovam a cada estação e pagam 8 moedas somente
+     na entrega. Eles expiram na mudança da estação; ações anteriores ao
+     aceite não valem para a nova encomenda. Concluir a reabertura mantém
+     o mundo aberto para plantar, explorar, conversar e aceitar novos pedidos.
+
+
+  DICAS DE SOBREVIVÊNCIA
+  ------------------------------------------------------------------------------
+   • CALOR: observe a HUD, cuide da reserva de água e procure sombra.
+     A hidratação participa da resposta de suor dentro das regras do modelo.
+   • FRIO: vista o casaco, fique perto da lareira e não deixe a temperatura
+     despencar. Tremer é o corpo gerando calor.
+   • ENERGIA: não trabalhe até zerar; descanse ( R ) antes do limite.
+   • DINHEIRO: venda o excedente para comprar sementes, roupas e melhorias.
+
+   • BIOMAS: a montanha fica ao norte e o oásis ao sul do mundo. Use E nos
+     pontos sinalizados para coletar gelo ou água do oásis (até 3 de cada,
+     custo de 2 energia). Consuma na mochila quando o efeito for útil.
+   • PAUSA: R inicia/termina descanso; E na cama ou catre também permite
+     descansar. Não precisa esperar atingir um limite para buscar abrigo.
+
+
+  MODO PROFESSOR
+  ------------------------------------------------------------------------------
+  O botão PROGRESSO e o menu ESC permitem consultar os registros desta partida,
+  praticar histologia e exportar JSON/CSV no aparelho. Tarefas pagam 5 moedas;
+  acertos pagam 10, uma vez por objetivo em cada ciclo. Cada estação renova os
+  objetivos e as questões, sem encerrar o mundo ou remover equipamentos.
+  PROGRESSO é o registro didático; JORNADA DO VALE é o diário da história.
+  O portal do professor com dados de turma é uma aplicação separada e depende
+  de configuração online. Para apresentar offline, use apelido e deixe turma vazia.
+
+
+  REQUISITOS
+  ------------------------------------------------------------------------------
+  Um navegador moderno (Google Chrome, Microsoft Edge ou Mozilla Firefox).
+  Não precisa instalar nada. Não precisa de internet para jogar.
+  Use teclado e mouse. O layout estreito não acrescenta controles de toque.
+
+
+  SAVE E MODELO DIDÁTICO
+  ------------------------------------------------------------------------------
+  Reabra o mesmo arquivo no mesmo navegador/perfil e clique CONTINUAR JOGO.
+  O save local guarda personagem, inventário, objetivos, amizade e memórias.
+  ESC permite salvar; uma partida nova reinicia os estados. Limpar dados do
+  navegador pode apagar o progresso. A história não tem cronômetro de sessão.
+
+  Os limites de 35/41 °C permitem retorno à fazenda como regra didática.
+  Não representam morte certa, desmaio inevitável ou limiar universal de dano.
+  As barras não medem sua saúde; roupa, abrigo, água e gelo são simplificados.
+  Hipotermia envolve temperatura central; congelamento envolve tecido local.
+
+
+  CRÉDITOS
+  ------------------------------------------------------------------------------
+  Fazenda 37 °C — versão educativa
+  Tema: A pele como sistema natural de controle térmico — Histologia
+  Sons e música: síntese por código do projeto, sem gravações externas.
+  O modelo é didático; limites térmicos e itens são regras do jogo.
+  Hipotermia e congelamento local são fenômenos distintos. Consulte LEIA-ME.txt
+  e REVISAO-QUESTOES-HISTOLOGIA.html para o conteúdo e a revisão docente.
+
+================================================================================
+                  Bom jogo, boas perguntas e bons encontros!
+================================================================================

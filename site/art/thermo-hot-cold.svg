@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 640" width="1220" height="640" role="img" aria-label="Diagrama da termorregulação: no calor há vasodilatação e sudorese; no frio há vasoconstrição, piloereção e tremor">
+  <defs>
+    <linearGradient id="hot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a1608"/><stop offset="1" stop-color="#7a2a0c"/>
+    </linearGradient>
+    <linearGradient id="cold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08243a"/><stop offset="1" stop-color="#0d3a5e"/>
+    </linearGradient>
+    <linearGradient id="skinh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0a684"/><stop offset="1" stop-color="#d97a5a"/>
+    </linearGradient>
+    <linearGradient id="skinc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cfe1ef"/><stop offset="1" stop-color="#9dc0dd"/>
+    </linearGradient>
+    <style>
+      .ttl{font-family:'Arial Narrow',Arial,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em;}
+      .cap{font-family:'Segoe UI',Arial,sans-serif;font-weight:700;font-size:20px;fill:#fff;}
+      .sub{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;fill:#f0e6d6;opacity:.9;}
+    </style>
+  </defs>
+
+  <rect width="1220" height="640" rx="14" fill="#0e0a06"/>
+
+  <!-- ================= CALOR (left) ================= -->
+  <g>
+    <rect x="14" y="14" width="546" height="612" rx="12" fill="url(#hot)"/>
+    <text x="42" y="86" class="ttl" font-size="52" fill="#ff8a48">CALOR</text>
+    <text x="44" y="112" class="sub" fill="#ffcaa6">o corpo precisa PERDER calor</text>
+
+    <!-- sun -->
+    <g transform="translate(470,86)"><circle r="26" fill="#ffb347"/>
+      <g stroke="#ffb347" stroke-width="5" stroke-linecap="round"><line x1="0" y1="-40" x2="0" y2="-32"/><line x1="0" y1="32" x2="0" y2="40"/><line x1="-40" y1="0" x2="-32" y2="0"/><line x1="32" y1="0" x2="40" y2="0"/><line x1="-28" y1="-28" x2="-23" y2="-23"/><line x1="23" y1="23" x2="28" y2="28"/><line x1="28" y1="-28" x2="23" y2="-23"/><line x1="-23" y1="23" x2="-28" y2="28"/></g>
+    </g>
+
+    <!-- skin strip -->
+    <rect x="42" y="360" width="476" height="120" rx="8" fill="url(#skinh)"/>
+    <rect x="42" y="360" width="476" height="20" fill="#f6c1a6"/>
+    <!-- eritema shimmer -->
+    <rect x="42" y="360" width="476" height="120" rx="8" fill="#ff3b1e" opacity=".12"/>
+    <!-- wide vasodilated vessel -->
+    <path d="M60 452 q120 -30 236 0 t222 -6" stroke="#e23b22" stroke-width="20" fill="none" stroke-linecap="round"/>
+    <text x="300" y="500" class="sub" text-anchor="middle" fill="#ffd3bf">vaso dilatado (mais sangue → mais calor sai)</text>
+    <!-- sweat droplets rising + evaporation -->
+    <g>
+      <g fill="#7fc4f0"><path d="M150 348 c-8 9 -12 16 -12 22 a12 12 0 0 0 24 0 c0 -6 -4 -13 -12 -22z"/>
+        <path d="M300 344 c-8 9 -12 16 -12 22 a12 12 0 0 0 24 0 c0 -6 -4 -13 -12 -22z"/>
+        <path d="M420 350 c-7 8 -11 14 -11 20 a11 11 0 0 0 22 0 c0 -6 -4 -12 -11 -20z"/></g>
+      <g stroke="#9ad4f5" stroke-width="2.5" stroke-dasharray="3 6" fill="none" opacity=".8">
+        <path d="M150 336 q-6 -30 4 -60"/><path d="M300 332 q8 -34 -4 -64"/><path d="M420 338 q-6 -28 6 -56"/></g>
+    </g>
+
+    <!-- callouts -->
+    <g class="cap"><text x="44" y="176">☀ Vasodilatação</text><text x="44" y="230">💧 Sudorese</text><text x="44" y="284">🔴 Eritema</text></g>
+    <g class="sub"><text x="44" y="198">os vasos abrem, a pele libera calor</text>
+      <text x="44" y="252">o suor evapora e resfria a superfície</text>
+      <text x="44" y="306">pele avermelhada = mais sangue na derme</text></g>
+  </g>
+
+  <!-- ================= center thermostat ================= -->
+  <g transform="translate(610,0)">
+    <line x1="0" y1="60" x2="0" y2="580" stroke="#2a2118" stroke-width="2" stroke-dasharray="4 6"/>
+    <!-- thermometer -->
+    <g transform="translate(0,230)">
+      <rect x="-13" y="-150" width="26" height="200" rx="13" fill="#1b140d" stroke="#5a4a34" stroke-width="3"/>
+      <circle cx="0" cy="70" r="30" fill="#1b140d" stroke="#5a4a34" stroke-width="3"/>
+      <rect x="-6" y="-120" width="12" height="160" rx="6" fill="#e8734a"/>
+      <circle cx="0" cy="70" r="20" fill="#e23b22"/>
+      <rect x="-6" y="30" width="12" height="20" fill="#e23b22"/>
+    </g>
+    <g text-anchor="middle" font-family="'Arial Narrow',Arial,sans-serif">
+      <text x="0" y="150" font-size="30" font-weight="800" fill="#ffd98a">37 °C</text>
+      <text x="0" y="176" font-size="13" fill="#c9bca6">equilíbrio</text>
+    </g>
+    <!-- hypothalamus controller -->
+    <g transform="translate(0,470)" text-anchor="middle">
+      <circle r="34" fill="#12100c" stroke="#8b7bd0" stroke-width="2.5"/>
+      <text y="-2" font-size="26">🧠</text>
+      <text y="60" font-size="14" font-weight="700" fill="#b7a9ef">Hipotálamo</text>
+      <text y="80" font-size="12" fill="#9a8fce">o termostato do corpo</text>
+    </g>
+    <!-- arrows -->
+    <path d="M-60 40 l-30 0 m0 0 l10 -8 m-10 8 l10 8" stroke="#ff8a48" stroke-width="3" fill="none"/>
+    <path d="M60 40 l30 0 m0 0 l-10 -8 m10 8 l-10 8" stroke="#5fb0f2" stroke-width="3" fill="none"/>
+  </g>
+
+  <!-- ================= FRIO (right) ================= -->
+  <g>
+    <rect x="660" y="14" width="546" height="612" rx="12" fill="url(#cold)"/>
+    <text x="1164" y="86" class="ttl" font-size="52" fill="#5fb0f2" text-anchor="end">FRIO</text>
+    <text x="1162" y="112" class="sub" fill="#bfe0f7" text-anchor="end">o corpo precisa CONSERVAR calor</text>
+
+    <!-- snowflake -->
+    <g transform="translate(710,86)" stroke="#bfe0f7" stroke-width="4" stroke-linecap="round">
+      <line x1="0" y1="-30" x2="0" y2="30"/><line x1="-26" y1="-15" x2="26" y2="15"/><line x1="-26" y1="15" x2="26" y2="-15"/>
+      <g stroke-width="3"><line x1="0" y1="-30" x2="-7" y2="-22"/><line x1="0" y1="-30" x2="7" y2="-22"/><line x1="0" y1="30" x2="-7" y2="22"/><line x1="0" y1="30" x2="7" y2="22"/></g>
+    </g>
+
+    <!-- skin strip -->
+    <rect x="702" y="360" width="476" height="120" rx="8" fill="url(#skinc)"/>
+    <rect x="702" y="360" width="476" height="20" fill="#e6f0f8"/>
+    <!-- narrow vasoconstricted vessel -->
+    <path d="M720 452 q120 -18 236 0 t222 -4" stroke="#2f6fae" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <text x="940" y="500" class="sub" text-anchor="middle" fill="#cfe4f5">vaso contraído (menos sangue → conserva calor)</text>
+    <!-- piloereção: hairs standing up -->
+    <g stroke="#6b5030" stroke-width="3" stroke-linecap="round">
+      <line x1="770" y1="360" x2="766" y2="326"/><line x1="810" y1="360" x2="808" y2="322"/>
+      <line x1="850" y1="360" x2="846" y2="328"/><line x1="890" y1="360" x2="888" y2="320"/>
+      <line x1="1090" y1="360" x2="1086" y2="326"/><line x1="1130" y1="360" x2="1128" y2="322"/></g>
+    <!-- goosebump mounds -->
+    <g fill="#bcd6e8"><circle cx="768" cy="362" r="6"/><circle cx="808" cy="362" r="6"/><circle cx="848" cy="362" r="6"/><circle cx="888" cy="362" r="6"/></g>
+
+    <!-- shiver marks -->
+    <g stroke="#9ec8e6" stroke-width="3" fill="none" opacity=".85">
+      <path d="M980 330 l8 -8 l-8 -8 l8 -8"/><path d="M1000 330 l8 -8 l-8 -8 l8 -8"/></g>
+
+    <!-- callouts -->
+    <g class="cap"><text x="1164" y="176" text-anchor="end">Vasoconstrição ❄</text><text x="1164" y="230" text-anchor="end">Piloereção 〰</text><text x="1164" y="284" text-anchor="end">Tremor 💪</text></g>
+    <g class="sub"><text x="1164" y="198" text-anchor="end">os vasos fecham e seguram o calor no núcleo</text>
+      <text x="1164" y="252" text-anchor="end">pelos eriçam (em humanos, quase vestigial)</text>
+      <text x="1164" y="306" text-anchor="end">músculos contraem e geram calor</text></g>
+  </g>
+</svg>

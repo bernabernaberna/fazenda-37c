@@ -1,0 +1,63 @@
+# Configurações e credenciais do ambiente local
+.env
+.env.*
+!.env.example
+.mcp.json
+.claude/
+.codex/
+.agents/
+.vscode/
+
+# Dependências, caches e artefatos de desktop
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
+*.exe
+*.log
+
+# Histórico local e áudio não distribuído
+claude-memory-backup/
+backups/
+backup*/
+audio/
+audio_src_wav/
+
+# Evidências e exportações de validação ficam no ambiente de trabalho
+analise/**/
+analise/*.json
+analise/*.csv
+analise/*.png
+analise/*.pdf
+site/shots/*
+!site/shots/site_*.png
+
+# Pacotes duplicados são gerados localmente sob demanda
+release/*.zip
+release/Fazenda37C-COMPLETO.html
+release/capa/
+release/*.docx
+
+# Metadados do sistema
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Anotações internas preservadas somente na cópia local
+analise/CRITERIOS-ENTREGA.md
+analise/GUIA-APRESENTACAO.md
+analise/HISTORIA-DO-VALE.md
+
+# Documentos de trabalho internos
+analise/
+AGENTS.md
+BACKEND-SEGURO-SUPABASE.md
+PLANO-*.md
+ROADMAP-*.md
+GUIA-ORIGINAL.md
+MIGRACAO-LEIAME.md
+REVISAO-QUESTOES-HISTOLOGIA.html
+BUILD.md
+supabase/

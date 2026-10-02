@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<!-- © 2026 Bernardo Oliveira — Fazenda 37 °C · Portal do Professor. Todos os direitos reservados. -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal do Professor — Fazenda 37 °C</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%23ff6a2a'/%3E%3Cstop%20offset='1'%20stop-color='%233aa0ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='url%28%23g%29'/%3E%3Crect%20x='13.5'%20y='5.5'%20width='5'%20height='16'%20rx='2.5'%20fill='%23ffffff'/%3E%3Ccircle%20cx='16'%20cy='24.5'%20r='5.2'%20fill='%23ffffff'/%3E%3Crect%20x='14.7'%20y='9'%20width='2.6'%20height='14'%20fill='%23ff3b2f'/%3E%3Ccircle%20cx='16'%20cy='24.5'%20r='3.1'%20fill='%23ff3b2f'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#1d2616; --card:#27331d; --card2:#2f3d24; --ink:#fff7e0; --muted:#cdbf9a;
+    --accent:#e8b53a; --accent2:#7bbf63; --line:#4a5a32; --danger:#c2553e; --ok:#5fa84a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Trebuchet MS',Verdana,Arial,sans-serif;background:
+       radial-gradient(ellipse at top,#2a3a1e 0%,#16200f 100%);color:var(--ink);min-height:100vh;}
+  a{color:#9fd0ff}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;
+         padding:14px 20px;background:rgba(0,0,0,.25);border-bottom:1px solid var(--line);}
+  header h1{font-size:18px;margin:0;color:var(--accent);letter-spacing:.5px;}
+  header .who{font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;}
+  .wrap{max-width:920px;margin:0 auto;padding:22px 16px 60px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;}
+  .card h2{margin:0 0 10px;font-size:16px;color:var(--accent2);}
+  label{display:block;font-size:13px;margin:10px 0 4px;color:var(--muted);}
+  input,select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);
+        background:#1b2412;color:var(--ink);font-size:14px;font-family:inherit;}
+  input:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+  button{cursor:pointer;border:0;border-radius:8px;padding:10px 16px;font-weight:800;
+         font-family:inherit;font-size:14px;background:var(--accent);color:#2a1c05;transition:filter .15s;}
+  button:hover{filter:brightness(1.08)} button:disabled{opacity:.5;cursor:default}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);}
+  button.danger{background:var(--danger);color:#fff;}
+  button.sm{padding:6px 10px;font-size:12px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .row > div{flex:1;min-width:160px;}
+  .tabs{display:flex;gap:8px;margin-bottom:12px;}
+  .tabs button{background:transparent;color:var(--muted);border:1px solid var(--line);}
+  .tabs button.on{background:var(--accent);color:#2a1c05;}
+  .msg{font-size:13px;padding:10px 12px;border-radius:8px;margin:10px 0;display:none;}
+  .msg.show{display:block}
+  .msg.err{background:rgba(194,85,62,.18);border:1px solid var(--danger);color:#ffd2c8;}
+  .msg.ok{background:rgba(95,168,74,.16);border:1px solid var(--ok);color:#d6f0c8;}
+  .item{display:flex;align-items:center;justify-content:space-between;gap:10px;
+        padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin:8px 0;background:var(--card2);}
+  .item .meta{font-size:12px;color:var(--muted);}
+  .crumb{font-size:13px;color:var(--muted);margin:4px 0 10px;}
+  .crumb b{color:var(--ink)}
+  .code{font-family:ui-monospace,'Courier New',monospace;font-size:26px;font-weight:900;
+        letter-spacing:3px;color:var(--accent);background:#16200f;border:1px dashed var(--accent);
+        border-radius:10px;padding:12px 16px;display:inline-block;}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);}
+  th{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.5px;}
+  .bar{height:8px;background:#16200f;border-radius:5px;overflow:hidden;min-width:80px;}
+  .bar > i{display:block;height:100%;background:var(--accent2);}
+  .stat{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:8px;
+        padding:8px 14px;margin:4px 6px 4px 0;}
+  .stat b{font-size:20px;color:var(--accent);display:block;}
+  .stat span{font-size:11px;color:var(--muted);}
+  .hide{display:none !important}
+  .muted{color:var(--muted);font-size:13px}
+  .foot{margin-top:24px;font-size:11px;color:var(--muted);text-align:center;line-height:1.5;}
+
+  /* --- estado da turma (aberta/fechada): precisa saltar aos olhos --- */
+  .badge{display:inline-block;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;
+         border:1px solid transparent;white-space:nowrap;}
+  .badge.open{background:rgba(95,168,74,.18);border-color:var(--ok);color:#d6f0c8;}
+  .badge.shut{background:rgba(194,85,62,.20);border-color:var(--danger);color:#ffd2c8;}
+  .notice{border-radius:10px;padding:12px 14px;margin:12px 0;font-size:13.5px;line-height:1.5;}
+  .notice.warn{background:rgba(194,85,62,.14);border:1px solid var(--danger);color:#ffdcd3;}
+  .notice.info{background:rgba(232,181,58,.10);border:1px solid var(--line);color:var(--muted);}
+  .notice b{color:var(--ink);}
+
+  /* --- estados vazios: dizem o que fazer em seguida, não só "sem dados" --- */
+  .empty{border:1px dashed var(--line);border-radius:10px;padding:16px 18px;background:rgba(0,0,0,.14);
+         color:var(--muted);font-size:13.5px;line-height:1.6;}
+  .empty b{color:var(--ink);display:block;margin-bottom:6px;font-size:14px;}
+  .empty ol,.empty ul{margin:8px 0 0 18px;padding:0;}
+  .empty li{margin:4px 0;}
+
+  /* --- desempenho por eixo / nível --- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:760px){ .grid2{grid-template-columns:1fr;} }
+  .grid2 h3{font-size:14px;margin:0 0 6px;color:var(--accent2);}
+  .tblwrap{overflow-x:auto;}          /* tabela rola sozinha em tela pequena */
+  .bar > i.mid{background:var(--accent);}
+  .bar > i.low{background:var(--danger);}
+  .tag{font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap;}
+  .tag.low{background:rgba(194,85,62,.22);color:#ffc9bd;}
+  .tag.mid{background:rgba(232,181,58,.18);color:#f2dd9e;}
+  .tag.ok{background:rgba(95,168,74,.18);color:#d6f0c8;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+  th.num,td.num{text-align:right;white-space:nowrap;}
+
+  /* foco de teclado visível (a professora pode navegar sem mouse) */
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
+    outline:3px solid #9fd0ff;outline-offset:2px;border-radius:4px;}
+  @media(prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌡️ Portal do Professor — Fazenda 37&nbsp;°C</h1>
+  <div class="who">
+    <a href="index.html" class="ghost sm" style="text-decoration:none;">← Voltar ao site</a>
+    <span id="whoEmail"></span>
+    <button id="btnLogout" class="ghost sm hide" onclick="doLogout()">Sair</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== AUTENTICAÇÃO ===== -->
+  <div id="authView" class="card">
+    <div class="tabs">
+      <button id="tabLogin" class="on" onclick="switchTab('login')">Entrar</button>
+      <button id="tabSignup" onclick="switchTab('signup')">Criar conta</button>
+    </div>
+
+    <div id="loginForm">
+      <h2>Entrar</h2>
+      <label>E-mail</label><input id="liEmail" type="email" autocomplete="email" placeholder="seu@email.com">
+      <label>Senha</label><input id="liPass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <div style="margin-top:14px"><button onclick="doLogin()">Entrar</button></div>
+    </div>
+
+    <div id="signupForm" class="hide">
+      <h2>Criar conta de professor</h2>
+      <div class="row">
+        <div><label>Seu nome</label><input id="suName" placeholder="ex: Maria Silva"></div>
+        <div><label>Matéria que leciona</label><input id="suSubject" placeholder="ex: Biologia"></div>
+      </div>
+      <label>E-mail</label><input id="suEmail" type="email" autocomplete="email" placeholder="seu@email.com">
+      <label>Senha (mín. 6 caracteres)</label><input id="suPass" type="password" autocomplete="new-password" placeholder="••••••••">
+      <div style="margin-top:14px"><button onclick="doSignup()">Criar conta</button></div>
+    </div>
+
+    <div id="authMsg" class="msg"></div>
+  </div>
+
+  <!-- ===== APP (logado) ===== -->
+  <div id="appView" class="hide">
+
+    <!-- Colégios -->
+    <div id="schoolsView">
+      <div class="card">
+        <h2>Meus colégios</h2>
+        <p class="muted">Crie um colégio e, dentro dele, as turmas. Cada turma gera um código para os alunos.</p>
+        <div class="row">
+          <div><label>Nome do colégio</label><input id="schoolName" placeholder="ex: Colégio Estadual XYZ"></div>
+          <div style="flex:0 0 auto"><button onclick="createSchool()">+ Colégio</button></div>
+        </div>
+        <div id="schoolsList"></div>
+      </div>
+    </div>
+
+    <!-- Turmas de um colégio -->
+    <div id="classesView" class="hide">
+      <div class="card">
+        <div class="crumb"><a href="#" onclick="goSchools();return false;">Meus colégios</a> › <b id="crumbSchool"></b></div>
+        <h2>Turmas</h2>
+        <div class="row">
+          <div><label>Nome da turma</label><input id="className" placeholder="ex: 7º ano A"></div>
+          <div style="flex:0 0 auto"><button onclick="createClass()">+ Turma</button></div>
+        </div>
+        <div id="classesList"></div>
+      </div>
+    </div>
+
+    <!-- Painel de uma turma -->
+    <div id="dashView" class="hide">
+      <div class="card">
+        <div class="crumb"><a href="#" onclick="goSchools();return false;">Meus colégios</a> ›
+          <a href="#" id="crumbSchool2" onclick="openSchool(_curSchool);return false;"></a> › <b id="crumbClass"></b></div>
+        <h2>Painel da turma</h2>
+        <p class="muted">Código para os alunos digitarem no jogo:</p>
+        <div><span id="classCode" class="code"></span>
+          <span id="classState" class="badge open">🟢 recebendo respostas</span>
+        </div>
+        <div class="toolbar">
+          <button class="ghost sm" onclick="copyCode()">Copiar código</button>
+          <button class="ghost sm" onclick="loadDashboard()">↻ Atualizar</button>
+          <button id="btnToggleOpen" class="ghost sm" onclick="toggleCurrentClass()">Fechar turma</button>
+          <button class="ghost sm" onclick="exportAnswersCsv()">⬇ CSV — respostas</button>
+          <button class="ghost sm" onclick="exportSummaryCsv()">⬇ CSV — resumo por aluno</button>
+        </div>
+        <!-- Turma fechada = o BANCO recusa respostas novas. Tem de estar explícito. -->
+        <div id="closedNotice" class="notice warn hide">
+          <b>Turma fechada.</b> O banco de dados está <b>recusando</b> qualquer resposta nova desta turma —
+          os alunos conseguem jogar, mas nada é gravado no painel. Clique em <b>“Reabrir turma”</b> antes da aula.
+        </div>
+        <div id="truncNotice" class="notice info hide"></div>
+        <div id="dashStats" style="margin-top:16px"></div>
+
+        <h2 style="margin-top:22px">Onde a turma está fraca</h2>
+        <p class="muted" style="margin:0 0 8px">Acerto por eixo de conteúdo e por nível da pergunta. Vermelho = abaixo de 60 % (vale revisar em sala).</p>
+        <div class="grid2">
+          <div><h3>Por eixo de conteúdo</h3><div id="catWrap"></div></div>
+          <div><h3>Por nível da pergunta</h3><div id="diffWrap"></div></div>
+        </div>
+
+        <h2 style="margin-top:22px">Ranking dos alunos</h2>
+        <div id="rankWrap"></div>
+        <h2 style="margin-top:22px">Conceitos com mais erros</h2>
+        <div id="missWrap"></div>
+        <div style="margin-top:22px">
+          <button class="danger sm" onclick="wipeClassData()">Apagar resultados desta turma</button>
+          <span class="muted"> (retenção de dados / LGPD — exporte o CSV antes, isto não tem volta)</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="appMsg" class="msg"></div>
+  </div>
+
+  <div class="foot">
+    © 2026 Bernardo Oliveira — Fazenda 37 °C · Os dados dos alunos são protegidos: cada professor acessa
+    somente as suas turmas. Use apenas a chave pública (anon) — nunca a chave secreta.
+  </div>
+</div>
+
+<!-- Versão FIXA + SRI (segurança de cadeia de suprimentos): o navegador só executa
+     se o arquivo bater com o hash; versão exata é imutável, então o hash não muda. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2"
+        integrity="sha384-JWEyvHh+lRf0sN/WWY+QTQwX+CyWqmNg4tkc8GQzAMEtR2wGNrCJlvnu1lHD1kDm"
+        crossorigin="anonymous"></script>
+<script>
+// ===== Configuração (chave anon é pública e segura graças ao RLS) =====
+const SUPABASE_URL  = 'https://sgetexmazhmnfwiqsljy.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXRleG1hemhtbmZ3aXFzbGp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMjI1OTEsImV4cCI6MjA5Nzc5ODU5MX0.s8hJINf5lVIVkXjF6U-Ku37uqx6SJMwYNsfLbG3-JD8';
+
+// A biblioteca vem de CDN: sem internet (ou com o site bloqueado pela rede da
+// escola) ela não carrega e TODO o script abaixo morreria numa exceção — a tela
+// ficaria bonita e simplesmente não reagiria a nada. Aviso explícito no lugar.
+if(typeof supabase === 'undefined' || !supabase.createClient){
+  (function(){
+    var pinta = function(){
+      var el = document.getElementById('authMsg');
+      if(!el) return;
+      el.textContent = 'Não consegui carregar a biblioteca de acesso (cdn.jsdelivr.net). '+
+        'O painel do professor precisa de internet. Verifique a conexão ou peça à TI da escola '+
+        'para liberar cdn.jsdelivr.net e supabase.co. (O jogo em si funciona offline.)';
+      el.className = 'msg show err';
+    };
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pinta);
+    else pinta();
+  })();
+  throw new Error('supabase-js indisponível');
+}
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let _user = null, _curSchool = null, _curClass = null;
+let _schoolsCache = [], _classesCache = [];   // segurança: passamos só o id (UUID) no HTML, nunca o objeto
+
+// ---- Helpers de UI ----
+function show(id){ document.getElementById(id).classList.remove('hide'); }
+function hide(id){ document.getElementById(id).classList.add('hide'); }
+function msg(id, text, ok){
+  const el = document.getElementById(id);
+  el.textContent = text; el.className = 'msg show ' + (ok ? 'ok' : 'err');
+}
+function clearMsg(id){ const el=document.getElementById(id); el.className='msg'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Rótulos legíveis. As chaves são fixas (o banco só aceita estes valores, ver
+// schema.sql), mas qualquer coisa fora da lista continua passando por esc().
+const CAT_LABEL  = { estrutura:'Estrutura', celulas:'Células', glandulas:'Glândulas',
+                     vasos:'Vasos', integracao:'Integração' };
+const CAT_HINT   = { estrutura:'epiderme, derme, hipoderme, estratos, folículo',
+                     celulas:'queratinócitos, melanócitos, Langerhans',
+                     glandulas:'écrinas, apócrinas, sebáceas; suor e sebo',
+                     vasos:'vasodilatação, vasoconstrição, anastomoses',
+                     integracao:'hipotálamo, tremor, evaporação, hiper/hipotermia' };
+const DIFF_LABEL = { basico:'Básico', intermediario:'Intermediário', avancado:'Avançado' };
+const CAT_ORDER  = ['estrutura','celulas','glandulas','vasos','integracao'];
+const DIFF_ORDER = ['basico','intermediario','avancado'];
+const SEM_CLASS  = '(sem classificação)';   // eventos antigos, gravados antes das colunas
+
+// Mensagem de erro ACIONÁVEL. "Erro ao carregar" não diz à professora o que fazer.
+function friendlyError(error, acao){
+  const raw  = (error && error.message) ? String(error.message) : 'erro desconhecido';
+  const code = (error && error.code) ? String(error.code) : '';
+  let m;
+  if(/Failed to fetch|NetworkError|network|ERR_INTERNET|load failed/i.test(raw))
+    m = 'Sem conexão com o servidor. Verifique a internet da escola e clique em Atualizar.';
+  else if(code==='42P01' || /does not exist|schema cache/i.test(raw))
+    m = 'As tabelas ainda não existem no Supabase. Abra o SQL Editor do projeto e rode o arquivo supabase/schema.sql uma vez.';
+  else if(code==='PGRST301' || /JWT|expired|not authenticated|session/i.test(raw))
+    m = 'Sua sessão expirou. Clique em Sair e entre novamente.';
+  else if(code==='23505' || /duplicate key/i.test(raw))
+    m = 'Já existe um registro com esse nome/código.';
+  else if(code==='42501' || /row-level security|permission denied/i.test(raw))
+    m = 'O banco recusou a operação (permissão). Confirme que você está logada com a conta dona desta turma.';
+  else if(/violates check constraint/i.test(raw))
+    m = 'O banco recusou o valor enviado (nome longo demais ou caractere inválido). Tente um nome mais curto.';
+  else if(/Email not confirmed/i.test(raw))
+    m = 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
+  else if(/Invalid login/i.test(raw))
+    m = 'E-mail ou senha incorretos.';
+  else
+    m = raw;
+  return (acao ? acao + ': ' : '') + m;
+}
+
+function switchTab(t){
+  document.getElementById('tabLogin').classList.toggle('on', t==='login');
+  document.getElementById('tabSignup').classList.toggle('on', t==='signup');
+  document.getElementById('loginForm').classList.toggle('hide', t!=='login');
+  document.getElementById('signupForm').classList.toggle('hide', t!=='signup');
+  clearMsg('authMsg');
+}
+
+// ===== Autenticação =====
+async function doSignup(){
+  clearMsg('authMsg');
+  const name=document.getElementById('suName').value.trim();
+  const subject=document.getElementById('suSubject').value.trim();
+  const email=document.getElementById('suEmail').value.trim();
+  const pass=document.getElementById('suPass').value;
+  if(!name || !email || pass.length<6){ return msg('authMsg','Preencha nome, e-mail e uma senha de ao menos 6 caracteres.'); }
+  const { error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { full_name: name, subject: subject } }
+  });
+  if(error) return msg('authMsg','Erro ao criar conta: '+error.message);
+  msg('authMsg','Conta criada! Enviamos um e-mail de confirmação para '+email+'. Confirme e depois faça login.', true);
+  switchTab('login');
+}
+
+async function doLogin(){
+  clearMsg('authMsg');
+  const email=document.getElementById('liEmail').value.trim();
+  const pass=document.getElementById('liPass').value;
+  if(!email || !pass) return msg('authMsg','Informe e-mail e senha.');
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if(error){
+    let m = error.message;
+    if(/Email not confirmed/i.test(m)) m = 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
+    else if(/Invalid login/i.test(m)) m = 'E-mail ou senha incorretos.';
+    return msg('authMsg', m);
+  }
+  _user = data.user;
+  enterApp();
+}
+
+async function doLogout(){ await sb.auth.signOut(); location.reload(); }
+
+function enterApp(){
+  hide('authView'); show('appView'); show('btnLogout');
+  document.getElementById('whoEmail').textContent = _user.email;
+  goSchools();
+}
+
+// ===== Colégios =====
+async function loadSchools(){
+  const { data, error } = await sb.from('schools').select('*').order('created_at');
+  const list = document.getElementById('schoolsList');
+  if(error){
+    list.innerHTML = '<div class="empty"><b>Não consegui carregar seus colégios.</b>'+
+      esc(friendlyError(error))+'<br><button class="ghost sm" onclick="loadSchools()" style="margin-top:10px">Tentar de novo</button></div>';
+    return;
+  }
+  if(!data.length){
+    list.innerHTML = '<div class="empty"><b>Nenhum colégio ainda.</b>'+
+      '<ol><li>Digite o nome do colégio no campo acima e clique em <b>+ Colégio</b>.</li>'+
+      '<li>Dentro dele, crie uma <b>turma</b> — o sistema gera um código de 5 letras.</li>'+
+      '<li>Passe o código aos alunos: eles digitam no jogo, em <b>Modo Professor</b>.</li></ol></div>';
+    return;
+  }
+  _schoolsCache = data;
+  list.innerHTML = data.map(s=>`
+    <div class="item">
+      <div><b>${esc(s.name)}</b></div>
+      <div>
+        <button class="ghost sm" onclick="openSchoolById('${s.id}')">Abrir turmas</button>
+        <button class="danger sm" onclick="delSchool('${s.id}', this)">Excluir</button>
+      </div>
+    </div>`).join('');
+}
+function openSchoolById(id){ const s=_schoolsCache.find(x=>x.id===id); if(s) openSchool(s); }
+async function createSchool(){
+  clearMsg('appMsg');
+  const name=document.getElementById('schoolName').value.trim();
+  if(!name) return msg('appMsg','Digite o nome do colégio.');
+  const { error } = await sb.from('schools').insert({ name, teacher_id: _user.id });
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível criar o colégio'));
+  document.getElementById('schoolName').value='';
+  loadSchools();
+}
+async function delSchool(id, btn){
+  if(!confirm('Excluir este colégio e TODAS as suas turmas?')) return;
+  const { error } = await sb.from('schools').delete().eq('id', id);
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível excluir'));
+  loadSchools();
+}
+function goSchools(){ _curSchool=null; _curClass=null; show('schoolsView'); hide('classesView'); hide('dashView'); clearMsg('appMsg'); loadSchools(); }
+
+// ===== Turmas =====
+function openSchool(s){
+  _curSchool = s;
+  hide('schoolsView'); show('classesView'); hide('dashView');
+  document.getElementById('crumbSchool').textContent = s.name;
+  loadClasses();
+}
+async function loadClasses(){
+  const { data, error } = await sb.from('classes').select('*').eq('school_id', _curSchool.id).order('created_at');
+  const list = document.getElementById('classesList');
+  if(error){
+    list.innerHTML='<div class="empty"><b>Não consegui carregar as turmas.</b>'+
+      esc(friendlyError(error))+'<br><button class="ghost sm" onclick="loadClasses()" style="margin-top:10px">Tentar de novo</button></div>';
+    return;
+  }
+  if(!data.length){
+    list.innerHTML='<div class="empty"><b>Nenhuma turma neste colégio ainda.</b>'+
+      'Crie a primeira acima. O <b>código de 5 letras</b> é gerado automaticamente — é ele que os alunos digitam no jogo.</div>';
+    return;
+  }
+  _classesCache = data;
+  list.innerHTML = data.map(c=>`
+    <div class="item">
+      <div><b>${esc(c.name)}</b> <span class="meta">código: <b>${esc(c.class_code)}</b></span>
+        <span class="meta"> · </span><span class="badge ${c.accepting?'open':'shut'}">${c.accepting ? '🟢 recebendo respostas' : '🔴 fechada — nada é gravado'}</span></div>
+      <div>
+        <button class="ghost sm" onclick="toggleClassOpen('${c.id}')">${c.accepting ? 'Fechar' : 'Reabrir'}</button>
+        <button class="ghost sm" onclick="openClassById('${c.id}')">Ver painel</button>
+        <button class="danger sm" onclick="delClass('${c.id}')">Excluir</button>
+      </div>
+    </div>`).join('');
+}
+function openClassById(id){ const c=_classesCache.find(x=>x.id===id); if(c) openClass(c); }
+// Anti-abuso: abre/fecha o recebimento de respostas da turma (sem atrito p/ o aluno)
+async function toggleClassOpen(id){
+  const c = _classesCache.find(x=>x.id===id); if(!c) return;
+  const { error } = await sb.from('classes').update({ accepting: !c.accepting }).eq('id', id);
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível mudar o estado da turma'));
+  loadClasses();
+}
+// Mesmo controle, dentro do painel da turma (é lá que a professora percebe o problema)
+async function toggleCurrentClass(){
+  if(!_curClass) return;
+  const alvo = !_curClass.accepting;
+  const { error } = await sb.from('classes').update({ accepting: alvo }).eq('id', _curClass.id);
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível mudar o estado da turma'));
+  _curClass.accepting = alvo;
+  const cc = _classesCache.find(x=>x.id===_curClass.id); if(cc) cc.accepting = alvo;
+  msg('appMsg', alvo ? 'Turma reaberta: as respostas dos alunos voltam a ser gravadas.'
+                     : 'Turma fechada: o banco vai recusar respostas novas até você reabrir.', alvo);
+  renderClassState();
+}
+// Pinta o selo aberta/fechada e o aviso. Chamado no load e a cada troca de estado.
+function renderClassState(){
+  const open = !!(_curClass && _curClass.accepting);
+  const badge = document.getElementById('classState');
+  badge.className = 'badge ' + (open ? 'open' : 'shut');
+  badge.textContent = open ? '🟢 recebendo respostas' : '🔴 fechada — nada é gravado';
+  document.getElementById('btnToggleOpen').textContent = open ? 'Fechar turma' : 'Reabrir turma';
+  document.getElementById('closedNotice').classList.toggle('hide', open);
+}
+async function createClass(){
+  clearMsg('appMsg');
+  const name=document.getElementById('className').value.trim();
+  if(!name) return msg('appMsg','Digite o nome da turma.');
+  // class_code é gerado automaticamente pelo banco; .select() retorna a linha criada
+  const { error } = await sb.from('classes').insert({ name, school_id: _curSchool.id, teacher_id: _user.id });
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível criar a turma'));
+  document.getElementById('className').value='';
+  loadClasses();
+}
+async function delClass(id){
+  if(!confirm('Excluir esta turma? Os resultados já enviados também são perdidos — exporte o CSV antes.')) return;
+  const { error } = await sb.from('classes').delete().eq('id', id);
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível excluir a turma'));
+  loadClasses();
+}
+
+// ===== Painel da turma =====
+const EVENT_LIMIT = 5000;      // teto da consulta; avisamos se bater nele
+let _lastEvents = [];          // guardado só para exportar CSV sem ir ao banco de novo
+
+function openClass(c){
+  _curClass = c;
+  hide('schoolsView'); hide('classesView'); show('dashView');
+  document.getElementById('crumbSchool2').textContent = _curSchool.name;
+  document.getElementById('crumbClass').textContent = c.name;
+  document.getElementById('classCode').textContent = c.class_code;
+  renderClassState();
+  loadDashboard();
+}
+function copyCode(){
+  navigator.clipboard?.writeText(_curClass.class_code);
+  msg('appMsg','Código copiado: '+_curClass.class_code, true);
+}
+async function loadDashboard(){
+  clearMsg('appMsg');
+  // Relê a turma: o estado aberta/fechada pode ter mudado em outro aparelho.
+  const cls = await sb.from('classes').select('*').eq('id', _curClass.id).maybeSingle();
+  if(!cls.error && cls.data){ _curClass = cls.data; }
+  renderClassState();
+
+  const { data, error } = await sb.from('quiz_events').select('*')
+    .eq('class_code', _curClass.class_code).order('created_at',{ascending:false}).limit(EVENT_LIMIT);
+  if(error){
+    _lastEvents = [];
+    msg('appMsg', friendlyError(error,'Não consegui carregar os resultados'));
+    const box = '<div class="empty"><b>Resultados indisponíveis.</b>'+esc(friendlyError(error))+
+      '<br><button class="ghost sm" onclick="loadDashboard()" style="margin-top:10px">Tentar de novo</button></div>';
+    document.getElementById('dashStats').innerHTML = '';
+    document.getElementById('catWrap').innerHTML = box;
+    document.getElementById('diffWrap').innerHTML = '';
+    document.getElementById('rankWrap').innerHTML = '';
+    document.getElementById('missWrap').innerHTML = '';
+    return;
+  }
+  _lastEvents = data || [];
+  const tn = document.getElementById('truncNotice');
+  if(_lastEvents.length >= EVENT_LIMIT){
+    tn.textContent = 'Mostrando as ' + EVENT_LIMIT + ' respostas mais recentes desta turma (há mais no banco). '+
+                     'Para o relatório completo, exporte o CSV por período ou apague os dados do bimestre anterior.';
+    tn.classList.remove('hide');
+  } else { tn.classList.add('hide'); }
+  renderDashboard(_lastEvents);
+}
+
+/* ===== Agregação (função PURA — dá para testar no console com dados falsos) =====
+   window.aggregateEvents([{student_name:'Ana',correct:true,score:10,
+     category:'vasos',difficulty:'basico',concept:'Vasodilatação'}, ...])          */
+function aggregateEvents(events){
+  const students={}, concepts={}, byCat={}, byDiff={};
+  let total=0, correct=0, lastAt=null;
+  const bump=(obj,key)=>{ const o=obj[key]||(obj[key]={key:key,answered:0,correct:0}); return o; };
+
+  for(const e of (events||[])){
+    total++; if(e.correct) correct++;
+    if(e.created_at && (!lastAt || e.created_at > lastAt)) lastAt = e.created_at;
+
+    const nm = (e.student_name==null || e.student_name==='') ? '(sem nome)' : String(e.student_name);
+    const s  = students[nm] || (students[nm]={name:nm,answered:0,correct:0,score:0,cat:{},diff:{}});
+    s.answered++; if(e.correct) s.correct++; s.score += (Number(e.score)||0);
+
+    const cat  = e.category   ? String(e.category)   : SEM_CLASS;
+    const diff = e.difficulty ? String(e.difficulty) : SEM_CLASS;
+    const gc = bump(byCat,cat);   gc.answered++; if(e.correct) gc.correct++;
+    const gd = bump(byDiff,diff); gd.answered++; if(e.correct) gd.correct++;
+    const sc = bump(s.cat,cat);   sc.answered++; if(e.correct) sc.correct++;
+    const sd = bump(s.diff,diff); sd.answered++; if(e.correct) sd.correct++;
+
+    if(e.concept){
+      const c = concepts[e.concept] || (concepts[e.concept]={concept:String(e.concept),wrong:0,total:0});
+      c.total++; if(!e.correct) c.wrong++;
+    }
+  }
+  const pct = o => o.answered ? Math.round(o.correct/o.answered*100) : null;
+
+  const ranking = Object.values(students)
+    .map(s=>({...s, acc: s.answered?Math.round(s.correct/s.answered*100):0}))
+    .sort((a,b)=> b.score-a.score || b.acc-a.acc);
+
+  const missed = Object.values(concepts).filter(c=>c.wrong>0)
+    .map(c=>({...c, rate: c.total?Math.round(c.wrong/c.total*100):0}))
+    .sort((a,b)=> b.wrong-a.wrong || b.rate-a.rate);
+
+  // Ordem acionável: eixo mais fraco primeiro. Sem resposta e "sem classificação"
+  // (eventos antigos, gravados antes das colunas) vão para o fim — não são eixo.
+  const rank = (obj, fixed) => {
+    const keys = fixed.slice();
+    for(const k in obj) if(keys.indexOf(k)<0) keys.push(k);
+    const fim = o => (o.key===SEM_CLASS ? 2 : (o.answered ? 0 : 1));
+    return keys.map(k=>{ const o=obj[k]||{key:k,answered:0,correct:0}; return {...o, acc: pct(o)}; })
+               .sort((a,b)=> fim(a)-fim(b) || (a.acc-b.acc));
+  };
+
+  return {
+    total, correct, lastAt,
+    classAcc: total?Math.round(correct/total*100):0,
+    studentCount: ranking.length,
+    ranking, missed,
+    byCat:  rank(byCat,  CAT_ORDER),
+    byDiff: DIFF_ORDER.concat(Object.keys(byDiff).filter(k=>DIFF_ORDER.indexOf(k)<0))
+              .map(k=>{ const o=byDiff[k]||{key:k,answered:0,correct:0}; return {...o, acc: pct(o)}; })
+  };
+}
+window.aggregateEvents = aggregateEvents;   // exposto de propósito (teste manual)
+
+function accClass(acc){ return acc==null?'':(acc<60?'low':(acc<75?'mid':'ok')); }
+function accTag(acc){
+  if(acc==null) return '<span class="muted">sem respostas</span>';
+  const k = accClass(acc);
+  const t = k==='low' ? 'revisar' : (k==='mid' ? 'atenção' : 'ok');
+  return `<span class="tag ${k}">${acc}% · ${t}</span>`;
+}
+function fmtWhen(iso){
+  if(!iso) return '—';
+  const d = new Date(iso); if(isNaN(d)) return '—';
+  const min = Math.round((Date.now()-d.getTime())/60000);
+  if(min < 1)    return 'agora';
+  if(min < 60)   return 'há '+min+' min';
+  if(min < 1440) return 'há '+Math.round(min/60)+' h';
+  return d.toLocaleDateString('pt-BR');
+}
+function fmtDateTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso); if(isNaN(d)) return String(iso);
+  return d.toLocaleString('pt-BR');
+}
+
+function renderDashboard(events){
+  const a = aggregateEvents(events);
+
+  document.getElementById('dashStats').innerHTML =
+    `<span class="stat"><b>${a.studentCount}</b><span>alunos</span></span>`+
+    `<span class="stat"><b>${a.total}</b><span>respostas</span></span>`+
+    `<span class="stat"><b>${a.classAcc}%</b><span>acerto da turma</span></span>`+
+    `<span class="stat"><b>${esc(fmtWhen(a.lastAt))}</b><span>última resposta</span></span>`;
+
+  // Turma sem NENHUMA resposta: explica o caminho todo em vez de "sem dados".
+  if(!a.total){
+    const vazio = `<div class="empty"><b>Nenhuma resposta chegou ainda.</b>
+      Para os resultados aparecerem aqui, cada aluno precisa:
+      <ol>
+        <li>abrir o jogo e, no menu, entrar em <b>Modo Professor</b>;</li>
+        <li>digitar o código <b>${esc(_curClass.class_code)}</b> e o próprio nome;</li>
+        <li><b>aceitar o envio</b> dos resultados (consentimento, LGPD) — sem isso os dados ficam só no computador dele;</li>
+        <li>responder ao menos uma missão de histologia.</li>
+      </ol>
+      ${_curClass.accepting ? '' : '<br><b>Atenção: esta turma está FECHADA</b> — reabra-a acima, senão o banco recusa tudo.'}
+      </div>`;
+    document.getElementById('catWrap').innerHTML  = vazio;
+    document.getElementById('diffWrap').innerHTML = '';
+    document.getElementById('rankWrap').innerHTML = '<p class="muted">O ranking aparece assim que a primeira resposta chegar.</p>';
+    document.getElementById('missWrap').innerHTML = '<p class="muted">Sem dados ainda.</p>';
+    return;
+  }
+
+  const rowsCat = a.byCat.map(c=>{
+    const nome = CAT_LABEL[c.key] || c.key;      // chave desconhecida → escapada abaixo
+    const dica = CAT_HINT[c.key] || '';
+    return `<tr>
+      <td><b>${esc(nome)}</b>${dica?`<br><span class="meta">${esc(dica)}</span>`:''}</td>
+      <td>${c.answered ? `<div class="bar"><i class="${accClass(c.acc)}" style="width:${c.acc}%"></i></div>${accTag(c.acc)}` : accTag(null)}</td>
+      <td class="num">${c.correct}/${c.answered}</td></tr>`;
+  }).join('');
+  document.getElementById('catWrap').innerHTML =
+    `<div class="tblwrap"><table><thead><tr><th>Eixo</th><th>Acerto</th><th class="num">Acertos</th></tr></thead>
+     <tbody>${rowsCat}</tbody></table></div>`;
+
+  const rowsDiff = a.byDiff.map(d=>{
+    const nome = DIFF_LABEL[d.key] || d.key;
+    return `<tr>
+      <td><b>${esc(nome)}</b></td>
+      <td>${d.answered ? `<div class="bar"><i class="${accClass(d.acc)}" style="width:${d.acc}%"></i></div>${accTag(d.acc)}` : accTag(null)}</td>
+      <td class="num">${d.correct}/${d.answered}</td></tr>`;
+  }).join('');
+  document.getElementById('diffWrap').innerHTML =
+    `<div class="tblwrap"><table><thead><tr><th>Nível</th><th>Acerto</th><th class="num">Acertos</th></tr></thead>
+     <tbody>${rowsDiff}</tbody></table></div>`;
+
+  document.getElementById('rankWrap').innerHTML =
+    `<div class="tblwrap"><table><thead><tr><th>#</th><th>Aluno</th><th>Acerto</th><th class="num">Pontos</th></tr></thead><tbody>`+
+    a.ranking.map((s,i)=>`<tr><td>${i+1}º</td><td>${esc(s.name)}</td>
+      <td><div class="bar"><i class="${accClass(s.acc)}" style="width:${s.acc}%"></i></div> ${s.acc}% (${s.correct}/${s.answered})</td>
+      <td class="num">${s.score}</td></tr>`).join('')+`</tbody></table></div>`;
+
+  document.getElementById('missWrap').innerHTML = a.missed.length
+    ? `<div class="tblwrap"><table><thead><tr><th>Conceito</th><th>Erros</th></tr></thead><tbody>`+
+      a.missed.slice(0,15).map(c=>`<tr><td>${esc(c.concept)}</td>
+        <td><div class="bar"><i class="low" style="width:${c.rate}%"></i></div> ${c.wrong} de ${c.total} (${c.rate}%)</td></tr>`).join('')+
+      `</tbody></table></div>`
+    : '<p class="muted">Nenhum erro registrado ainda. 🎉</p>';
+}
+
+/* ===================== EXPORTAR CSV =====================
+   Abre direto na planilha da professora. Sem biblioteca externa. */
+function csvCell(v){
+  let s = (v==null ? '' : String(v));
+  // Nome de aluno é texto DIGITADO PELO ALUNO: uma célula iniciada por = + - @
+  // vira fórmula no Excel/Sheets (CSV injection). O apóstrofo neutraliza.
+  // Números negativos (pontuação) são exceção — senão a coluna vira texto e a
+  // professora não consegue somar no Excel.
+  if(/^[=+\-@\t\r]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) s = "'" + s;
+  if(/[";\n\r]/.test(s))     s = '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function toCsv(rows){ return rows.map(r=>r.map(csvCell).join(';')).join('\r\n'); }
+function downloadCsv(nome, rows){
+  // BOM (U+FEFF) + separador ';' = acentos e colunas corretos no Excel em português
+  const blob = new Blob(['\uFEFF'+toCsv(rows)], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+function slug(s){
+  return String(s||'turma').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+         .replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'turma';
+}
+function csvBase(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return slug(_curSchool && _curSchool.name)+'_'+slug(_curClass && _curClass.name)+'_'+
+         d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+}
+function exportAnswersCsv(){
+  if(!_lastEvents.length) return msg('appMsg','Não há respostas para exportar nesta turma.');
+  const rows = [['data_hora','aluno','colegio','turma','codigo_turma','missao','conceito','eixo','nivel','acertou','pontos']];
+  // do mais antigo para o mais novo: é como a professora lê o histórico
+  _lastEvents.slice().reverse().forEach(e=>rows.push([
+    fmtDateTime(e.created_at), e.student_name||'(sem nome)',
+    (_curSchool&&_curSchool.name)||'', (_curClass&&_curClass.name)||'', e.class_code||'',
+    e.mission_id||'', e.concept||'',
+    e.category ? (CAT_LABEL[e.category]||e.category) : '',
+    e.difficulty ? (DIFF_LABEL[e.difficulty]||e.difficulty) : '',
+    e.correct ? 'sim' : 'nao', (e.score==null?'':e.score)
+  ]));
+  downloadCsv('fazenda37c_respostas_'+csvBase()+'.csv', rows);
+  msg('appMsg','CSV com '+_lastEvents.length+' respostas baixado.', true);
+}
+function exportSummaryCsv(){
+  if(!_lastEvents.length) return msg('appMsg','Não há respostas para exportar nesta turma.');
+  const a = aggregateEvents(_lastEvents);
+  const head = ['aluno','respostas','acertos','acerto_%','pontos'];
+  DIFF_ORDER.forEach(d=>head.push('nivel_'+d+'_%'));
+  CAT_ORDER.forEach(c=>head.push('eixo_'+c+'_%'));
+  const rows = [head];
+  const p = o => (o && o.answered) ? Math.round(o.correct/o.answered*100) : '';  // vazio ≠ 0 %
+  a.ranking.forEach(s=>{
+    const r = [s.name, s.answered, s.correct, s.acc, s.score];
+    DIFF_ORDER.forEach(d=>r.push(p(s.diff[d])));
+    CAT_ORDER.forEach(c=>r.push(p(s.cat[c])));
+    rows.push(r);
+  });
+  // Linha final com a turma inteira — é o número que vai para o relatório
+  const t = ['TURMA (total)', a.total, a.correct, a.classAcc, a.ranking.reduce((x,s)=>x+s.score,0)];
+  a.byDiff.forEach(d=>{ if(DIFF_ORDER.indexOf(d.key)>=0) t.push(d.acc==null?'':d.acc); });
+  CAT_ORDER.forEach(k=>{ const c=a.byCat.find(x=>x.key===k); t.push((c&&c.acc!=null)?c.acc:''); });
+  rows.push(t);
+  downloadCsv('fazenda37c_resumo_'+csvBase()+'.csv', rows);
+  msg('appMsg','CSV de resumo baixado ('+a.ranking.length+' alunos).', true);
+}
+
+async function wipeClassData(){
+  if(!confirm('Apagar TODOS os resultados desta turma? Esta ação não pode ser desfeita.\n\nDica: exporte o CSV antes.')) return;
+  const { error } = await sb.from('quiz_events').delete().eq('class_code', _curClass.class_code);
+  if(error) return msg('appMsg', friendlyError(error,'Não foi possível apagar'));
+  msg('appMsg','Resultados da turma apagados.', true);
+  loadDashboard();
+}
+
+// ===== Sessão inicial =====
+(async function init(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){ _user = data.session.user; enterApp(); }
+})();
+</script>
+</body>
+</html>

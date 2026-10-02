@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 660" width="1220" height="660" role="img" aria-label="Corte histológico da pele mostrando epiderme, derme e hipoderme com suas estruturas">
+  <defs>
+    <linearGradient id="epi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6ddab"/><stop offset="1" stop-color="#e4b478"/>
+    </linearGradient>
+    <linearGradient id="der" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3c3b2"/><stop offset="1" stop-color="#e7a693"/>
+    </linearGradient>
+    <linearGradient id="hyp" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8e7b2"/><stop offset="1" stop-color="#f0d488"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf4e6"/><stop offset="1" stop-color="#f3e8d2"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="50%" cy="42%" r="72%">
+      <stop offset="70%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#3a2a12" stop-opacity=".18"/>
+    </radialGradient>
+    <style>
+      .lbl{font-family:'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:600;fill:#4a3a26;}
+      .band{font-family:'Arial Narrow',Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
+      .lead{stroke:#6a5b45;stroke-width:1.4;fill:none;}
+      .dot{fill:#4a3a26;}
+    </style>
+  </defs>
+
+  <!-- plate -->
+  <rect x="0" y="0" width="1220" height="660" rx="14" fill="url(#plate)"/>
+
+  <!-- ===== skin block (left 620px) ===== -->
+  <g>
+    <!-- HIPODERME -->
+    <rect x="40" y="452" width="560" height="150" fill="url(#hyp)"/>
+    <!-- adipocytes -->
+    <g fill="#fdf4d0" stroke="#e6cd82" stroke-width="2">
+      <circle cx="90" cy="512" r="26"/><circle cx="148" cy="498" r="30"/><circle cx="210" cy="516" r="27"/>
+      <circle cx="270" cy="500" r="31"/><circle cx="330" cy="520" r="25"/><circle cx="388" cy="502" r="29"/>
+      <circle cx="446" cy="520" r="27"/><circle cx="500" cy="500" r="30"/><circle cx="556" cy="516" r="26"/>
+      <circle cx="120" cy="560" r="24"/><circle cx="240" cy="562" r="26"/><circle cx="360" cy="560" r="23"/><circle cx="480" cy="562" r="25"/>
+    </g>
+    <!-- large vessel in hypodermis -->
+    <path d="M40 578 q120 -22 250 0 t270 -4" stroke="#cf463b" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <path d="M40 592 q120 -18 250 2 t270 -2" stroke="#3f7fbf" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+    <!-- DERME -->
+    <rect x="40" y="162" width="560" height="290" fill="url(#der)"/>
+    <!-- collagen fibers -->
+    <g stroke="#e0998a" stroke-width="1.3" fill="none" opacity=".55">
+      <path d="M50 210 q90 18 180 2 t190 8 t150 -6"/><path d="M60 250 q80 -16 170 4 t200 -6 t150 8"/>
+      <path d="M50 300 q100 20 200 0 t180 6 t140 -8"/><path d="M60 350 q90 -14 180 6 t190 -4 t150 6"/>
+      <path d="M50 400 q100 16 200 -2 t180 8 t140 -6"/>
+    </g>
+
+    <!-- dermal papillae + basal wavy junction -->
+    <path d="M40 176 q20 -18 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 L600 162 L40 162 Z" fill="url(#epi)"/>
+    <path d="M40 176 q20 -18 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" stroke="#b9763f" stroke-width="2.4" fill="none"/>
+
+    <!-- EPIDERME -->
+    <rect x="40" y="70" width="560" height="94" fill="url(#epi)"/>
+    <!-- corneum flakes on top -->
+    <path d="M40 70 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 l24 -9 l24 9 L600 70 Z" fill="#fae6bd"/>
+    <!-- basal cells + melanocyte -->
+    <g>
+      <g fill="#d79a5e"><circle cx="120" cy="156" r="5"/><circle cx="150" cy="158" r="5"/><circle cx="180" cy="156" r="5"/><circle cx="360" cy="158" r="5"/><circle cx="392" cy="156" r="5"/><circle cx="470" cy="158" r="5"/><circle cx="500" cy="156" r="5"/></g>
+      <!-- melanocyte (dark dendritic) -->
+      <path d="M300 158 l-10 -8 M300 158 l10 -8 M300 158 l-12 3 M300 158 l12 3 M300 158 l0 -12" stroke="#4a3120" stroke-width="2"/>
+      <circle cx="300" cy="158" r="6" fill="#3a2416"/>
+    </g>
+
+    <!-- ===== structures ===== -->
+    <!-- hair shaft + follicle (diagonal) -->
+    <g>
+      <path d="M250 30 L262 70 L286 452" stroke="#6b4a2a" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M262 70 L286 452" stroke="#4e3620" stroke-width="2.5" fill="none" opacity=".5"/>
+      <!-- follicle bulb -->
+      <ellipse cx="288" cy="452" rx="20" ry="24" fill="#c99a63" stroke="#8a5c33" stroke-width="2.5"/>
+      <ellipse cx="288" cy="460" rx="10" ry="9" fill="#e7a693"/>
+      <!-- sebaceous gland (lobes) -->
+      <g fill="#f2c84b" stroke="#c99a1e" stroke-width="1.6">
+        <circle cx="228" cy="250" r="15"/><circle cx="216" cy="272" r="13"/><circle cx="244" cy="272" r="13"/><circle cx="230" cy="290" r="12"/>
+      </g>
+      <path d="M244 268 L272 230" stroke="#c99a1e" stroke-width="4" fill="none"/>
+      <!-- arrector pili muscle -->
+      <path d="M300 200 L272 236" stroke="#d97a5a" stroke-width="7" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- eccrine sweat gland: coil deep + duct to pore -->
+    <g>
+      <path d="M470 168 C466 250 452 300 452 350" stroke="#3f92cf" stroke-width="4.5" fill="none"/>
+      <path d="M452 350 c-30 6 -34 34 -20 50 c14 16 44 12 50 -6 c6 -18 -10 -30 -26 -26 c-16 4 -18 24 -6 34 c12 10 30 4 32 -8"
+            stroke="#3f92cf" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <!-- pore + sweat droplet -->
+      <circle cx="470" cy="70" r="6" fill="#cfe6f5" stroke="#3f92cf" stroke-width="2"/>
+      <path d="M470 46 c-7 8 -10 14 -10 19 a10 10 0 0 0 20 0 c0 -5 -3 -11 -10 -19 z" fill="#6fb7e8"/>
+    </g>
+
+    <!-- capillary loop into a papilla -->
+    <path d="M96 452 L100 210 c0 -18 26 -18 26 0 L128 452" stroke="#cf463b" stroke-width="4" fill="none"/>
+
+    <!-- Meissner corpuscle in papilla -->
+    <ellipse cx="160" cy="196" rx="9" ry="14" fill="#c79bde" stroke="#8e5cae" stroke-width="1.6"/>
+    <!-- Pacinian corpuscle (deep, onion) -->
+    <g fill="none" stroke="#caa27a" stroke-width="2">
+      <ellipse cx="530" cy="410" rx="30" ry="22"/><ellipse cx="530" cy="410" rx="22" ry="15"/><ellipse cx="530" cy="410" rx="13" ry="9"/>
+    </g>
+    <circle cx="530" cy="410" r="4" fill="#8a6a44"/>
+    <path d="M530 432 q-6 20 -30 20" stroke="#caa27a" stroke-width="3" fill="none"/>
+
+    <rect x="40" y="70" width="560" height="532" fill="url(#vig)" rx="4"/>
+  </g>
+
+  <!-- ===== band labels (right) ===== -->
+  <g class="band">
+    <text x="616" y="122" fill="#b8863a">EPIDERME</text>
+    <text x="616" y="312" fill="#c56b52">DERME</text>
+    <text x="616" y="536" fill="#c9a53a">HIPODERME</text>
+  </g>
+  <g class="lbl" fill="#7a6a52" font-weight="500" font-size="12.5">
+    <text x="616" y="140">epitélio · queratinócitos</text>
+    <text x="616" y="330">tec. conjuntivo · vasos · anexos</text>
+    <text x="616" y="554">tecido adiposo (isolante)</text>
+  </g>
+
+  <!-- ===== leader labels (structures) ===== -->
+  <g class="lbl">
+    <!-- estrato córneo / poro -->
+    <path class="lead" d="M470 44 L470 22 L820 22"/><circle class="dot" cx="470" cy="44" r="3"/>
+    <text x="826" y="27">Poro + suor (evaporação resfria)</text>
+
+    <path class="lead" d="M300 150 L300 128 L820 128"/><circle class="dot" cx="300" cy="150" r="3"/>
+    <text x="826" y="133">Melanócito (melanina · proteção UV)</text>
+
+    <path class="lead" d="M160 190 L360 170 L820 170"/><circle class="dot" cx="160" cy="190" r="3"/>
+    <text x="826" y="175">Papila dérmica + corpúsculo de Meissner</text>
+
+    <path class="lead" d="M112 300 L112 300 L112 300"/>
+    <path class="lead" d="M112 320 L400 360 L820 360"/><circle class="dot" cx="112" cy="320" r="3"/>
+    <text x="826" y="365">Alça capilar (eritema = vasodilatação)</text>
+
+    <path class="lead" d="M228 262 L228 240 L560 220 L820 220"/><circle class="dot" cx="228" cy="262" r="3"/>
+    <text x="826" y="225">Glândula sebácea (sebo)</text>
+
+    <path class="lead" d="M286 236 L286 236" /><path class="lead" d="M284 210 L560 268 L820 268"/><circle class="dot" cx="286" cy="218" r="3"/>
+    <text x="826" y="273">M. eretor do pelo (piloereção)</text>
+
+    <path class="lead" d="M288 452 L340 470 L820 470"/><circle class="dot" cx="288" cy="452" r="3"/>
+    <text x="826" y="475">Folículo piloso (origem do pelo)</text>
+
+    <path class="lead" d="M452 360 L452 340 L560 316 L820 316"/><circle class="dot" cx="452" cy="360" r="3"/>
+    <text x="826" y="321">Glândula sudorípara écrina</text>
+
+    <path class="lead" d="M530 410 L620 430 L820 430"/><circle class="dot" cx="530" cy="410" r="3"/>
+    <text x="826" y="435">Corpúsculo de Pacini (pressão)</text>
+
+    <path class="lead" d="M300 578 L360 600 L820 600"/><circle class="dot" cx="300" cy="578" r="3"/>
+    <text x="826" y="605">Vaso sanguíneo (artéria / veia)</text>
+
+    <path class="lead" d="M270 500 L340 520 L820 520"/><circle class="dot" cx="270" cy="500" r="3"/>
+    <text x="826" y="525">Adipócitos (tecido adiposo)</text>
+  </g>
+</svg>

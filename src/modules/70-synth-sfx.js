@@ -1,0 +1,225 @@
+/* ============================================================
+   Synth SFX — procedurally generated UI/feedback sounds
+   ============================================================
+   These are short Web-Audio-only sounds for events that don't have
+   a dedicated WAV file. They're cheap (no asset bloat) and give
+   crisp game-feel feedback for actions like quiz answers,
+   achievement unlocks, scene transitions, and UI clicks.
+
+   All sounds respect `soundEnabled` and the AudioManager master volume.
+
+   Exposed (window):
+     synthSfx.chimeOk()         pleasant "correct/good" chime
+     synthSfx.chimeBad()        soft "wrong" tone
+     synthSfx.achievement()     ascending three-note arpeggio
+     synthSfx.levelup()         triumphant fanfare (rank up)
+     synthSfx.sparkle()         bright rising sparkle (new concept)
+     synthSfx.whoosh()          short low-pitched whoosh (scene transition)
+     synthSfx.click()           subtle UI click
+     synthSfx.door()            door open thump
+     synthSfx.bubble()          single water-bubble blip (pot cooking)
+     synthSfx.splash()          fishing splash
+     synthSfx.sleep()           gentle two-note "going to bed" sound
+     synthSfx.pop()             short pop (deposit / pickup)
+     synthSfx.spray()           misting spray
+   ============================================================ */
+(function(){
+  let _ctx = null;
+  let _master = null;
+  const _voices=new Set(),_timers=new Set();
+  let _suspended=false;
+  function _later(fn,ms){
+    if(_suspended||(typeof soundEnabled!=='undefined'&&!soundEnabled)||(typeof AudioManager!=='undefined'&&AudioManager.master<=0))return;
+    const id=setTimeout(()=>{_timers.delete(id);fn();},ms);_timers.add(id);return id;
+  }
+  function _stopAll(){
+    for(const id of _timers)clearTimeout(id);_timers.clear();
+    for(const voice of [..._voices]){try{voice.source.stop();}catch{}voice.cleanup();}
+  }
+  function _track(source,nodes){
+    if(_voices.size>=24){const old=_voices.values().next().value;try{old.source.stop();}catch{}old.cleanup();}
+    const voice={source,cleanup(){for(const node of nodes)try{node.disconnect();}catch{}_voices.delete(voice);}};
+    _voices.add(voice);source.onended=voice.cleanup;
+  }
+
+  function _ensure(){
+    if(typeof soundEnabled !== 'undefined' && !soundEnabled) return false;
+    if(_suspended || (typeof AudioManager!=='undefined' && AudioManager.master<=0))return false;
+    if(_ctx){if(_ctx.state==='suspended')_ctx.resume().catch(()=>{});return true;}
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      _ctx = new AC();
+      _master = _ctx.createGain();
+      _master.gain.value = 0.55;
+      const limiter=_ctx.createDynamicsCompressor();
+      limiter.threshold.value=-10;limiter.knee.value=12;limiter.ratio.value=5;
+      limiter.attack.value=.003;limiter.release.value=.12;
+      _master.connect(limiter);limiter.connect(_ctx.destination);
+    } catch(e){ return false; }
+    return true;
+  }
+
+  function _vol(){
+    const m = (typeof AudioManager !== 'undefined') ? (AudioManager.master ?? 0.75) : 0.75;
+    const enabled = (typeof soundEnabled === 'undefined') ? true : !!soundEnabled;
+    if(_master && _ctx){_master.gain.cancelScheduledValues(_ctx.currentTime);_master.gain.value=enabled?0.55*m:0;}
+    if(!enabled||m<=0)_stopAll();
+    return enabled && m>0 ? 1 : 0;
+  }
+
+  // Schedule an envelope: attack → sustain → release on a gain node
+  function _env(gain, t0, attack, hold, release, peak){
+    gain.cancelScheduledValues(t0);
+    gain.setValueAtTime(0, t0);
+    gain.linearRampToValueAtTime(peak, t0 + attack);
+    gain.linearRampToValueAtTime(peak * 0.8, t0 + attack + hold);
+    gain.linearRampToValueAtTime(0, t0 + attack + hold + release);
+  }
+
+  // Play a single tone with envelope
+  function _tone({ freq, type='sine', dur=0.15, vol=0.3, attack=0.005, release=0.08, detune=0, filter=null }){
+    if(!_ensure()) return;
+    const v = _vol();
+    if(v <= 0) return;
+    const t0 = _ctx.currentTime;
+    const osc = _ctx.createOscillator();
+    const gain = _ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    if(detune) osc.detune.value = detune;
+    let last = osc;
+    const nodes=[osc,gain];
+    if(filter){
+      const lp = _ctx.createBiquadFilter();
+      lp.type = filter.type || 'lowpass';
+      lp.frequency.value = filter.freq || 2000;
+      lp.Q.value = filter.Q || 0.7;
+      last.connect(lp);
+      nodes.push(lp);
+      last = lp;
+    }
+    last.connect(gain);
+    gain.connect(_master);
+    _track(osc,nodes);
+    _env(gain.gain, t0, attack, Math.max(0, dur - attack - release), release, vol * v);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+
+  // Brief broadband noise burst (useful for whoosh / splash)
+  function _noiseBurst({ dur=0.25, vol=0.25, filterFreq=800, filterType='lowpass', sweep=0 }){
+    if(!_ensure()) return;
+    const v = _vol();
+    if(v <= 0) return;
+    const t0 = _ctx.currentTime;
+    const sampleRate = _ctx.sampleRate;
+    const buf = _ctx.createBuffer(1, Math.ceil(sampleRate * dur), sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0; i<data.length; i++) data[i] = (Math.random()*2 - 1);
+    const src = _ctx.createBufferSource();
+    src.buffer = buf;
+    const lp = _ctx.createBiquadFilter();
+    lp.type = filterType;
+    lp.frequency.value = filterFreq;
+    lp.Q.value = 0.6;
+    if(sweep !== 0){
+      lp.frequency.setValueAtTime(filterFreq, t0);
+      lp.frequency.linearRampToValueAtTime(filterFreq + sweep, t0 + dur);
+    }
+    const gain = _ctx.createGain();
+    src.connect(lp); lp.connect(gain); gain.connect(_master);
+    _track(src,[src,lp,gain]);
+    _env(gain.gain, t0, 0.01, dur*0.6, dur*0.4, vol * v);
+    src.start(t0);
+    src.stop(t0 + dur + 0.05);
+  }
+
+  // ===== Sound effects =====
+  const synthSfx = {
+    chimeOk(){
+      // Two-note major-third major chord (G + B + D approximate)
+      _tone({ freq: 784, type: 'sine', dur: 0.18, vol: 0.30, release: 0.12 });
+      _tone({ freq: 988, type: 'sine', dur: 0.22, vol: 0.22, release: 0.16 });
+      _later(()=>_tone({ freq: 1175, type: 'sine', dur: 0.30, vol: 0.20, release: 0.20 }), 80);
+    },
+    chimeBad(){
+      // Two-note minor descent (suggests "wrong")
+      _tone({ freq: 392, type: 'triangle', dur: 0.20, vol: 0.28, release: 0.14 });
+      _later(()=>_tone({ freq: 311, type: 'triangle', dur: 0.30, vol: 0.25, release: 0.20 }), 110);
+    },
+    achievement(){
+      // Ascending C-E-G-C arpeggio
+      const notes = [523, 659, 784, 1047];
+      notes.forEach((f, i)=>{
+        _later(()=>_tone({ freq: f, type: 'triangle', dur: 0.22, vol: 0.28, release: 0.18 }), i*90);
+      });
+    },
+    levelup(){
+      // Fanfarra ascendente mais rica que achievement — usada ao subir de nível
+      const notes = [523, 659, 784, 1047, 1319];
+      notes.forEach((f, i)=>{
+        _later(()=>_tone({ freq: f, type: 'triangle', dur: 0.26, vol: 0.30, release: 0.20 }), i*80);
+      });
+      // brilho sustentado no topo
+      _later(()=>_tone({ freq: 1568, type: 'sine', dur: 0.55, vol: 0.16, release: 0.42 }), 420);
+      _later(()=>_tone({ freq: 2093, type: 'sine', dur: 0.45, vol: 0.10, release: 0.38 }), 470);
+    },
+    sparkle(){
+      // Brilho curto ascendente — usado ao desbloquear um novo conceito
+      _tone({ freq: 1318, type: 'sine', dur: 0.12, vol: 0.18, release: 0.10 });
+      _later(()=>_tone({ freq: 1760, type: 'sine', dur: 0.14, vol: 0.16, release: 0.12 }), 70);
+      _later(()=>_tone({ freq: 2093, type: 'sine', dur: 0.18, vol: 0.14, release: 0.14 }), 150);
+    },
+    whoosh(){
+      _noiseBurst({ dur: 0.32, vol: 0.18, filterFreq: 300, sweep: 800, filterType: 'lowpass' });
+    },
+    click(){
+      _tone({ freq: 1800, type: 'square', dur: 0.04, vol: 0.10, attack: 0.001, release: 0.025 });
+    },
+    door(){
+      // Wood thump — low triangle + click
+      _tone({ freq: 110, type: 'triangle', dur: 0.18, vol: 0.30, attack: 0.005, release: 0.14 });
+      _later(()=>_tone({ freq: 90, type: 'sine', dur: 0.12, vol: 0.18, release: 0.10 }), 30);
+    },
+    bubble(){
+      // Single water bubble — rising sine + decay
+      if(!_ensure()) return;
+      const v = _vol(); if(v <= 0) return;
+      const t0 = _ctx.currentTime;
+      const osc = _ctx.createOscillator();
+      const gain = _ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(380, t0);
+      osc.frequency.exponentialRampToValueAtTime(900, t0 + 0.10);
+      osc.connect(gain); gain.connect(_master);
+      _track(osc,[osc,gain]);
+      _env(gain.gain, t0, 0.005, 0.04, 0.08, 0.18 * v);
+      osc.start(t0); osc.stop(t0 + 0.20);
+    },
+    splash(){
+      // Quick water splash
+      _noiseBurst({ dur: 0.22, vol: 0.30, filterFreq: 1500, filterType: 'bandpass', sweep: -800 });
+      _later(()=>{
+        _tone({ freq: 250, type: 'sine', dur: 0.20, vol: 0.18, release: 0.16 });
+      }, 40);
+    },
+    sleep(){
+      // Soft "going to bed" two-note descent
+      _tone({ freq: 440, type: 'sine', dur: 0.30, vol: 0.22, release: 0.24 });
+      _later(()=>_tone({ freq: 330, type: 'sine', dur: 0.40, vol: 0.18, release: 0.30 }), 150);
+    },
+    pop(){
+      _tone({ freq: 600, type: 'sine', dur: 0.06, vol: 0.20, attack: 0.002, release: 0.04 });
+    },
+    spray(){
+      _noiseBurst({ dur: 0.45, vol: 0.15, filterFreq: 3000, filterType: 'highpass', sweep: -1500 });
+    },
+  };
+
+  synthSfx.syncVolume=_vol;
+  synthSfx.stopAll=_stopAll;
+  synthSfx.suspend=()=>{_suspended=true;_stopAll();return _ctx&&_ctx.state!=='closed'?_ctx.suspend():Promise.resolve();};
+  synthSfx.resume=()=>{_suspended=false;return _ctx&&_ctx.state==='suspended'?_ctx.resume():Promise.resolve();};
+  synthSfx.state=()=>({context:_ctx?.state||'not-created',voices:_voices.size,timers:_timers.size,master:_master?.gain.value??null});
+  window.synthSfx = synthSfx;
+})();
