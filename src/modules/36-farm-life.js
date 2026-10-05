@@ -14,9 +14,9 @@
   compota:{name:'Compota de frutas',icon:'🫙',description:'Um lanche da fazenda: recupera até 22 de energia e 8 de hidratação.'}};
  const STOCK_IDS=['mel','fruta','leite','ovos','compota'];
  const PROJECTS=[
-  {id:'oficina',name:'Oficina de Tomás',description:'Uma bancada esquecida, um tear pequeno e ferramentas que ainda têm conserto. Tomás faz os encaixes; Inês ensina as costuras.',benefit:'Libera cobertores e luvas; o trabalho aparece no mapa.',x:280,y:1096,cost:{coins:18,items:{wood:3,wool:1}}},
-  {id:'cozinha',name:'Cozinha do encontro',description:'Rosa guardou o fogareiro. Você traz a lenha; os moradores trazem suas receitas.',benefit:'Libera sopa, chá com mel, compota e preparo de ração.',x:176,y:1096,cost:{coins:24,items:{wood:4,veg:1}}},
-  {id:'apiario',name:'Apiário dos três ventos',description:'Reparar as caixas e plantar flores devolve abrigo às abelhas do pomar.',benefit:'Produz mel a cada 90 segundos de jogo ativo; até 3 por coleta.',x:808,y:1072,cost:{coins:22,items:{wood:4,hay:2}}},
+  {id:'oficina',name:'Oficina de Tomás',description:'Uma bancada esquecida junto ao celeiro e ferramentas que ainda têm conserto. Tomás faz os encaixes; Inês ensina as costuras.',benefit:'Libera cobertores e luvas; o trabalho aparece no mapa.',x:432,y:792,cost:{coins:18,items:{wood:3,wool:1}}},
+  {id:'cozinha',name:'Cozinha do encontro',description:'Rosa guardou o fogareiro junto à casa. Você traz a lenha; os moradores trazem suas receitas.',benefit:'Libera sopa, chá com mel, compota e preparo de ração.',x:244,y:848,cost:{coins:24,items:{wood:4,veg:1}}},
+  {id:'apiario',name:'Apiário dos três ventos',description:'Reparar as caixas e plantar flores devolve abrigo às abelhas do pomar.',benefit:'Produz mel a cada 90 segundos de jogo ativo; até 3 por coleta.',x:880,y:976,cost:{coins:22,items:{wood:4,hay:2}}},
   {id:'irrigacao',name:'Bomba e canais da horta',description:'Tomás reconhece a velha bomba do vale. Conserte o mecanismo e recarregue o reservatório.',benefit:'Duas águas irrigam até 6 canteiros secos, um a cada 12 segundos ativos.',x:344,y:1016,cost:{coins:26,items:{wood:5}}}
  ];
  const RECIPES=[
@@ -28,12 +28,12 @@
   {id:'racao',name:'Ração da colheita',description:'Aproveite vegetais e feno para alimentar os animais. Uma mistura rende 6 fenos.',projectId:'cozinha',cost:{items:{veg:1,hay:1}},result:{id:'hay',amount:6,source:'inv'}}
  ];
  const PRODUCTION=[
-  {id:'mel',name:'Colher mel no apiário',item:'mel',projectId:'apiario',x:808,y:1072,cycleSeconds:90},
+  {id:'mel',name:'Colher mel no apiário',item:'mel',projectId:'apiario',x:880,y:976,cycleSeconds:90},
   {id:'pomar',name:'Colher frutos do pomar',item:'fruta',projectId:null,x:856,y:928,cycleSeconds:70},
-  {id:'leite',name:'Ordenhar o curral',item:'leite',projectId:null,x:512,y:918,kind:'cow',cycleSeconds:100},
-  {id:'ovos',name:'Recolher os ovos',item:'ovos',projectId:null,x:512,y:918,kind:'chicken',cycleSeconds:80}
+  {id:'leite',name:'Ordenhar o curral',item:'leite',projectId:null,x:548,y:918,kind:'cow',cycleSeconds:100},
+  {id:'ovos',name:'Recolher os ovos',item:'ovos',projectId:null,x:548,y:918,kind:'chicken',cycleSeconds:80}
  ];
- const BOARD={id:'quadro',name:'Quadro de encomendas',x:568,y:1290};
+ const BOARD={id:'quadro',name:'Quadro de encomendas',x:566,y:1276};
  const ORDERS=[
   {id:'cesta-rosa',npcId:'rosa',title:'A cesta de Rosa',description:'Rosa leva uma cesta às pessoas que ainda não conseguem visitar a feira.',cost:{items:{veg:2,fruta:1}},reward:64},
   {id:'fio-ines',npcId:'ines',title:'Fios e cuidado',description:'Inês prepara um cobertor para a cabana e guarda mel para o chá de quem chega.',cost:{items:{wool:2,mel:1}},reward:42},
@@ -45,11 +45,11 @@
  const CLUES=[
   {id:'carta-perdida',title:'Uma dobra na carta',x:264,y:928,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Uma dobra guarda terra fresca da horta.'},
   {id:'ponte-marca',title:'Marcas sob a ponte',x:720,y:936,text:'O verso da placa tem uma seta feita para virar. Tomás reconhece o encaixe: estas marcas orientavam as trocas antes da ventania.'},
-  {id:'horta-caderno',title:'O caderno da horta',x:408,y:984,text:'Três colunas dizem “alto, margem, areia”. São os lugares de quem guardou as amostras antes da ventania, não coordenadas de um tesouro.'},
+  {id:'horta-caderno',title:'O caderno da horta',x:332,y:976,text:'Três colunas dizem “alto, margem, areia”. São os lugares de quem guardou as amostras antes da ventania, não coordenadas de um tesouro.'},
   {id:'cabana-fita',title:'Uma fita na cabana',x:520,y:272,text:'Uma fita de lã prende um recado de Inês, datado de antes da ventania: “Reserva entregue; se a neve fechar a rota, a próxima tentativa continua aqui.”'},
   {id:'oasis-caixa',title:'A caixa do oásis',x:640,y:1812,text:'A etiqueta tem as assinaturas de Rosa e Caio: “Esta reserva pertence ao vale. Não confundir troca com dívida.” A rede também alcançava o oásis.'},
   {id:'mapa-nico',title:'O mapa de Nico',x:392,y:1000,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Você já conhecia esta ideia.'},
-  {id:'arquivo-casa',title:'O arquivo da Casa',x:608,y:1280,text:'O acordo distribuía amostras entre os três biomas e previa encontros para comparar o que crescia. Os papéis voaram; o silêncio desfez os encontros. As sementes já estavam protegidas pela rede.'}
+  {id:'arquivo-casa',title:'O arquivo da Casa',x:650,y:1274,text:'O acordo distribuía amostras entre os três biomas e previa encontros para comparar o que crescia. Os papéis voaram; o silêncio desfez os encontros. As sementes já estavam protegidas pela rede.'}
  ];
  let callbacks={},API=null,state=fresh(),animalCache={objects:null,length:0,list:[]};
  const sprites=new Map();
@@ -94,7 +94,7 @@
  function deliverOrder(id){const d=ORDERS.find(o=>o.id===id);if(!d)return answer(false,'Encomenda desconhecida.');const p=player(),row=state.orders[id],why=pointReason(BOARD)||(row.cooldown>0?'Esta encomenda volta em '+Math.ceil(row.cooldown)+' segundos de jogo ativo.':'')||costReason(d.cost,p)||(count(p?.coins,MAX_COUNT)+d.reward>MAX_COUNT?'A bolsa de moedas está cheia.':'');if(why)return answer(false,why);pay(d.cost,p);row.deliveries=Math.min(MAX_COUNT,row.deliveries+1);row.cooldown=180;p.coins=count(p.coins,MAX_COUNT)+d.reward;state.totals.orders=Math.min(MAX_COUNT,state.totals.orders+1);return announce('order',{orderId:id,npcId:d.npcId,coins:d.reward,amount:1,delivery:row.deliveries},'Encomenda entregue: +'+d.reward+' moedas. O morador agradece o seu trabalho.');}
  function inspect(id){const def=CLUES.find(c=>c.id===id);if(!def)return answer(false,'Pista desconhecida.');const d=clue(def),why=pointReason(d,38);if(why)return answer(false,why);const row=state.clues[id],first=!row.found;row.found=true;row.reads=Math.min(MAX_COUNT,row.reads+1);return announce('inspect',{clueId:id,first,text:d.text,title:d.title},d.text);}
  function consume(id){if(id!=='compota')return answer(false,'Este produto deve ser usado numa receita ou encomenda.');const p=player();if(!p||p.dead)return answer(false,'Comece uma partida para consumir o lanche.');if(!state.stock.compota)return answer(false,'Prepare compota na cozinha primeiro.');if(!Number.isFinite(p.en)||!Number.isFinite(p.hyd))return answer(false,'O estado do jogador ainda não está disponível.');const energy=Math.max(0,Math.min(22,100-p.en)),water=Math.max(0,Math.min(8,100-p.hyd));if(!energy&&!water)return answer(false,'Você já está com energia e hidratação completas. Guarde o lanche.');state.stock.compota--;p.en=Math.min(100,p.en+energy);p.hyd=Math.min(100,p.hyd+water);return announce('use',{item:'compota',amount:1,energy,hydration:water},'Compota: +'+Math.round(energy)+' energia e +'+Math.round(water)+' hidratação.');}
- const CORRAL={id:'curral',name:'Curral',x:512,y:918};
+ const CORRAL={id:'curral',name:'Curral',x:548,y:918};
  function care(id){if(id!=='curral')return answer(false,'Cuidado desconhecido.');const p=player(),list=animals(),cost={items:{hay:2,water:1}},why=pointReason(CORRAL)||(!list.length?'Não há animais neste curral.':'')||(list.every(a=>Number(a.well??.85)>=.9)?'Os animais já estão bem alimentados.':'')||costReason(cost,p);if(why)return answer(false,why);pay(cost,p);for(const a of list)a.well=1;return announce('care',{kind:'curral',animals:list.length},'Feno e água fresca para o curral. Animais alimentados voltam a produzir.');}
  function refillIrrigation(){const p=player(),d=project('irrigacao'),cost={items:{water:2}},why=!built(d.id)?'Recupere a bomba da horta primeiro.':pointReason(d)||(state.irrigation.charges>0?'O reservatório ainda tem '+state.irrigation.charges+' regas.':'')||costReason(cost,p);if(why)return answer(false,why);pay(cost,p);state.irrigation.charges=6;state.irrigation.elapsed=0;return announce('care',{kind:'irrigacao',charges:6},'Reservatório abastecido: até 6 canteiros secos serão regados.');}
  function cropSet(value){const r=value||read();return r.mainCrops||API?.scenes?.main?.crops||r.crops||{};}
@@ -143,46 +143,73 @@
  function R(g,c,x,y,w,h){g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
  const P={ink:'#2b4036',dark:'#5c4d3b',wood:'#92754d',light:'#c9a56b',cream:'#eee0b2',green:'#65865f',sage:'#a4b985',clay:'#b46f54',water:'#65adb5',amber:'#e1b957'};
  function cached(key,width,height,paint){let c=sprites.get(key);if(!c){c=document.createElement('canvas');c.width=width;c.height=height;paint(c.getContext('2d'));sprites.set(key,c);}return c;}
- function roof(g,x,y,w,color){for(let row=0;row<12;row++){const edge=Math.floor(row/2);R(g,row===11?P.dark:color,x-edge,y+row,w+edge*2,1);if(row%4===1)R(g,P.light,x-edge,y+row,w+edge*2,1);}R(g,P.dark,x-6,y+12,w+12,3);}
+ // As atividades usam móveis e anexos do cenário, sem toldos ou placas soltas.
+ // O contato no chão permanece pequeno e coincide com o volume de colisão.
  function paintProject(g,id,done){
-  const x=10,y=14;R(g,'rgba(32,50,38,.2)',x-3,68,66,7);R(g,'#b1a075',x,63,58,9);R(g,P.dark,x,69,60,3);R(g,P.cream,x+1,63,58,2);
-  if(!done){
-   R(g,P.dark,x+2,44,3,23);R(g,P.dark,x+50,44,3,23);R(g,P.wood,x+2,43,51,3);R(g,P.light,x+4,43,48,1);
-   for(let n=0;n<3;n++){R(g,P.wood,x+8+n*4,57+n*3,32,3);R(g,P.light,x+8+n*4,57+n*3,30,1);}R(g,P.dark,x+17,34,28,19);R(g,P.cream,x+18,35,26,17);R(g,P.green,x+21,38,20,1);R(g,P.dark,x+21,43,14,1);R(g,P.dark,x+21,47,18,1);return;
-  }
+  R(g,'rgba(32,50,38,.16)',7,39,34,4);
   if(id==='oficina'){
-   R(g,P.dark,x+4,y+8,3,48);R(g,P.dark,x+51,y+8,3,48);roof(g,x+2,y,54,P.green);R(g,P.dark,x+5,49,50,6);R(g,P.wood,x+5,49,50,3);R(g,P.light,x+6,49,47,1);R(g,P.dark,x+9,53,4,13);R(g,P.dark,x+45,53,4,13);
-   R(g,P.wood,x+11,27,17,21);R(g,P.dark,x+13,29,2,20);R(g,P.dark,x+24,29,2,20);for(let n=0;n<6;n++)R(g,P.cream,x+15+n,31,1,14);R(g,P.clay,x+15,36,10,5);R(g,P.water,x+16,38,8,1);R(g,P.dark,x+34,39,12,8);R(g,P.light,x+35,40,10,2);R(g,P.dark,x+41,29,2,12);R(g,P.light,x+37,29,10,3);
+   R(g,P.dark,10,27,28,5);R(g,P.wood,10,26,28,4);R(g,P.light,10,26,28,1);
+   R(g,P.dark,12,31,3,10);R(g,P.dark,33,31,3,done?10:6);R(g,P.wood,14,36,20,3);
+   if(done){R(g,P.cream,15,23,10,3);R(g,P.clay,16,23,8,1);R(g,P.dark,29,16,2,10);R(g,'#aeb3a0',26,16,8,3);R(g,P.dark,22,23,11,2);R(g,P.light,32,21,3,4);}
+   else{R(g,P.dark,25,26,3,4);R(g,P.wood,14,38,15,2);R(g,'#aeb3a0',19,23,7,2);}
   }else if(id==='cozinha'){
-   R(g,P.dark,x+4,y+7,3,50);R(g,P.dark,x+52,y+7,3,50);roof(g,x+2,y,55,P.clay);R(g,P.dark,x+5,49,49,6);R(g,P.wood,x+5,49,49,3);R(g,P.light,x+6,49,47,1);R(g,P.dark,x+10,53,4,13);R(g,P.dark,x+47,53,4,13);
-   R(g,'#83877b',x+7,34,19,18);R(g,P.dark,x+9,44,15,6);R(g,P.amber,x+12,46,8,3);R(g,P.dark,x+10,30,13,6);R(g,'#bfc1a7',x+11,30,11,3);R(g,P.cream,x+14,28,6,2);R(g,P.cream,x+34,43,12,5);R(g,P.wood,x+33,40,14,3);R(g,P.clay,x+38,32,7,8);R(g,P.cream,x+39,33,5,1);R(g,P.green,x+42,25,3,7);
+   R(g,'#7f8174',12,25,24,15);R(g,'#a3a48e',12,25,22,2);R(g,P.dark,12,37,24,3);
+   for(let y=29;y<37;y+=4){R(g,'#626d60',13,y,22,1);R(g,'#626d60',y%3?20:27,y-2,1,3);}
+   R(g,P.dark,18,31,10,6);R(g,done?P.clay:P.dark,19,32,8,4);if(done)R(g,P.amber,21,34,4,2);
+   R(g,P.dark,16,20,16,6);R(g,done?'#bec1aa':'#858b7b',17,20,14,4);R(g,P.cream,19,19,10,1);R(g,P.dark,22,17,4,2);
+   if(done){R(g,P.dark,33,13,3,13);R(g,'#b2b3a1',33,13,2,12);R(g,P.wood,10,40,6,2);R(g,P.wood,31,40,8,2);}else{R(g,P.dark,23,21,2,4);R(g,'#787b6d',13,40,10,2);}
   }else if(id==='apiario'){
-   for(let n=0;n<2;n++){const xx=x+7+n*27;R(g,P.dark,xx,58,3,10);R(g,P.dark,xx+14,58,3,10);R(g,P.wood,xx-2,36,20,23);for(let row=0;row<3;row++){R(g,P.light,xx-2,37+row*7,19,2);R(g,P.dark,xx-2,43+row*7,20,1);}roof(g,xx-2,25,20,P.green);R(g,P.ink,xx+3,55,10,2);R(g,P.cream,xx+4,38,7,2);}
-   for(let n=0;n<7;n++){const xx=x-1+n*10,yy=60+n%2*3;R(g,P.green,xx,yy,1,8);R(g,n%2?P.clay:P.amber,xx-2,yy-2,5,3);R(g,P.cream,xx,yy-1,1,1);}
+   for(let n=0;n<2;n++){const x=5+n*22,y=done?22:28+n*2;
+    R(g,P.dark,x+2,37,2,4);R(g,P.dark,x+13,37,2,4);R(g,done?P.wood:P.dark,x,y,17,37-y);
+    for(let row=y+2;row<37;row+=5){R(g,done?P.light:'#8b7959',x+1,row,15,1);R(g,P.dark,x+1,row+3,15,1);}
+    R(g,P.dark,x-1,y-2,19,3);R(g,done?P.green:'#777456',x,y-2,17,1);R(g,P.ink,x+5,35,7,2);
+   }
   }else{
-   R(g,P.dark,x+7,28,23,35);R(g,P.wood,x+8,28,21,33);R(g,P.light,x+10,29,3,32);for(let row=0;row<4;row++)R(g,P.dark,x+7,29+row*9,23,2);R(g,P.water,x+10,27,17,3);R(g,P.dark,x+34,38,5,25);R(g,'#abb3a0',x+35,39,3,21);R(g,'#abb3a0',x+35,38,14,3);R(g,P.dark,x+47,37,3,12);R(g,P.water,x+42,60,15,3);R(g,P.cream,x+10,64,43,2);
+   R(g,P.dark,13,23,17,16);R(g,P.wood,14,23,15,15);R(g,P.light,15,24,2,13);
+   R(g,P.dark,13,28,17,2);R(g,P.dark,13,35,17,2);R(g,done?'#81958c':'#767b6c',29,17,3,21);
+   R(g,P.dark,27,16,9,3);R(g,done?'#aeb9a6':'#7c8374',29,17,12,2);R(g,P.dark,38,18,3,8);
+   R(g,done?P.water:P.dark,15,22,13,2);R(g,P.dark,32,37,10,3);R(g,done?P.water:'#777456',33,38,8,1);
+   if(!done){R(g,P.dark,21,30,2,7);R(g,P.wood,17,40,12,2);}
   }
  }
- function drawProject(o,g){const done=built(o.projectId),c=cached('project:'+o.projectId+':'+done,84,86,c=>paintProject(c,o.projectId,done));g.drawImage(c,Math.round(o.x-41),Math.round(o.y-72));
-  if(done&&o.projectId==='apiario'&&state.production.mel.ready>0){R(g,P.cream,o.x-4,o.y-48,9,9);R(g,P.amber,o.x-3,o.y-45,7,5);R(g,P.dark,o.x-3,o.y-49,7,2);}
-  if(done&&o.projectId==='irrigacao'&&state.irrigation.charges>0)R(g,P.water,o.x-22,o.y-45,15,3);
-  if(done&&maintained(o.projectId)){R(g,P.cream,o.x+21,o.y-33,7,7);R(g,P.green,o.x+22,o.y-31,5,1);R(g,P.green,o.x+24,o.y-33,1,5);}
+ function drawProject(o,g){const done=built(o.projectId),c=cached('project:'+o.projectId+':'+done,48,44,c=>paintProject(c,o.projectId,done));g.drawImage(c,Math.round(o.x-24),Math.round(o.y-40));
+  if(done&&o.projectId==='apiario'&&state.production.mel.ready>0)R(g,P.amber,o.x-10,o.y-11,3,2);
+  if(done&&o.projectId==='irrigacao'&&state.irrigation.charges>0)R(g,P.water,o.x-8,o.y-18,10,2);
+  if(done&&maintained(o.projectId))R(g,P.light,o.x-8,o.y-9,8,1);
  }
  function footprint(o){
   if(o?.type!=='farm_life_project'||!project(o.projectId))return null;
-  if(!built(o.projectId))return{x:o.x-27,y:o.y-14,w:54,h:14};
-  if(o.projectId==='apiario')return{x:o.x-31,y:o.y-47,w:62,h:45};
-  if(o.projectId==='irrigacao')return{x:o.x-26,y:o.y-46,w:48,h:42};
-  // Toldos são atravessáveis; somente a bancada ocupa o contato no chão.
-  return{x:o.x-28,y:o.y-24,w:56,h:23};
+  const h=built(o.projectId)?(o.projectId==='apiario'?18:o.projectId==='oficina'?12:16):8;
+  const w=o.projectId==='apiario'?40:o.projectId==='cozinha'?26:24;
+  return{x:o.x-w/2,y:o.y-h,w,h};
  }
  function drawMarker(o,g){
-  const key=o.type==='farm_life_clue'?'clue:'+o.clueId:'station:'+o.stationId,c=cached(key,42,54,c=>{
-   R(c,'rgba(30,48,36,.2)',4,47,33,4);R(c,P.dark,17,25,3,24);R(c,P.wood,18,25,1,23);
-   if(o.type==='farm_life_clue'){R(c,P.dark,7,18,27,18);R(c,P.wood,8,19,25,15);R(c,P.cream,11,21,18,12);for(let n=0;n<3;n++)R(c,P.green,14+n*4,23+n%2,2,6);R(c,P.dark,13,31,14,1);R(c,P.amber,27,29,3,3);}
-   else if(o.stationId==='quadro'){R(c,P.dark,2,4,37,33);R(c,P.wood,4,6,33,29);for(let n=0;n<3;n++){R(c,P.cream,7+n*10,11+n%2*6,8,13);R(c,P.clay,9+n*10,13+n%2*6,3,1);R(c,P.dark,9+n*10,17+n%2*6,4,1);}roof(c,4,0,33,P.green);}
-   else{R(c,P.dark,4,14,34,15);R(c,P.cream,5,15,32,12);R(c,P.green,9,18,24,2);R(c,P.wood,9,23,17,1);}
-  });g.drawImage(c,Math.round(o.x-21),Math.round(o.y-46));if(o.type==='farm_life_clue'&&state.clues[o.clueId]?.found){R(g,P.green,o.x+7,o.y-26,6,6);R(g,P.cream,o.x+8,o.y-24,4,1);}}
+  const key=o.type==='farm_life_clue'?'clue:'+o.clueId:'station:'+o.stationId,c=cached(key,32,30,c=>{
+   if(o.type==='farm_life_clue'){
+    const id=o.clueId;
+    if(id==='ponte-marca'){for(let n=0;n<3;n++){R(c,'#786a4a',10+n*4,20,1,6);R(c,'#ad9565',11+n*4,20,1,6);}return;}
+    if(id==='cabana-fita'){R(c,P.dark,14,11,3,16);R(c,P.cream,15,12,1,14);R(c,P.clay,11,12,9,3);R(c,P.clay,16,15,3,6);R(c,P.light,13,13,3,1);return;}
+    R(c,'rgba(30,48,36,.14)',7,26,19,3);
+    if(id==='oasis-caixa'||id==='arquivo-casa'){
+     R(c,P.dark,6,17,20,10);R(c,P.wood,7,18,18,8);R(c,P.light,7,18,18,1);R(c,P.dark,7,22,18,1);R(c,P.cream,13,16,10,4);R(c,P.dark,16,18,5,1);
+    }else if(id==='horta-caderno'){
+     R(c,P.dark,9,20,15,8);R(c,P.green,9,19,14,7);R(c,P.cream,11,20,11,4);R(c,P.light,9,25,14,1);R(c,P.dark,15,21,6,1);
+    }else if(id==='mapa-nico'){
+     R(c,P.dark,8,20,16,8);R(c,P.cream,8,19,15,7);R(c,P.light,13,19,1,7);R(c,P.light,18,19,1,7);R(c,P.green,10,21,4,1);R(c,P.green,14,22,6,1);R(c,P.clay,20,23,2,2);
+    }else{
+     R(c,P.wood,8,24,17,4);R(c,P.dark,8,27,17,1);R(c,P.cream,10,20,13,6);R(c,P.light,12,21,9,1);R(c,P.light,14,23,5,1);R(c,P.clay,16,23,2,2);
+    }
+   }else if(o.stationId==='quadro'){
+    R(c,P.dark,6,8,21,16);R(c,P.wood,7,9,19,14);R(c,P.light,7,9,19,1);
+    for(let n=0;n<2;n++){R(c,P.cream,9+n*9,12,7,8);R(c,P.dark,10+n*9,14,4,1);R(c,P.clay,11+n*9,11,2,1);}
+    R(c,P.dark,8,24,17,2);
+   }else if(o.stationId==='curral'){
+    R(c,'rgba(30,48,36,.14)',4,27,24,2);R(c,P.dark,4,20,24,7);R(c,P.wood,5,21,22,5);R(c,P.light,5,21,22,1);R(c,P.green,7,22,18,2);R(c,P.dark,7,26,2,2);R(c,P.dark,23,26,2,2);
+   }else{
+    R(c,'rgba(30,48,36,.14)',9,27,15,2);R(c,P.dark,9,21,15,6);R(c,P.wood,10,22,13,4);R(c,P.light,11,22,1,4);R(c,P.light,20,22,1,4);R(c,P.clay,12,20,4,3);R(c,P.clay,18,19,4,3);R(c,P.green,14,19,2,1);
+   }
+  });g.drawImage(c,Math.round(o.x-16),Math.round(o.y-27));
+ }
  function register(api){
   API=api;api.registerObjectDrawer('farm_life_project',drawProject);api.registerObjectDrawer('farm_life_clue',drawMarker);api.registerObjectDrawer('farm_life_station',drawMarker);
   for(const d of PROJECTS)api.addObjectToMain({type:'farm_life_project',projectId:d.id,x:d.x,y:d.y,_world:true,interactionHint:'trabalhar em '+d.name});
