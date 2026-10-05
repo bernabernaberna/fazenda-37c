@@ -9,9 +9,10 @@ Os moradores têm **18 lembranças para descobrir e 36 respostas possíveis**.
 Suas escolhas ficam no diário, reaparecem nas conversas e abrem histórias
 depois da reabertura. Os NPCs também comentam ações recentes do jogador.
 
-A atualização melhora as poses de descanso, os sons de cada ambiente e
-as interações. O mundo e a interface receberam otimizações para reduzir
-trabalho repetido durante a partida.
+Seis cenas animadas acompanham os encontros principais da história, com
+cenários do próprio vale. Os personagens mexem a boca, piscam e gesticulam
+nas cenas e nas conversas. Retratos mostram suas expressões enquanto o texto
+aparece. A Jornada do Vale permite assistir ou rever as cenas desbloqueadas.
 
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
@@ -35,6 +36,10 @@ abri-lo no navegador sem internet. O progresso é salvo no próprio navegador.
 
 Perto de uma cama, use E para deitar ou levantar. Começar a se mover também
 encerra o descanso. Conversas e o diário pausam a simulação enquanto você lê.
+Nas cenas, Enter ou Espaço revela a fala e depois avança; Esc permite pular.
+Nas conversas, E revela a fala inteira, Tab escolhe uma resposta e Enter
+confirma. A opção de reduzir movimento mantém as poses estáveis e mostra
+o texto completo. As cenas funcionam também sem internet.
 
 ## Compilar
 

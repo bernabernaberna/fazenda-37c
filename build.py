@@ -74,6 +74,7 @@ MODULE_ORDER = [
     "30-dynamic-lighting.js", # point lights from fires, sun god-rays, sparks
     "31-interior-art.js",    # paredes, marcenaria, tecidos e vidro dos interiores
     "32-animal-life.js",     # anatomia, comportamento e movimento dos animais
+    "34-story-cinematics.js", # cenas do vale, falas animadas e galeria de reprises
     "40-grass-sway.js",       # animated grass blades + wind streaks
     "50-window-glow.js",      # warm halos from house/barn windows at night
     "60-histology-annotations.js", # realtime science labels over the player

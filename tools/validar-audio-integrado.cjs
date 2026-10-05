@@ -108,6 +108,9 @@ function loopsExpected(data){return data.paused?data.loops.every(a=>a.volume===0
     await page.waitForFunction(()=>cutsceneActive);
     await page.keyboard.press('Space');await page.waitForFunction(()=>tutorialActive);
     await page.getByRole('button',{name:'Pular tutorial',exact:true}).click();
+    // A Carta agora sucede o tutorial. Prepara a auditoria fora da cutscene;
+    // a abertura real é coberta pela validação própria do diretor da v5.
+    await page.evaluate(()=>{window.FarmStoryIntegration?.visualUpdate(0);if(window.FarmStoryCinematics?.isOpen())FarmStoryCinematics.close({skipped:true});});
     await page.keyboard.press('Escape');
     await page.getByRole('button',{name:'⚙ Configurações',exact:true}).click();
     await page.evaluate(()=>{AmbientSynth.setRiver(0.35);AmbientSynth.setCrickets(0.3);synthSfx.levelup();AudioManager.playSfx('death_sound',0.8);});

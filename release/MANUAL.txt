@@ -28,6 +28,14 @@
   próximas conversas e ficam no diário; a história continua depois da reabertura.
   Nada custa moedas ao escolher uma resposta ou voltar para conversar depois.
 
+  Seis cenas animadas acompanham a chegada, a horta, o rio, a montanha,
+  o oásis e a reabertura. Enter ou Espaço revela a fala e depois avança.
+  Esc ou Pular cena devolve você ao vale. A Jornada do Vale reúne as cenas
+  desbloqueadas para assistir ou rever, sem repetir recompensas.
+  Nas conversas, retratos e moradores mexem a boca, piscam e gesticulam.
+  E mostra o texto inteiro; Tab escolhe a resposta e Enter confirma.
+  Movimento reduzido mostra o texto completo com poses estáveis.
+
   Para descansar, R senta o personagem; E perto da cama ou do catre inicia
   repouso deitado. Caminhar, R ou E faz levantar. Movimento reduzido mantém
   o descanso estável. O som acompanha bioma, interior, noite e repouso.

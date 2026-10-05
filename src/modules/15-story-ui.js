@@ -3,15 +3,57 @@
   'use strict';
   let adapter={}, panel=null, dialog=null, book=null, previousFocus=null;
   let bookOpen=false, lastChapter='', lastNpc='', ready=false,lastHud='';
+  let speech=null,portraitClock=0;
   const cast=()=>window.FarmStoryWorld?.characters || [];
   const story=()=>window.FarmStoryWorld;
   const state=()=>adapter.read?.() || {};
+  const reducedMotion=()=>!!adapter.reducedMotion?.()||document.body.classList.contains('access-reduce-motion');
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
   const button=(text,fn,cls='vale-button')=>{const n=el('button',cls,text);n.type='button';n.addEventListener('click',fn);return n;};
   function portrait(id,size=96){
     const c=el('canvas','vale-portrait');c.width=size;c.height=size;
     c.setAttribute('aria-label','Retrato de '+(cast().find(x=>x.id===id)?.name||'você'));
     window.FarmCharacterArt?.drawPortrait(c,id,{gender:state().gender,name:id==='player'?state().name:cast().find(x=>x.id===id)?.name});return c;
+  }
+  function delivery(d){
+    const text=String(d.text||'').toLocaleLowerCase('pt-BR');
+    const expression=d.expression||(/deu certo|conseguimos|portas abertas|obrigad|topa|!/.test(text)?'joyful':/ventania|fechou|esperando|sozinh|medo|perigo|frio/.test(text)?'concerned':/pergunt|observ|desen|lembr|história|caderno/.test(text)?'thoughtful':'warm');
+    const gesture=d.gesture||(d.kind==='offer'||/venha|convide|convid|topa|comigo/.test(text)?'invite':d.kind==='lore'||d.npcId==='lia'?'explain':d.kind==='response'?'nod':'explain');
+    return {expression,gesture};
+  }
+  function speechState(npcId){
+    if(!speech||!dialog?.classList.contains('show')||(npcId&&npcId!==speech.npcId))return {speaking:false,speechTime:0,reducedMotion:reducedMotion()};
+    const complete=speech.cursor>=speech.letters.length;
+    return {speaking:!complete&&speech.hold<=0&&!reducedMotion(),speechTime:speech.elapsed,expression:speech.expression,gesture:complete?'listen':speech.gesture,reducedMotion:reducedMotion()};
+  }
+  function repaintSpeech(){
+    if(!speech)return;
+    const count=Math.min(speech.letters.length,Math.floor(speech.cursor));
+    if(count!==speech.painted){
+      speech.painted=count;speech.shown.textContent=speech.letters.slice(0,count).join('');speech.hidden.textContent=speech.letters.slice(count).join('');
+      const revealFocused=document.activeElement===speech.revealButton;speech.revealButton.hidden=count===speech.letters.length;
+      if(revealFocused&&speech.revealButton.hidden)dialog.querySelector('.vale-choices button')?.focus({preventScroll:true});
+      speech.help.textContent=count===speech.letters.length?'Conversa pausada · Tab escolhe · Enter confirma · Esc volta ao mundo':'Conversa pausada · E mostra a fala inteira · Tab escolhe · Esc volta ao mundo';
+    }
+    const s=state();window.FarmCharacterArt?.drawPortrait(speech.canvas,speech.npcId,{gender:s.gender,name:cast().find(x=>x.id===speech.npcId)?.name,...speechState()});
+  }
+  function reveal(){
+    if(!speech||speech.cursor>=speech.letters.length)return false;
+    speech.cursor=speech.letters.length;speech.hold=0;repaintSpeech();return true;
+  }
+  function update(dt){
+    if(!speech||!dialog?.classList.contains('show')||!Number.isFinite(dt)||dt<=0)return;
+    dt=Math.min(dt,.1);speech.elapsed+=dt;portraitClock+=dt;
+    if(reducedMotion())reveal();
+    else if(speech.cursor<speech.letters.length){
+      speech.hold=Math.max(0,speech.hold-dt);
+      if(speech.hold===0){
+        const before=Math.floor(speech.cursor);speech.cursor=Math.min(speech.letters.length,speech.cursor+dt*44);
+        const crossed=speech.letters.slice(before,Math.floor(speech.cursor)).join('');
+        if(/[.!?…]/.test(crossed))speech.hold=.14;
+      }
+    }
+    if(portraitClock>=1/12){portraitClock%=1/12;repaintSpeech();}
   }
   function rememberFocus(){if(!previousFocus&&!dialog?.classList.contains('show')&&!bookOpen)previousFocus=document.activeElement;adapter.beforeOpen?.();}
   function returnFocus(){const f=previousFocus;previousFocus=null;if(f?.isConnected&&f!==document.body&&f!==document.documentElement&&f.getClientRects().length)f.focus({preventScroll:true});else adapter.focusGame?.();}
@@ -36,20 +78,23 @@
       #valeHud:hover{border-color:#f4d591;background:#294a3e}#valeHud:focus-visible{outline:3px solid #ffda7c;outline-offset:3px}
       .vale-overlay{display:none;position:fixed;inset:0;z-index:1700;box-sizing:border-box;background:linear-gradient(180deg,rgba(11,25,26,.2),rgba(11,25,26,.66));padding:22px;align-items:flex-end;justify-content:center}
       .vale-overlay.show{display:flex}.vale-overlay *, .vale-book-overlay *{box-sizing:border-box}
-      .vale-dialog-card{position:relative;width:min(940px,100%);max-height:calc(100dvh - 44px);overflow:auto;display:grid;grid-template-columns:154px 1fr;gap:24px;background:var(--vale-paper);border:3px solid #574634;border-radius:5px;box-shadow:0 0 0 2px #d1af75,0 18px 70px #081712a8;padding:25px;color:var(--vale-ink)}
+      .vale-dialog-card{position:relative;width:min(940px,100%);max-height:calc(100dvh - 44px);overflow:auto;display:grid;grid-template-columns:128px 1fr;gap:20px;background:var(--vale-paper);border:3px solid #574634;border-radius:5px;box-shadow:0 0 0 2px #d1af75,0 18px 70px #081712a8;padding:20px;color:var(--vale-ink)}
       .vale-dialog-card:before{content:'';position:absolute;left:0;right:0;top:0;height:6px;background:repeating-linear-gradient(90deg,#304b3a 0 22px,#a48c5b 22px 25px,#304b3a 25px 47px)}
       .vale-dialog-person{display:flex;flex-direction:column;align-items:center;gap:10px;align-self:start;padding-top:6px}
       .vale-portrait{image-rendering:pixelated;display:block;background:#c8d6bb;border:2px solid #80744e;box-shadow:3px 3px 0 #c7bb99;border-radius:4px;max-width:100%;width:128px;height:128px}
+      .vale-dialog-person .vale-portrait{width:110px;height:110px}
       .vale-dialog-person .vale-role{font:11px/1.5 Georgia,serif;text-align:center;color:#657256}
       .vale-dialog-header{display:flex;gap:16px;align-items:start;justify-content:space-between;margin:0 0 12px}
-      .vale-dialog-header h2{font:700 26px/1.12 Georgia,serif;margin:3px 0;color:#203e32}
+      .vale-dialog-header h2{font:700 24px/1.12 Georgia,serif;margin:3px 0;color:#203e32}
       .vale-kicker{font:10px/1.5 monospace;letter-spacing:1.5px;text-transform:uppercase;color:#7a744b}
-      .vale-dialog-text{font:18px/1.65 Georgia,'Times New Roman',serif;white-space:pre-wrap;margin:0 0 20px;max-width:64ch}
+      .vale-dialog-text{font:17px/1.55 Georgia,'Times New Roman',serif;white-space:pre-wrap;margin:0 0 20px;max-width:64ch}
       .vale-dialog-content{min-width:0;display:flex;flex-direction:column;min-height:0}
-      .vale-dialog-body{max-height:38dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 14px 2px 0;margin-bottom:14px;min-height:80px}
+      .vale-dialog-body{max-height:20dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 14px 2px 0;margin-bottom:12px;min-height:64px}
       .vale-dialog-body:focus-visible{outline:2px solid #375d44;outline-offset:2px}
       .vale-dialog-body .vale-dialog-text{margin-bottom:8px}
-      .vale-dialog-card .vale-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:32dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:3px 7px 5px 3px}
+      .vale-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+      .vale-unrevealed{visibility:hidden}.vale-reveal{align-self:flex-start;font:11px/1.4 monospace;padding:5px 8px;min-height:29px;margin:0 0 10px;background:transparent;color:#506342;border:1px solid #b4b18c;border-radius:3px;cursor:pointer}.vale-reveal:focus-visible{outline:3px solid #375d44;outline-offset:2px}.vale-reveal[hidden]{display:none}
+      .vale-dialog-card .vale-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:24dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:3px 7px 5px 3px}
       .vale-dialog-card .vale-button{overflow-wrap:anywhere;min-width:0;flex-shrink:0}
       .vale-dialog-person{position:sticky;top:6px}
       .vale-dialog-help{flex:0 0 auto}
@@ -80,13 +125,13 @@
       @media(max-width:460px){#valeHud{padding:8px}#valeHud strong{font-size:12px}#valeHud .vale-hud-objective{font-size:10px}#valeHud .vale-kicker{font-size:8px;letter-spacing:.4px}#valeHud .vale-hud-footer{font-size:8px}.vale-dialog-card{display:block;padding:16px}.vale-dialog-person{float:left;width:58px;padding:0;margin:0 12px 8px 0}.vale-dialog-person .vale-portrait{width:56px;height:56px}.vale-dialog-person .vale-role{display:none}.vale-dialog-header h2{font-size:20px}.vale-dialog-header{min-height:58px;gap:7px}.vale-kicker{font-size:9px;letter-spacing:.5px}.vale-dialog-text{clear:both;font-size:16px}.vale-choices{clear:both}.vale-residents{grid-template-columns:1fr}.vale-close{font-size:11px;padding:6px 8px}.vale-book h2{font-size:23px}}
       @media(max-width:700px){.vale-dialog-body{max-height:30dvh}.vale-dialog-card .vale-choices{max-height:31dvh;grid-template-columns:1fr}.vale-discoveries{grid-template-columns:1fr}}
       @media(max-height:520px){.vale-overlay{padding:8px}.vale-dialog-card{padding:13px;max-height:calc(100dvh - 16px);grid-template-columns:80px 1fr;gap:12px}.vale-dialog-person .vale-portrait{width:70px;height:70px}.vale-dialog-header{margin-bottom:6px}.vale-dialog-header h2{font-size:20px}.vale-dialog-body{max-height:23dvh;min-height:45px;margin-bottom:6px}.vale-dialog-text{font-size:15px;line-height:1.45}.vale-dialog-card .vale-choices{max-height:29dvh}.vale-dialog-help{margin-top:5px}}
-      @media(max-width:460px){.vale-dialog-card{display:grid;grid-template-columns:58px minmax(0,1fr);gap:9px 12px}.vale-dialog-person{float:none;position:static;margin:0;width:58px;grid-column:1;grid-row:1}.vale-dialog-content{display:contents}.vale-dialog-header{grid-column:2;grid-row:1;margin-bottom:0;min-width:0}.vale-dialog-body,.vale-dialog-card .vale-choices,.vale-dialog-help{grid-column:1/-1}.vale-dialog-body{padding-right:8px}.vale-dialog-help{margin-top:0}}
+      @media(max-width:460px){.vale-dialog-card{display:grid;grid-template-columns:58px minmax(0,1fr);gap:9px 12px}.vale-dialog-person{float:none;position:static;margin:0;width:58px;grid-column:1;grid-row:1}.vale-dialog-content{display:contents}.vale-dialog-header{grid-column:2;grid-row:1;margin-bottom:0;min-width:0}.vale-dialog-body,.vale-dialog-card .vale-choices,.vale-dialog-help,.vale-reveal{grid-column:1/-1}.vale-dialog-body{padding-right:8px}.vale-dialog-help{margin-top:0}}
       @media(max-width:520px){#characterSelect .csCard,#startMenu .menuCard{padding:16px;border-width:3px}#characterSelect .cs-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#characterSelect .cs-option{padding:10px 4px;min-width:0}#characterSelect .cs-portrait{width:64px;height:86px}#characterSelect .cs-nameRow{flex-wrap:wrap}#characterSelect input{box-sizing:border-box;max-width:100%;min-width:0}#startMenu .menuGrid{grid-template-columns:1fr}#startMenu .vale-menu-story{font-size:15px;line-height:1.5}}
     `;
     document.head.append(style);
     panel=button('',()=>openBook(),'panel');panel.id='valeHud';panel.setAttribute('aria-label','Abrir Jornada do Vale, carta e moradores');
     document.getElementById('topright')?.append(panel);
-    dialog=el('div','vale-overlay');dialog.id='valeDialogue';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','valeSpeaker');
+    dialog=el('div','vale-overlay');dialog.id='valeDialogue';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','valeSpeaker');dialog.setAttribute('aria-describedby','valeSpeechText');
     book=el('div','vale-book-overlay');book.id='valeBook';book.setAttribute('role','dialog');book.setAttribute('aria-modal','true');book.setAttribute('aria-labelledby','valeBookTitle');
     document.body.append(dialog,book);
     // Captura antes dos controles do mundo: nenhuma escolha vira movimento/ação.
@@ -107,16 +152,17 @@
   }
   function showDialogue(d){
     if(!ready)return;
-    if(!d){const was=dialog.classList.contains('show');dialog.classList.remove('show');lastNpc='';if(was)returnFocus();refresh();return;}
+    if(!d){const was=dialog.classList.contains('show');dialog.classList.remove('show');lastNpc='';speech=null;if(was)returnFocus();refresh();return;}
     const was=dialog.classList.contains('show');if(!was){rememberFocus();bookOpen=false;book.classList.remove('show');}
     const oldChoice=document.activeElement?.dataset?.valeChoice;
     dialog.replaceChildren();
     const card=el('section','vale-dialog-card'),person=el('div','vale-dialog-person'),content=el('div','vale-dialog-content');
-    person.append(portrait(d.npcId==='letter'?'rosa':d.npcId,128),el('span','vale-role',d.role||''));
+    const portraitId=d.npcId==='letter'?'rosa':d.npcId,face=portrait(portraitId,128);
+    person.append(face,el('span','vale-role',d.role||''));
     const head=el('div','vale-dialog-header'),label=el('div');label.append(el('span','vale-kicker',d.title||'Uma conversa no vale'));
     const speaker=el('h2','',d.speaker||'Carta de Rosa');speaker.id='valeSpeaker';label.append(speaker);
     const body=el('div','vale-dialog-body');body.tabIndex=0;body.setAttribute('aria-label','Fala de '+(d.speaker||'Rosa')+'; use as setas para ler');
-    body.append(el('p','vale-dialog-text',d.text||''));
+    const paragraph=el('p','vale-dialog-text'),full=el('span','vale-sr-only',d.text||''),visual=el('span','vale-visual-text'),shown=el('span','vale-revealed'),hidden=el('span','vale-unrevealed');paragraph.id='valeSpeechText';visual.setAttribute('aria-hidden','true');visual.append(shown,hidden);paragraph.append(full,visual);body.append(paragraph);
     head.append(label,button('Fechar · Esc',closeDialogue,'vale-close'));content.append(head,body);
     if(d.kind==='offer')body.append(el('p','vale-offer-terms','Pedido da estação · 8 moedas na entrega. Conta apenas o que você fizer depois de aceitar. Expira quando a estação mudar.'));
     if(d.kind==='lore')body.append(el('p','vale-offer-terms','Uma lembrança do vale. Sua resposta muda a conversa; você pode pensar e voltar depois.'));
@@ -124,8 +170,10 @@
     (d.choices||[]).forEach((choice,i)=>{const b=button(choice.label,()=>story().choose(choice.id),i===0?'vale-button vale-button-primary':'vale-button');b.dataset.valeChoice=choice.id;choices.append(b);});
     if(d.canAdvance&&!(d.choices||[]).some(c=>c.id==='back'))choices.append(button('Continuar →',()=>story().advance(),'vale-button vale-button-primary'));
     if(!choices.children.length)choices.append(button('Até mais',closeDialogue));
-    content.append(choices,el('div','vale-dialog-help','Conversa pausada · Tab escolhe · Enter confirma · Esc volta ao mundo'));
+    const revealButton=button('Mostrar fala inteira · E',reveal,'vale-reveal'),help=el('div','vale-dialog-help');
+    content.append(revealButton,choices,help);
     card.append(person,content);dialog.append(card);dialog.classList.add('show');
+    const letters=Array.from(String(d.text||''));speech={npcId:portraitId,canvas:face,letters,cursor:reducedMotion()?letters.length:Math.min(3,letters.length),elapsed:0,hold:0,painted:-1,shown,hidden,revealButton,help,...delivery(d)};portraitClock=0;repaintSpeech();
     const matching=oldChoice?Array.from(choices.children).find(b=>b.dataset.valeChoice===oldChoice):null;
     (matching||choices.querySelector('button'))?.focus({preventScroll:true});lastNpc=d.npcId;refresh();
   }
@@ -182,6 +230,10 @@
       p.append(portrait(def.id,96),label);people.append(p);
     }
     card.append(people);
+    const scenes=window.FarmStoryCinematics?.catalogue?.()||[],seen=scenes.filter(s=>s.seen);
+    card.append(el('h3','','Cenas da jornada · '+seen.length+' / '+scenes.length));
+    if(scenes.some(s=>s.available||s.unlocked||s.seen))card.append(button(seen.length?'Rever cenas da jornada':'Ver cenas da jornada',()=>{closeBook(false);window.FarmStoryCinematics?.openGallery?.();}));
+    else card.append(el('p','','Os encontros importantes ganham cenas próprias. Depois de assisti-las ou pulá-las, você poderá revê-las aqui.'));
     card.append(el('h3','','Vozes do vale · '+(s.discoveries?.length||0)+' / '+(s.discoveryTotal||18)),el('p','','Cada morador conhece uma parte do passado. Converse, volte após as etapas e escute as lembranças. As histórias de depois da reabertura continuam na vida do vale.'));
     if(s.discoveries?.length){
       const collection=el('div','vale-discoveries');
@@ -211,14 +263,16 @@
       e.stopImmediatePropagation();return;
     }
     if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(bookOpen)closeBook();else closeDialogue();return;}
+    if(e.key.toLowerCase()==='e'&&dialog.classList.contains('show')){e.preventDefault();e.stopImmediatePropagation();reveal();return;}
     if(e.key==='Enter'||e.key===' '){
       e.preventDefault();e.stopImmediatePropagation();
-      const a=document.activeElement;if((a?.tagName==='BUTTON'||a?.tagName==='SUMMARY')&&active.contains(a))a.click();return;
+      const a=document.activeElement;if((a?.tagName==='BUTTON'||a?.tagName==='SUMMARY')&&active.contains(a))a.click();
+      else if(dialog.classList.contains('show')&&!reveal()&&story()?.currentDialogue()?.canAdvance)story().advance();return;
     }
     if(dialog.classList.contains('show')&&/^[1-9]$/.test(e.key)){
       e.preventDefault();e.stopImmediatePropagation();dialog.querySelectorAll('.vale-choices button')[Number(e.key)-1]?.click();return;
     }
     e.stopImmediatePropagation();if(['w','a','s','d','q','f','c','r','e','h','j','i'].includes(e.key.toLowerCase()))e.preventDefault();
   }
-  window.FarmStoryUI={init(a){adapter=a||{};install();},refresh,showDialogue,open:openBook,close(){closeBook(false);closeDialogue();},isOpen(){return bookOpen||!!story()?.isOpen();}};
+  window.FarmStoryUI={init(a){adapter=a||{};install();},refresh,showDialogue,update,reveal,speechState,open:openBook,close(){closeBook(false);closeDialogue();},isOpen(){return bookOpen||!!story()?.isOpen();},presentation(){return speech?{npcId:speech.npcId,visible:Math.floor(speech.cursor),total:speech.letters.length,elapsed:speech.elapsed,...speechState()}:null;}};
 })();

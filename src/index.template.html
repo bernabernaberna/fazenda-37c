@@ -3995,6 +3995,7 @@ function startGame(newGame=false){
     }
   }
   gameStarted = true;
+  if(newGame)window.FarmStoryIntegration?.notifyNewGame();
   document.body.classList.add('game-on');   // libera os botões flutuantes só em jogo (evita sobreposição no menu)
   document.getElementById('startMenu').classList.add('hide');
   AudioManager.init();
@@ -5991,6 +5992,7 @@ function saveGame(auto=false){
       histologyCompleted: histologyMissions.filter(m=>m.completed).map(m=>m.id),
       learningJourney: window.FarmLearningJourney.serialize(),
       storyWorld: window.FarmStoryWorld?.serialize(),
+      storyCinematics: window.FarmStoryCinematics?.serialize(),
       homeostasisTimer, hotExposureTimer,
       histologyPlayTime,lastHistMissionAt:_lastHistMissionAt,
       objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0}))
@@ -6065,6 +6067,7 @@ function loadGameFromData(data){
   tasks = isFrio() ? coldTasks : hotTasks;
   window.FarmLearningJourney.restore(data.learningJourney,learningContext());
   window.FarmStoryIntegration?.restore(data.storyWorld);
+  window.FarmStoryCinematics?.restore(data.storyCinematics,{chapterIndex:window.FarmStoryWorld?.snapshot()?.chapter?.index||0});
   renderTasks(); renderInv(); renderShop(); renderJournal(); renderHistologyHud(); updateBars(); renderAchievements?.();
   return true;
 }
@@ -8822,7 +8825,7 @@ function learningContext(){
 }
 function readingPanelOpen(){
   const shown=id=>!!document.getElementById(id)?.classList.contains('show');
-  return window.FarmWorldMap?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || journalOpen || inventoryOpen || shopOpen
+  return window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || journalOpen || inventoryOpen || shopOpen
     || ['summary','accessMenu','achPanel','creditsPanel','tutorialOverlay'].some(shown);
 }
 function resetSeasonTasks(list){
@@ -8838,6 +8841,7 @@ function resetSeasonTasks(list){
   }
 }
 function resetSandboxRun(){
+  window.FarmStoryCinematics?.reset();
   window.FarmWorldMap?.reset();
   window.FarmAnimalLife?.reset();
   window.FarmRestVisual?.reset();
@@ -13648,8 +13652,12 @@ function endCutscene(){
   // fazia a câmera deslizar lentamente até o jogador — parecia travado.
   if(typeof snapCamera === 'function') snapCamera();
   if(_pendingTutorialAfterCutscene){
-    _pendingTutorialAfterCutscene = false;
-    setTimeout(()=>{ try{ maybeStartTutorial(true); }catch(e){} }, 800);
+    // A carta animada aguarda também o intervalo até o tutorial aparecer.
+    setTimeout(()=>{
+      if(!_pendingTutorialAfterCutscene||!gameStarted)return;
+      _pendingTutorialAfterCutscene=false;
+      try{maybeStartTutorial(true);}catch(e){}
+    },800);
   }
 }
 function cutsceneCamera(){
@@ -13841,6 +13849,43 @@ function drawSunShadows(list){
   ctx.restore();
 }
 
+/* Recorte do cenário real para o palco. Executa somente ao trocar de plano;
+   não chama render/update nem altera jogador, clima, objetos ou recompensas.
+   O contexto de desenho e as referências de cena são restaurados no finally. */
+function drawCinematicWorld(g,view={}){
+  const main=scenes.main;if(!main||!g)return false;
+  const width=Math.max(1,Math.min(1920,Number(view.width)||960)),height=Math.max(1,Math.min(960,Number(view.height)||480));
+  const zoom=Math.max(1,Math.min(6,Number(view.zoom)||3)),visibleW=width/zoom,visibleH=height/zoom;
+  const centerX=Math.max(visibleW/2,Math.min(main.MW*TS-visibleW/2,Number(view.focusX)||main.MW*TS/2));
+  const centerY=Math.max(visibleH/2,Math.min(main.MH*TS-visibleH/2,Number(view.focusY)||main.MH*TS/2));
+  const left=centerX-visibleW/2,top=centerY-visibleH/2;
+  const prior={ctx,map,objects,crops,MW,MH,currentScene};
+  const fallback={tree:drawTree,bush:drawBush,flower:drawFlower,house:drawHouse,barn:drawBarn,well:drawWell,
+    sellbox:drawSellBox,woodpile:drawWoodpile,fireplace:drawFireplace,loom:drawLoom,bench:drawBench,
+    animal:drawAnimal,scarecrow:drawScarecrow,sunflower:drawSunflower,bridge:drawBridge,
+    river_cattail:drawRiverCattail,river_lily:drawRiverLily,fishing_spot:drawFishingSpot};
+  g.save();
+  try{
+    ctx=g;map=main.map;objects=main.objects;crops=main.crops;MW=main.MW;MH=main.MH;currentScene='main';
+    g.setTransform(1,0,0,1,0,0);g.imageSmoothingEnabled=false;
+    g.fillStyle=view.region==='mountain'?'#c9d7d3':view.region==='desert'?'#c9a16b':'#6d8957';g.fillRect(0,0,width,height);
+    g.scale(zoom,zoom);g.translate(-left,-top);
+    for(let y=Math.max(0,Math.floor(top/TS));y<Math.min(MH,Math.ceil((top+visibleH)/TS));y++)
+      for(let x=Math.max(0,Math.floor(left/TS));x<Math.min(MW,Math.ceil((left+visibleW)/TS));x++)drawTile(x,y,map[y][x],g);
+    window.FarmWorldDepth?.drawGround(g);
+    for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
+    const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
+    for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
+    visible.sort((a,b)=>(window.FarmWorldDepth?FarmWorldDepth.depth(a)-FarmWorldDepth.depth(b):a.y-b.y));
+    drawSunShadows(visible);
+    for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
+    return true;
+  }finally{
+    ({ctx,map,objects,crops,MW,MH,currentScene}=prior);g.restore();
+  }
+}
+window.drawCinematicWorld=drawCinematicWorld;
+
 /* ---------- Pós-processamento: BLOOM (light bleed cinematográfico) ----------
    Copia o frame para um buffer pequeno aplicando brightness+contrast (isola as
    áreas CLARAS) e blur; depois re-projeta por cima em 'lighter'. Resultado: sol,
@@ -13936,6 +13981,14 @@ function render(){
     const cs = cutsceneCamera();
     if(cs){ camTargetX = cs.x; camTargetY = cs.y; }
   }
+  // Deixa os dois interlocutores acima da caixa de conversa no desktop.
+  // Muda apenas o enquadramento; posições e simulação continuam pausadas.
+  const dialogueNpc=window.FarmStoryWorld?.currentDialogue?.()?.npcId;
+  if(!cutsceneActive&&currentScene==='main'&&innerWidth>700&&innerHeight>600
+    &&window.FarmStoryUI?.speechState?.(dialogueNpc)?.expression){
+    const speaker=window.FarmStoryIntegration?.read?.().npcs?.find(o=>o.npcId===dialogueNpc);
+    if(speaker){camTargetX=(player.x+speaker.x)/2;camTargetY=(player.y+speaker.y)/2+visH*.24;}
+  }
   // ----- Alvo da câmera (clampeado aos limites do mapa) -----
   let targetCamX, targetCamY;
   if(MW*TS < visW){
@@ -13949,7 +14002,7 @@ function render(){
     targetCamY = Math.max(0, Math.min(MH*TS - visH, camTargetY - visH/2));
   }
   // ----- Suavização (lerp) -----
-  if(_camX === null || _camSnap || cutsceneActive){
+  if(_camX === null || _camSnap || cutsceneActive || A11Y.reduceMotion){
     // Snap: primeira frame, troca de cena, ou durante cutscene (que já interpola)
     _camX = targetCamX; _camY = targetCamY; _camSnap = false;
   } else {
@@ -14788,6 +14841,7 @@ function loop(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   // Sem simulação/renderização em abas ocultas; retoma sem acumular tempo.
   if(document.hidden){requestAnimationFrame(loop);return;}
+  window.FarmStoryIntegration?.visualUpdate(dt);
   // Cutscene avança independente do pause
   if(cutsceneActive) cutsceneT += dt;
   // Pause: skip update logic but keep rendering animated
@@ -15062,6 +15116,12 @@ function toggleFullscreen(){
 }
 // Captura ESC antes do handler antigo para abrir menu de pause / acessibilidade quando não houver modal prioritário.
 window.addEventListener('keydown', function(e){
+  // O diretor instalado ao abrir uma cena vem depois deste listener.
+  // Escape precisa fechar a cena antes de chegar ao menu de pausa.
+  if(window.FarmStoryCinematics?.isOpen()){
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();FarmStoryCinematics.close({skipped:true});}
+    return;
+  }
   // Skip ESC handling while the user is in the character-select modal
   // (otherwise pressing ESC in the name input opens the access menu).
   const cs = document.getElementById('characterSelect');

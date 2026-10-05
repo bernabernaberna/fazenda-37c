@@ -4577,15 +4577,57 @@ body.hud-game #legend{display:none !important;}
   'use strict';
   let adapter={}, panel=null, dialog=null, book=null, previousFocus=null;
   let bookOpen=false, lastChapter='', lastNpc='', ready=false,lastHud='';
+  let speech=null,portraitClock=0;
   const cast=()=>window.FarmStoryWorld?.characters || [];
   const story=()=>window.FarmStoryWorld;
   const state=()=>adapter.read?.() || {};
+  const reducedMotion=()=>!!adapter.reducedMotion?.()||document.body.classList.contains('access-reduce-motion');
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
   const button=(text,fn,cls='vale-button')=>{const n=el('button',cls,text);n.type='button';n.addEventListener('click',fn);return n;};
   function portrait(id,size=96){
     const c=el('canvas','vale-portrait');c.width=size;c.height=size;
     c.setAttribute('aria-label','Retrato de '+(cast().find(x=>x.id===id)?.name||'você'));
     window.FarmCharacterArt?.drawPortrait(c,id,{gender:state().gender,name:id==='player'?state().name:cast().find(x=>x.id===id)?.name});return c;
+  }
+  function delivery(d){
+    const text=String(d.text||'').toLocaleLowerCase('pt-BR');
+    const expression=d.expression||(/deu certo|conseguimos|portas abertas|obrigad|topa|!/.test(text)?'joyful':/ventania|fechou|esperando|sozinh|medo|perigo|frio/.test(text)?'concerned':/pergunt|observ|desen|lembr|história|caderno/.test(text)?'thoughtful':'warm');
+    const gesture=d.gesture||(d.kind==='offer'||/venha|convide|convid|topa|comigo/.test(text)?'invite':d.kind==='lore'||d.npcId==='lia'?'explain':d.kind==='response'?'nod':'explain');
+    return {expression,gesture};
+  }
+  function speechState(npcId){
+    if(!speech||!dialog?.classList.contains('show')||(npcId&&npcId!==speech.npcId))return {speaking:false,speechTime:0,reducedMotion:reducedMotion()};
+    const complete=speech.cursor>=speech.letters.length;
+    return {speaking:!complete&&speech.hold<=0&&!reducedMotion(),speechTime:speech.elapsed,expression:speech.expression,gesture:complete?'listen':speech.gesture,reducedMotion:reducedMotion()};
+  }
+  function repaintSpeech(){
+    if(!speech)return;
+    const count=Math.min(speech.letters.length,Math.floor(speech.cursor));
+    if(count!==speech.painted){
+      speech.painted=count;speech.shown.textContent=speech.letters.slice(0,count).join('');speech.hidden.textContent=speech.letters.slice(count).join('');
+      const revealFocused=document.activeElement===speech.revealButton;speech.revealButton.hidden=count===speech.letters.length;
+      if(revealFocused&&speech.revealButton.hidden)dialog.querySelector('.vale-choices button')?.focus({preventScroll:true});
+      speech.help.textContent=count===speech.letters.length?'Conversa pausada · Tab escolhe · Enter confirma · Esc volta ao mundo':'Conversa pausada · E mostra a fala inteira · Tab escolhe · Esc volta ao mundo';
+    }
+    const s=state();window.FarmCharacterArt?.drawPortrait(speech.canvas,speech.npcId,{gender:s.gender,name:cast().find(x=>x.id===speech.npcId)?.name,...speechState()});
+  }
+  function reveal(){
+    if(!speech||speech.cursor>=speech.letters.length)return false;
+    speech.cursor=speech.letters.length;speech.hold=0;repaintSpeech();return true;
+  }
+  function update(dt){
+    if(!speech||!dialog?.classList.contains('show')||!Number.isFinite(dt)||dt<=0)return;
+    dt=Math.min(dt,.1);speech.elapsed+=dt;portraitClock+=dt;
+    if(reducedMotion())reveal();
+    else if(speech.cursor<speech.letters.length){
+      speech.hold=Math.max(0,speech.hold-dt);
+      if(speech.hold===0){
+        const before=Math.floor(speech.cursor);speech.cursor=Math.min(speech.letters.length,speech.cursor+dt*44);
+        const crossed=speech.letters.slice(before,Math.floor(speech.cursor)).join('');
+        if(/[.!?…]/.test(crossed))speech.hold=.14;
+      }
+    }
+    if(portraitClock>=1/12){portraitClock%=1/12;repaintSpeech();}
   }
   function rememberFocus(){if(!previousFocus&&!dialog?.classList.contains('show')&&!bookOpen)previousFocus=document.activeElement;adapter.beforeOpen?.();}
   function returnFocus(){const f=previousFocus;previousFocus=null;if(f?.isConnected&&f!==document.body&&f!==document.documentElement&&f.getClientRects().length)f.focus({preventScroll:true});else adapter.focusGame?.();}
@@ -4610,20 +4652,23 @@ body.hud-game #legend{display:none !important;}
       #valeHud:hover{border-color:#f4d591;background:#294a3e}#valeHud:focus-visible{outline:3px solid #ffda7c;outline-offset:3px}
       .vale-overlay{display:none;position:fixed;inset:0;z-index:1700;box-sizing:border-box;background:linear-gradient(180deg,rgba(11,25,26,.2),rgba(11,25,26,.66));padding:22px;align-items:flex-end;justify-content:center}
       .vale-overlay.show{display:flex}.vale-overlay *, .vale-book-overlay *{box-sizing:border-box}
-      .vale-dialog-card{position:relative;width:min(940px,100%);max-height:calc(100dvh - 44px);overflow:auto;display:grid;grid-template-columns:154px 1fr;gap:24px;background:var(--vale-paper);border:3px solid #574634;border-radius:5px;box-shadow:0 0 0 2px #d1af75,0 18px 70px #081712a8;padding:25px;color:var(--vale-ink)}
+      .vale-dialog-card{position:relative;width:min(940px,100%);max-height:calc(100dvh - 44px);overflow:auto;display:grid;grid-template-columns:128px 1fr;gap:20px;background:var(--vale-paper);border:3px solid #574634;border-radius:5px;box-shadow:0 0 0 2px #d1af75,0 18px 70px #081712a8;padding:20px;color:var(--vale-ink)}
       .vale-dialog-card:before{content:'';position:absolute;left:0;right:0;top:0;height:6px;background:repeating-linear-gradient(90deg,#304b3a 0 22px,#a48c5b 22px 25px,#304b3a 25px 47px)}
       .vale-dialog-person{display:flex;flex-direction:column;align-items:center;gap:10px;align-self:start;padding-top:6px}
       .vale-portrait{image-rendering:pixelated;display:block;background:#c8d6bb;border:2px solid #80744e;box-shadow:3px 3px 0 #c7bb99;border-radius:4px;max-width:100%;width:128px;height:128px}
+      .vale-dialog-person .vale-portrait{width:110px;height:110px}
       .vale-dialog-person .vale-role{font:11px/1.5 Georgia,serif;text-align:center;color:#657256}
       .vale-dialog-header{display:flex;gap:16px;align-items:start;justify-content:space-between;margin:0 0 12px}
-      .vale-dialog-header h2{font:700 26px/1.12 Georgia,serif;margin:3px 0;color:#203e32}
+      .vale-dialog-header h2{font:700 24px/1.12 Georgia,serif;margin:3px 0;color:#203e32}
       .vale-kicker{font:10px/1.5 monospace;letter-spacing:1.5px;text-transform:uppercase;color:#7a744b}
-      .vale-dialog-text{font:18px/1.65 Georgia,'Times New Roman',serif;white-space:pre-wrap;margin:0 0 20px;max-width:64ch}
+      .vale-dialog-text{font:17px/1.55 Georgia,'Times New Roman',serif;white-space:pre-wrap;margin:0 0 20px;max-width:64ch}
       .vale-dialog-content{min-width:0;display:flex;flex-direction:column;min-height:0}
-      .vale-dialog-body{max-height:38dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 14px 2px 0;margin-bottom:14px;min-height:80px}
+      .vale-dialog-body{max-height:20dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 14px 2px 0;margin-bottom:12px;min-height:64px}
       .vale-dialog-body:focus-visible{outline:2px solid #375d44;outline-offset:2px}
       .vale-dialog-body .vale-dialog-text{margin-bottom:8px}
-      .vale-dialog-card .vale-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:32dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:3px 7px 5px 3px}
+      .vale-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+      .vale-unrevealed{visibility:hidden}.vale-reveal{align-self:flex-start;font:11px/1.4 monospace;padding:5px 8px;min-height:29px;margin:0 0 10px;background:transparent;color:#506342;border:1px solid #b4b18c;border-radius:3px;cursor:pointer}.vale-reveal:focus-visible{outline:3px solid #375d44;outline-offset:2px}.vale-reveal[hidden]{display:none}
+      .vale-dialog-card .vale-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:24dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:3px 7px 5px 3px}
       .vale-dialog-card .vale-button{overflow-wrap:anywhere;min-width:0;flex-shrink:0}
       .vale-dialog-person{position:sticky;top:6px}
       .vale-dialog-help{flex:0 0 auto}
@@ -4654,13 +4699,13 @@ body.hud-game #legend{display:none !important;}
       @media(max-width:460px){#valeHud{padding:8px}#valeHud strong{font-size:12px}#valeHud .vale-hud-objective{font-size:10px}#valeHud .vale-kicker{font-size:8px;letter-spacing:.4px}#valeHud .vale-hud-footer{font-size:8px}.vale-dialog-card{display:block;padding:16px}.vale-dialog-person{float:left;width:58px;padding:0;margin:0 12px 8px 0}.vale-dialog-person .vale-portrait{width:56px;height:56px}.vale-dialog-person .vale-role{display:none}.vale-dialog-header h2{font-size:20px}.vale-dialog-header{min-height:58px;gap:7px}.vale-kicker{font-size:9px;letter-spacing:.5px}.vale-dialog-text{clear:both;font-size:16px}.vale-choices{clear:both}.vale-residents{grid-template-columns:1fr}.vale-close{font-size:11px;padding:6px 8px}.vale-book h2{font-size:23px}}
       @media(max-width:700px){.vale-dialog-body{max-height:30dvh}.vale-dialog-card .vale-choices{max-height:31dvh;grid-template-columns:1fr}.vale-discoveries{grid-template-columns:1fr}}
       @media(max-height:520px){.vale-overlay{padding:8px}.vale-dialog-card{padding:13px;max-height:calc(100dvh - 16px);grid-template-columns:80px 1fr;gap:12px}.vale-dialog-person .vale-portrait{width:70px;height:70px}.vale-dialog-header{margin-bottom:6px}.vale-dialog-header h2{font-size:20px}.vale-dialog-body{max-height:23dvh;min-height:45px;margin-bottom:6px}.vale-dialog-text{font-size:15px;line-height:1.45}.vale-dialog-card .vale-choices{max-height:29dvh}.vale-dialog-help{margin-top:5px}}
-      @media(max-width:460px){.vale-dialog-card{display:grid;grid-template-columns:58px minmax(0,1fr);gap:9px 12px}.vale-dialog-person{float:none;position:static;margin:0;width:58px;grid-column:1;grid-row:1}.vale-dialog-content{display:contents}.vale-dialog-header{grid-column:2;grid-row:1;margin-bottom:0;min-width:0}.vale-dialog-body,.vale-dialog-card .vale-choices,.vale-dialog-help{grid-column:1/-1}.vale-dialog-body{padding-right:8px}.vale-dialog-help{margin-top:0}}
+      @media(max-width:460px){.vale-dialog-card{display:grid;grid-template-columns:58px minmax(0,1fr);gap:9px 12px}.vale-dialog-person{float:none;position:static;margin:0;width:58px;grid-column:1;grid-row:1}.vale-dialog-content{display:contents}.vale-dialog-header{grid-column:2;grid-row:1;margin-bottom:0;min-width:0}.vale-dialog-body,.vale-dialog-card .vale-choices,.vale-dialog-help,.vale-reveal{grid-column:1/-1}.vale-dialog-body{padding-right:8px}.vale-dialog-help{margin-top:0}}
       @media(max-width:520px){#characterSelect .csCard,#startMenu .menuCard{padding:16px;border-width:3px}#characterSelect .cs-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#characterSelect .cs-option{padding:10px 4px;min-width:0}#characterSelect .cs-portrait{width:64px;height:86px}#characterSelect .cs-nameRow{flex-wrap:wrap}#characterSelect input{box-sizing:border-box;max-width:100%;min-width:0}#startMenu .menuGrid{grid-template-columns:1fr}#startMenu .vale-menu-story{font-size:15px;line-height:1.5}}
     `;
     document.head.append(style);
     panel=button('',()=>openBook(),'panel');panel.id='valeHud';panel.setAttribute('aria-label','Abrir Jornada do Vale, carta e moradores');
     document.getElementById('topright')?.append(panel);
-    dialog=el('div','vale-overlay');dialog.id='valeDialogue';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','valeSpeaker');
+    dialog=el('div','vale-overlay');dialog.id='valeDialogue';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','valeSpeaker');dialog.setAttribute('aria-describedby','valeSpeechText');
     book=el('div','vale-book-overlay');book.id='valeBook';book.setAttribute('role','dialog');book.setAttribute('aria-modal','true');book.setAttribute('aria-labelledby','valeBookTitle');
     document.body.append(dialog,book);
     // Captura antes dos controles do mundo: nenhuma escolha vira movimento/ação.
@@ -4681,16 +4726,17 @@ body.hud-game #legend{display:none !important;}
   }
   function showDialogue(d){
     if(!ready)return;
-    if(!d){const was=dialog.classList.contains('show');dialog.classList.remove('show');lastNpc='';if(was)returnFocus();refresh();return;}
+    if(!d){const was=dialog.classList.contains('show');dialog.classList.remove('show');lastNpc='';speech=null;if(was)returnFocus();refresh();return;}
     const was=dialog.classList.contains('show');if(!was){rememberFocus();bookOpen=false;book.classList.remove('show');}
     const oldChoice=document.activeElement?.dataset?.valeChoice;
     dialog.replaceChildren();
     const card=el('section','vale-dialog-card'),person=el('div','vale-dialog-person'),content=el('div','vale-dialog-content');
-    person.append(portrait(d.npcId==='letter'?'rosa':d.npcId,128),el('span','vale-role',d.role||''));
+    const portraitId=d.npcId==='letter'?'rosa':d.npcId,face=portrait(portraitId,128);
+    person.append(face,el('span','vale-role',d.role||''));
     const head=el('div','vale-dialog-header'),label=el('div');label.append(el('span','vale-kicker',d.title||'Uma conversa no vale'));
     const speaker=el('h2','',d.speaker||'Carta de Rosa');speaker.id='valeSpeaker';label.append(speaker);
     const body=el('div','vale-dialog-body');body.tabIndex=0;body.setAttribute('aria-label','Fala de '+(d.speaker||'Rosa')+'; use as setas para ler');
-    body.append(el('p','vale-dialog-text',d.text||''));
+    const paragraph=el('p','vale-dialog-text'),full=el('span','vale-sr-only',d.text||''),visual=el('span','vale-visual-text'),shown=el('span','vale-revealed'),hidden=el('span','vale-unrevealed');paragraph.id='valeSpeechText';visual.setAttribute('aria-hidden','true');visual.append(shown,hidden);paragraph.append(full,visual);body.append(paragraph);
     head.append(label,button('Fechar · Esc',closeDialogue,'vale-close'));content.append(head,body);
     if(d.kind==='offer')body.append(el('p','vale-offer-terms','Pedido da estação · 8 moedas na entrega. Conta apenas o que você fizer depois de aceitar. Expira quando a estação mudar.'));
     if(d.kind==='lore')body.append(el('p','vale-offer-terms','Uma lembrança do vale. Sua resposta muda a conversa; você pode pensar e voltar depois.'));
@@ -4698,8 +4744,10 @@ body.hud-game #legend{display:none !important;}
     (d.choices||[]).forEach((choice,i)=>{const b=button(choice.label,()=>story().choose(choice.id),i===0?'vale-button vale-button-primary':'vale-button');b.dataset.valeChoice=choice.id;choices.append(b);});
     if(d.canAdvance&&!(d.choices||[]).some(c=>c.id==='back'))choices.append(button('Continuar →',()=>story().advance(),'vale-button vale-button-primary'));
     if(!choices.children.length)choices.append(button('Até mais',closeDialogue));
-    content.append(choices,el('div','vale-dialog-help','Conversa pausada · Tab escolhe · Enter confirma · Esc volta ao mundo'));
+    const revealButton=button('Mostrar fala inteira · E',reveal,'vale-reveal'),help=el('div','vale-dialog-help');
+    content.append(revealButton,choices,help);
     card.append(person,content);dialog.append(card);dialog.classList.add('show');
+    const letters=Array.from(String(d.text||''));speech={npcId:portraitId,canvas:face,letters,cursor:reducedMotion()?letters.length:Math.min(3,letters.length),elapsed:0,hold:0,painted:-1,shown,hidden,revealButton,help,...delivery(d)};portraitClock=0;repaintSpeech();
     const matching=oldChoice?Array.from(choices.children).find(b=>b.dataset.valeChoice===oldChoice):null;
     (matching||choices.querySelector('button'))?.focus({preventScroll:true});lastNpc=d.npcId;refresh();
   }
@@ -4756,6 +4804,10 @@ body.hud-game #legend{display:none !important;}
       p.append(portrait(def.id,96),label);people.append(p);
     }
     card.append(people);
+    const scenes=window.FarmStoryCinematics?.catalogue?.()||[],seen=scenes.filter(s=>s.seen);
+    card.append(el('h3','','Cenas da jornada · '+seen.length+' / '+scenes.length));
+    if(scenes.some(s=>s.available||s.unlocked||s.seen))card.append(button(seen.length?'Rever cenas da jornada':'Ver cenas da jornada',()=>{closeBook(false);window.FarmStoryCinematics?.openGallery?.();}));
+    else card.append(el('p','','Os encontros importantes ganham cenas próprias. Depois de assisti-las ou pulá-las, você poderá revê-las aqui.'));
     card.append(el('h3','','Vozes do vale · '+(s.discoveries?.length||0)+' / '+(s.discoveryTotal||18)),el('p','','Cada morador conhece uma parte do passado. Converse, volte após as etapas e escute as lembranças. As histórias de depois da reabertura continuam na vida do vale.'));
     if(s.discoveries?.length){
       const collection=el('div','vale-discoveries');
@@ -4785,16 +4837,18 @@ body.hud-game #legend{display:none !important;}
       e.stopImmediatePropagation();return;
     }
     if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(bookOpen)closeBook();else closeDialogue();return;}
+    if(e.key.toLowerCase()==='e'&&dialog.classList.contains('show')){e.preventDefault();e.stopImmediatePropagation();reveal();return;}
     if(e.key==='Enter'||e.key===' '){
       e.preventDefault();e.stopImmediatePropagation();
-      const a=document.activeElement;if((a?.tagName==='BUTTON'||a?.tagName==='SUMMARY')&&active.contains(a))a.click();return;
+      const a=document.activeElement;if((a?.tagName==='BUTTON'||a?.tagName==='SUMMARY')&&active.contains(a))a.click();
+      else if(dialog.classList.contains('show')&&!reveal()&&story()?.currentDialogue()?.canAdvance)story().advance();return;
     }
     if(dialog.classList.contains('show')&&/^[1-9]$/.test(e.key)){
       e.preventDefault();e.stopImmediatePropagation();dialog.querySelectorAll('.vale-choices button')[Number(e.key)-1]?.click();return;
     }
     e.stopImmediatePropagation();if(['w','a','s','d','q','f','c','r','e','h','j','i'].includes(e.key.toLowerCase()))e.preventDefault();
   }
-  window.FarmStoryUI={init(a){adapter=a||{};install();},refresh,showDialogue,open:openBook,close(){closeBook(false);closeDialogue();},isOpen(){return bookOpen||!!story()?.isOpen();}};
+  window.FarmStoryUI={init(a){adapter=a||{};install();},refresh,showDialogue,update,reveal,speechState,open:openBook,close(){closeBook(false);closeDialogue();},isOpen(){return bookOpen||!!story()?.isOpen();},presentation(){return speech?{npcId:speech.npcId,visible:Math.floor(speech.cursor),total:speech.letters.length,elapsed:speech.elapsed,...speechState()}:null;}};
 })();
 
 /* ===================================
@@ -4804,6 +4858,9 @@ body.hud-game #legend{display:none !important;}
 (function(){
   'use strict';
   let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
+  let cinematicReady=false,lastStory=null;
+  const cinematicQueue=[];
+  const chapterScenes={1:'horta',2:'rio',3:'abrigo',4:'oasis'};
   const actors=[];
   const homes={};
   let navigation=null,navVersion='',community={x:608,y:1260};
@@ -4877,8 +4934,46 @@ body.hud-game #legend{display:none !important;}
     if(shopOpen)closeShop();if(inventoryOpen)toggleInventory(false);if(journalOpen)toggleJournal(false);if(skinOpen)toggleSkinView();
     for(const k in keys)keys[k]=false;player.moving=false;player.running=false;
   }
+  function scheduleSave(){
+    if(gameStarted&&!restoring&&!pendingSave){
+      pendingSave=true;queueMicrotask(()=>{pendingSave=false;if(gameStarted&&!restoring)saveGame(true);});
+    }
+  }
+  function queueScene(id){
+    if(!id||cinematicQueue.includes(id)||window.FarmStoryCinematics?.catalogue?.().find(s=>s.id===id)?.seen)return;
+    cinematicQueue.push(id);
+  }
+  function observeStory(snapshot){
+    const current={index:snapshot.chapter?.index||0,status:snapshot.chapter?.status||'available'};
+    if(lastStory&&!restoring){
+      if(current.index===lastStory.index&&current.status==='active'&&lastStory.status==='available')queueScene(chapterScenes[current.index]);
+      if(current.index===6&&lastStory.index<6)queueScene('reabertura');
+    }
+    lastStory=current;
+  }
+  function initializeCinematics(){
+    if(cinematicReady||!window.FarmStoryCinematics)return;cinematicReady=true;
+    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),reducedMotion:!!A11Y.reduceMotion}),
+      beforeOpen(){FarmStoryUI.close();beforeOpen();},
+      onClose(){document.getElementById('game')?.focus({preventScroll:true});FarmStoryUI.refresh();},
+      onChange(){FarmStoryUI.refresh();scheduleSave();},
+      drawWorld(g,view){return window.drawCinematicWorld?.(g,view)===true;}
+    });
+  }
+  function visualUpdate(dt){
+    if(!active||!gameStarted||document.hidden)return;initializeCinematics();
+    FarmStoryUI.update(dt);window.FarmStoryCinematics?.update?.(dt);
+    if(!cinematicQueue.length||!window.FarmStoryCinematics||FarmStoryCinematics.isOpen()||FarmStoryUI.isOpen()
+      ||isPaused||cutsceneActive||player.dead||histologyMissionOpen||tutorialActive
+      ||(typeof _pendingTutorialAfterCutscene!=='undefined'&&_pendingTutorialAfterCutscene)
+      ||document.getElementById('tutorialOverlay')?.classList.contains('show'))return;
+    FarmStoryCinematics.play(cinematicQueue.shift());
+  }
+  function notifyNewGame(){cinematicQueue.length=0;lastStory=null;observeStory(FarmStoryWorld.snapshot());queueScene('carta');}
   function drawNPC(o,g){
-    window.FarmCharacterArt?.drawNPC(g,o,{winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
+    const delivery=window.FarmStoryUI?.speechState?.(o.npcId)||{};
+    const pose=delivery.expression?{...o,moving:false,gaitBlend:0,npcActivity:'talk'}:o;
+    window.FarmCharacterArt?.drawNPC(g,pose,{winter:isFrio(),time:performance.now(),...delivery,reducedMotion:!!A11Y.reduceMotion});
     if(!gameStarted||cutsceneActive||player.dead||currentScene!=='main')return;
     const def=FarmStoryWorld.characters.find(n=>n.id===o.npcId),near=nearObj(['story_npc'],55)===o;
     if(!near)return;
@@ -4893,8 +4988,8 @@ body.hud-game #legend{display:none !important;}
   }
   function init(){
     if(active)return;active=true;
-    FarmStoryUI.init({read,drawMap:map,beforeOpen,focusGame(){document.getElementById('game')?.focus({preventScroll:true});},
-      canOpen:()=>gameStarted&&!player.dead&&!cutsceneActive&&!histologyMissionOpen&&!document.getElementById('tutorialOverlay')?.classList.contains('show')});
+    FarmStoryUI.init({read,drawMap:map,beforeOpen,reducedMotion:()=>!!A11Y.reduceMotion,focusGame(){document.getElementById('game')?.focus({preventScroll:true});},
+      canOpen:()=>gameStarted&&!player.dead&&!cutsceneActive&&!window.FarmStoryCinematics?.isOpen?.()&&!histologyMissionOpen&&!document.getElementById('tutorialOverlay')?.classList.contains('show')});
     FarmStoryWorld.init({readState:read,
       reward(event){
         const coins=Math.floor(Number(event.coins)||0);if(coins<=0||coins>1000)return;
@@ -4903,11 +4998,10 @@ body.hud-game #legend{display:none !important;}
         flashFx(player.x,player.y-24,'+'+coins+' moedas','#efd19a');
         window.synthSfx?.chimeOk?.();
       },
-      onChange(){
+      onChange(snapshot){
+        observeStory(snapshot);
         FarmStoryUI.refresh();
-        if(gameStarted&&!restoring&&!pendingSave){
-          pendingSave=true;queueMicrotask(()=>{pendingSave=false;if(gameStarted&&!restoring)saveGame(true);});
-        }
+        scheduleSave();
       },
       onDialogue(d){
         if(d)beforeOpen();FarmStoryUI.showDialogue(d);
@@ -4919,6 +5013,7 @@ body.hud-game #legend{display:none !important;}
       }
     });
     for(const def of FarmStoryWorld.characters)place(def);
+    observeStory(FarmStoryWorld.snapshot());initializeCinematics();
     rebuildNavigation();
     FarmBiomes.registerObjectDrawer('story_npc',drawNPC);
     FarmBiomes.registerInteraction('story_npc',o=>{if(!gameStarted||player.dead)return false;FarmStoryWorld.interact(o.npcId);return true;});
@@ -5018,12 +5113,13 @@ body.hud-game #legend{display:none !important;}
     if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.y))return false;
     community={x:point.x,y:point.y};navigation=null;for(const o of actors)o._routineKey='';return true;
   }
-  function reset(){if(!active)return;FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}FarmStoryUI.refresh();}
-  function restore(data){if(!active)return;restoring=true;try{FarmStoryUI.close();FarmStoryWorld.restore(data,read());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}FarmStoryUI.refresh();}
-  window.FarmStoryIntegration={init,update,reset,restore,read,configureCommunity,
+  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}FarmStoryUI.refresh();}
+  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;restoring=true;try{FarmStoryUI.close();FarmStoryWorld.restore(data,read());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}FarmStoryUI.refresh();}
+  window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,
+    cinematicQueue:()=>cinematicQueue.slice(),
     navigationState(){return actors.map(o=>({npcId:o.npcId,x:o.x,y:o.y,moving:o.moving,anim:o.anim,activity:o.npcActivity,routeLength:o._route.length,routine:o.routineDescription,region:o.region}));},
     record(type,payload){if(active&&gameStarted&&!player.dead)FarmStoryWorld.record(type,payload||{});},
-    isOpen:()=>!!window.FarmStoryUI?.isOpen()};
+    isOpen:()=>!!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()};
 })();
 
 /* ===========================
@@ -6839,8 +6935,8 @@ body.hud-game #legend{display:none !important;}
   Object.values(profiles).forEach(Object.freeze);Object.freeze(profiles);Object.freeze(heroM);Object.freeze(heroF);
   // A margem é transparente: reserva o arco de passada e a ponta da ferramenta.
   // O contato com o chão continua em y+10, sem alterar colisão ou profundidade.
-  const W=48,H=52,AX=24,AY=38,FEET_Y=10,MAX_SPRITES=768;
-  const sprites=new Map(),portraits=new Map();
+  const W=48,H=52,AX=24,AY=38,FEET_Y=10,MAX_SPRITES=768,MAX_PORTRAITS=256,MAX_SPEECH_BANKS=48;
+  const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
     if(typeof OffscreenCanvas!=='undefined') return new OffscreenCanvas(w,h);
     const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -6857,6 +6953,18 @@ body.hud-game #legend{display:none !important;}
   function blend(value,fallback){return Math.round(Math.max(0,Math.min(1,Number.isFinite(value)?value:fallback))*8);}
   function position(actor,opts){return {x:Number.isFinite(opts.x)?opts.x:Math.round(Number(actor.x)||0),
     y:Number.isFinite(opts.y)?opts.y:Math.round(Number(actor.y)||0)};}
+  function conversation(opts,allowed=true){
+    const conversing=allowed&&(!!opts.speaking||['explain','invite','nod','listen'].includes(opts.gesture));
+    const expression=conversing&&['warm','thoughtful','concerned','joyful'].includes(opts.expression)?opts.expression:'neutral';
+    const gesture=conversing&&['explain','invite','nod','listen'].includes(opts.gesture)?opts.gesture:'';
+    const t=Math.max(0,Number.isFinite(opts.speechTime)?opts.speechTime:clock(opts)/1000);
+    // A cadência tem pausas entre sílabas, em vez de abrir e fechar como um
+    // metrônomo. São quatro bocas e três níveis de gesto, sempre cacheáveis.
+    const mouth=conversing&&opts.speaking&&!opts.reducedMotion?[0,1,2,1,0,3,1,2,0,1,3,0][Math.floor(t/.12)%12]:0;
+    const speechPhase=conversing&&!opts.reducedMotion&&gesture?[0,0,1,1,2,2,1,0][Math.floor(t/.24)%8]:0;
+    const speechBlink=conversing&&!opts.reducedMotion&&t%4.6>4.42;
+    return{conversing,expression,gesture,mouth,speechPhase,speechBlink};
+  }
   function state(actor,opts,hero){
     const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
     const restMode=rest&&opts.restMode==='bed'?'bed':rest?'sit':'';
@@ -6867,19 +6975,20 @@ body.hud-game #legend{display:none !important;}
     // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
     const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
     const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
-    const job=!hero&&!actor.moving&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
+    const speech=conversation(opts,!actor.dead&&!rest);
+    const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
-    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion;
+    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion&&!speech.conversing;
     // A simulação conserva a fase ao parar. A amplitude recolhe a passada até
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
     return {dir:dirOf(actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
-      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,
+      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
       actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
-      blink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
+      blink:speech.conversing?speech.speechBlink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
       hat:hero&&!!actor.hat,coat:hero&&!!actor.coatEquipped,scarf:hero&&!!actor.scarf,
       boots:hero&&!!actor.boots,gloves:hero&&!!actor.glovesEquipped,
       blanket:hero&&!!actor.blanketEquipped,towel:hero&&actor.towelTimer>0};
@@ -6928,6 +7037,7 @@ body.hud-game #legend{display:none !important;}
   // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
   function paintHead(g,d,s){
+    if(s.conversing){g.save();if(['nod','listen'].includes(s.gesture)&&s.speechPhase===2)g.translate(0,1);}
     const side=s.dir===1||s.dir===2,back=s.dir===3;
     // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
     rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
@@ -6980,7 +7090,36 @@ body.hud-game #legend{display:none !important;}
       rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
       rect(g,P.terra,side?2:3,-15,2,5);rect(g,'#794b43',side?3:4,-14,1,4);
     }
+    if(s.conversing&&!back){
+      // O queixo continua no mesmo rosto, inclusive sob a barba do Caio.
+      // Expressão e boca não atravessam os equipamentos ou o penteado.
+      const mx=side?3:-1,my=-18;
+      rect(g,d.skin,side?2:-2,-19,side?3:5,2);
+      if(s.mouth===1){rect(g,d.skinSh,mx,my-1,side?2:3,2);rect(g,P.cream,mx,my-1,side?1:2,1);}
+      else if(s.mouth===2){rect(g,P.ink,mx,my-1,side?2:3,2);rect(g,d.skinSh,mx,my+1,side?2:3,1);}
+      else if(s.mouth===3){rect(g,d.skinSh,mx,my-1,2,2);rect(g,P.ink,mx+1,my-1,1,1);}
+      else{rect(g,d.skinSh,mx,my,side?2:3,1);if(['warm','joyful'].includes(s.expression))rect(g,P.cream,mx,my,side?1:2,1);}
+      if(s.expression==='concerned'){
+        rect(g,d.hairSh,side?2:-3,-24,side?2:2,1);if(!side)rect(g,d.hairSh,2,-24,2,1);
+        rect(g,d.hairSh,side?3:-2,-23,1,1);if(!side)rect(g,d.hairSh,2,-23,1,1);
+      }else if(s.expression==='thoughtful'){
+        rect(g,d.hairSh,side?2:-3,-24,side?2:3,1);if(!side)rect(g,d.hairSh,2,-23,2,1);
+      }else if(s.expression==='joyful'){
+        rect(g,d.skinSh,side?4:-4,-20,1,1);if(!side)rect(g,d.skinSh,3,-20,1,1);
+        rect(g,P.cream,mx,my-1,side?1:2,1);
+      }
+    }
     if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
+    if(s.conversing)g.restore();
+  }
+  function paintSpeechGesture(g,d,s,hand,behind){
+    if(!s.conversing||s.moving||(s.dir===3)!==behind||!['explain','invite'].includes(s.gesture))return;
+    const side=s.dir===1||s.dir===2,back=s.dir===3,phase=s.speechPhase;
+    const invite=s.gesture==='invite',hx=side?3+phase:back?5:6+phase,hy=-9-phase*(invite?1:2);
+    const sleeve=s.coat?'#739598':d.shirtHi;
+    limb(g,sleeve,side?0:5,-14,side?1:6,-11,3);limb(g,sleeve,side?1:6,-11,hx-1,hy-1,2);
+    rect(g,hand,hx,hy,invite?3:2,2);rect(g,d.skinHi,hx,hy,invite?2:1,1);
+    if(invite&&phase>0)rect(g,hand,hx+2,hy-1,1,1);
   }
   function paintRest(g,d,s){
     // O primeiro estágio conserva a silhueta anterior ao agachar. A mesma
@@ -7084,6 +7223,7 @@ body.hud-game #legend{display:none !important;}
       }
     }
     paintAction(g,d,s,hand,true);
+    paintSpeechGesture(g,d,s,hand,true);
     // Na corrida o peito avança um pixel sobre o apoio; cabeça e roupa seguem
     // o mesmo volume, sem sacudir os pés ou deslocar a sombra.
     g.translate(side?Math.round(run*strength):0,lift);
@@ -7095,7 +7235,7 @@ body.hud-game #legend{display:none !important;}
       limb(g,shirtSh,-2,-15,Math.round(rearHand*.45)-2,-11,3);
       limb(g,shirtSh,Math.round(rearHand*.45)-2,-11,rearHand-1,handY-1,2);rect(g,hand,rearHand,handY,2,2);
       rect(g,shirt,-4,-16,8,9);rect(g,shirtHi,-4,-15,2,7);rect(g,shirtSh,2,-15,2,9);
-      if(!s.action){
+      if(!s.action&&!(s.conversing&&!s.moving&&['explain','invite'].includes(s.gesture))){
         limb(g,shirtHi,-1,-14,Math.round(frontHand*.4)-1,-10,3);
         limb(g,shirtHi,Math.round(frontHand*.4)-1,-10,frontHand,handY-1,2);rect(g,hand,frontHand+1,handY,2,2);
       }
@@ -7104,7 +7244,7 @@ body.hud-game #legend{display:none !important;}
       rect(g,shirt,-6,-16,12,9);rect(g,shirtHi,-6,-15,2,7);rect(g,shirtSh,4,-15,2,8);
       rect(g,shirt,-6,-7,12,1);rect(g,shirt,-6,-15,12,2);
       rect(g,shirt,-6,-15,12,2);
-      if(!s.action){rect(g,shirtHi,5,-14-swing,3,6);rect(g,hand,6,-8-swing,2,2);}
+      if(!s.action&&!(s.conversing&&!s.moving&&['explain','invite'].includes(s.gesture))){rect(g,shirtHi,5,-14-swing,3,6);rect(g,hand,6,-8-swing,2,2);}
     }
     if(d.style==='apron'&&!s.coat){
       rect(g,d.shirt,side?-5:-7,-8,side?10:14,4);rect(g,d.shirtSh,side?3:5,-8,2,4);
@@ -7141,6 +7281,7 @@ body.hud-game #legend{display:none !important;}
     }
     paintHead(g,d,s);
     paintAction(g,d,s,hand,false);
+    paintSpeechGesture(g,d,s,hand,false);
     g.restore();
   }
   function sprite(id,gender,s){
@@ -7151,6 +7292,27 @@ body.hud-game #legend{display:none !important;}
     g.globalCompositeOperation='source-in';rect(g,P.ink,0,0,W,H);g.globalCompositeOperation='source-over';g.drawImage(raw,0,0);
     if(sprites.size>=MAX_SPRITES) sprites.delete(sprites.keys().next().value);sprites.set(key,c);return c;
   }
+  function speechFrame(s){return (s.speechPhase*2+Number(s.blink))*4+s.mouth;}
+  function drawSprite(g,id,gender,s,x,y){
+    if(!s.conversing){g.drawImage(sprite(id,gender,s),x,y);return;}
+    // Cada banco contém a combinação inteira: 4 bocas × 2 olhos × 3 gestos.
+    // Abrir uma fala aquece um banco; avançar o texto só recorta drawImage.
+    // A identidade, roupa e fase da passada continuam no mesmo desenho.
+    const bankState={...s,mouth:0,blink:false,speechBlink:false,speechPhase:0};
+    const key=id+'|'+(id==='player'?gender:'m')+'|'+Object.values(bankState).join(',');let bank=speechBanks.get(key);
+    if(!bank){
+      const raw=canvas(W*24,H),rg=raw.getContext('2d');rg.imageSmoothingEnabled=false;
+      for(let phase=0;phase<3;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
+        const frame=(phase*2+blink)*4+mouth;rg.save();rg.translate(frame*W,0);
+        paintBody(rg,profile(id,gender),{...s,mouth,blink:!!blink,speechBlink:!!blink,speechPhase:phase});rg.restore();
+      }
+      bank=canvas(W*24,H);const bg=bank.getContext('2d');bg.imageSmoothingEnabled=false;
+      bg.drawImage(raw,-1,0);bg.drawImage(raw,1,0);bg.drawImage(raw,0,-1);bg.drawImage(raw,0,1);
+      bg.globalCompositeOperation='source-in';rect(bg,P.ink,0,0,W*24,H);bg.globalCompositeOperation='source-over';bg.drawImage(raw,0,0);
+      if(speechBanks.size>=MAX_SPEECH_BANKS)speechBanks.delete(speechBanks.keys().next().value);speechBanks.set(key,bank);
+    }
+    g.drawImage(bank,speechFrame(s)*W,0,W,H,x,y,W,H);
+  }
   function shadow(g,x,feet,rest){
     rect(g,'rgba(24,59,54,0.13)',x-(rest?10:8),feet-2,rest?20:16,4);
     rect(g,'rgba(24,59,54,0.22)',x-(rest?8:6),feet-1,rest?16:12,2);
@@ -7160,7 +7322,7 @@ body.hud-game #legend{display:none !important;}
     if(!g||!actor) return false;const p=position(actor,opts),s=state(actor,opts,hero);
     g.save();g.imageSmoothingEnabled=false;if(s.restMode!=='bed')shadow(g,p.x,p.y+FEET_Y,s.rest);
     if(actor.dead) g.globalAlpha*=0.65;
-    g.drawImage(sprite(id,actor.gender==='f'?'f':'m',s),p.x-AX,p.y+FEET_Y-AY);
+    drawSprite(g,id,actor.gender==='f'?'f':'m',s,p.x-AX,p.y+FEET_Y-AY);
     if(hero&&!opts.reducedMotion&&!actor.dead&&s.restMode!=='bed'){
       const phase=Math.floor(clock(opts)/180)%4;
       if(opts.winter&&actor.temp<36.2&&s.dir!==3){
@@ -7173,12 +7335,13 @@ body.hud-game #legend{display:none !important;}
   }
   // Retrato de 32×32 ampliado sem suavização: desenhado para a tela, não
   // um recorte do sprite. Traços, expressão e penteado pertencem ao elenco.
-  function paintPortrait(g,d,id,gender){
+  function paintPortrait(g,d,id,gender,s=null){
     rect(g,P.ink,0,0,32,32);rect(g,P.amber,1,1,30,30);rect(g,P.edge,2,2,28,28);
     rect(g,P.sage,3,3,26,26);rect(g,'#7c946b',3,3,16,14);
     rect(g,'#91a676',4,4,9,10);rect(g,P.leaf,5,5,5,1);
     // Pequeno ramo bordado no fundo, coerente com o vale.
     for(let i=0;i<4;i++){rect(g,P.edge,25-i,18+i*2,1,2);rect(g,P.leaf,24-i,17+i*2,2,1);}
+    if(s){g.save();if(['nod','listen'].includes(s.gesture)&&s.speechPhase===2)g.translate(0,1);}
     rect(g,d.shirtSh,6,26,21,4);rect(g,d.shirt,8,24,17,6);rect(g,d.shirtHi,8,25,5,5);
     rect(g,d.shirtSh,23,26,3,4);rect(g,d.skinSh,13,21,7,5);rect(g,d.skin,14,21,4,4);
     rect(g,d.trim,11,25,3,2);rect(g,P.cream,13,25,3,3);rect(g,P.cream,18,25,3,2);
@@ -7245,18 +7408,62 @@ body.hud-game #legend{display:none !important;}
       rect(g,P.edge,9,8,16,1);rect(g,'#bd9450',6,9,22,3);rect(g,P.amber,6,9,20,1);rect(g,P.cream,7,9,6,1);
       rect(g,P.soil,21,26,2,4);rect(g,P.amber,22,27,2,1);rect(g,P.edge,16,28,1,2);
     }
+    if(s){paintPortraitSpeech(g,d,s);g.restore();}
     // A borda em degraus enquadra a figura, preservando a grade de pixel.
     rect(g,P.ink,0,0,32,1);rect(g,P.ink,0,31,32,1);rect(g,P.ink,0,0,1,32);rect(g,P.ink,31,0,1,32);
     rect(g,P.cream,2,2,1,1);rect(g,P.cream,29,29,1,1);
   }
+  function paintPortraitSpeech(g,d,s){
+    const bright=d.expression==='curious'||d.expression==='bright';
+    // Óculos e sardas ficam fora das duas janelas dos olhos. O fundo do rosto
+    // é recomposto antes do piscar para não deixar a pupila antiga aparente.
+    for(const [x,w]of [[12,4],[19,3]]){
+      rect(g,d.skin,x,14,w,2);
+      if(s.blink)rect(g,d.hairSh,x,15,w-1,1);
+      else{rect(g,P.cream,x,14,w,bright||s.expression==='joyful'?2:1);rect(g,P.ink,x+(x===12?2:1),14,1,bright||s.expression==='joyful'?2:1);}
+    }
+    rect(g,d.skin,12,12,4,2);rect(g,d.skin,19,12,3,2);
+    if(s.expression==='concerned'){
+      rect(g,d.hairSh,12,13,2,1);rect(g,d.hairSh,14,12,2,1);rect(g,d.hairSh,19,12,2,1);rect(g,d.hairSh,21,13,1,1);
+    }else if(s.expression==='thoughtful'){
+      rect(g,d.hairSh,12,12,4,1);rect(g,d.hairSh,19,13,3,1);
+    }else{
+      rect(g,d.hairSh,12,13-(s.expression==='joyful'?1:0),4,1);rect(g,d.hairSh,19,13-(s.expression==='joyful'?1:0),3,1);
+    }
+    // A armação da Rosa continua dourada; sobrancelhas ficam logo acima dela.
+    if(d.hairStyle==='bun'){rect(g,P.amber,11,13,6,1);rect(g,P.amber,18,13,5,1);}
+    rect(g,d.skin,14,19,7,3);rect(g,d.skinHi,16,21,3,1);
+    if(s.mouth===1){rect(g,d.skinSh,15,19,5,2);rect(g,P.cream,16,19,3,1);}
+    else if(s.mouth===2){rect(g,P.ink,16,19,3,3);rect(g,d.skinSh,15,20,1,1);rect(g,d.skinSh,19,20,1,1);rect(g,P.cream,16,19,3,1);}
+    else if(s.mouth===3){rect(g,d.skinSh,17,19,3,2);rect(g,P.ink,18,19,1,2);}
+    else{
+      rect(g,d.skinSh,15,20,5,1);
+      if(['warm','joyful'].includes(s.expression)){rect(g,P.cream,16,20,3,1);rect(g,d.skinSh,15,19,1,1);rect(g,d.skinSh,19,19,1,1);}
+      if(s.expression==='concerned'){rect(g,d.skinSh,16,19,3,1);rect(g,d.skin,16,20,3,1);}
+      if(s.expression==='thoughtful'){rect(g,d.skinSh,18,19,3,1);}
+    }
+    if(s.expression==='joyful'){rect(g,d.skinSh,12,18,2,1);rect(g,d.skinSh,21,18,1,1);}
+    if(['explain','invite'].includes(s.gesture)&&s.speechPhase>0){
+      const x=s.gesture==='invite'?24:22,y=28-s.speechPhase;
+      rect(g,d.shirtHi,x-1,y+1,3,3);rect(g,d.skin,x,y,3,2);rect(g,d.skinHi,x,y,2,1);
+    }
+  }
   function drawPortrait(target,id,opts={}){
     if(!target?.getContext) return false;id=profiles[id]?id:'player';const gender=opts.gender==='f'?'f':'m';
-    const key=id+'|'+gender;let cached=portraits.get(key);
-    if(!cached){cached=canvas(32,32);paintPortrait(cached.getContext('2d'),profile(id,gender),id,gender);portraits.set(key,cached);}
+    const speech=conversation(opts),s={...speech,blink:speech.speechBlink};
+    const key=s.conversing?'fala|'+id+'|'+(id==='player'?gender:'m')+'|'+s.expression+'|'+s.gesture:id+'|'+gender;let cached=portraits.get(key);
+    if(!cached){
+      cached=canvas(s.conversing?32*24:32,32);const cg=cached.getContext('2d');
+      if(s.conversing){for(let phase=0;phase<3;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
+        const frame=(phase*2+blink)*4+mouth;cg.save();cg.translate(frame*32,0);paintPortrait(cg,profile(id,gender),id,gender,{...s,mouth,blink:!!blink,speechPhase:phase});cg.restore();
+      }}else paintPortrait(cg,profile(id,gender),id,gender);
+      if(portraits.size>=MAX_PORTRAITS)portraits.delete(portraits.keys().next().value);portraits.set(key,cached);
+    }
     if(!target.width) target.width=96;if(!target.height) target.height=96;
     const g=target.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,target.width,target.height);
     g.imageSmoothingEnabled=false;const size=Math.min(target.width,target.height),x=Math.floor((target.width-size)/2),y=Math.floor((target.height-size)/2);
-    rect(g,P.ink,0,0,target.width,target.height);g.drawImage(cached,x,y,size,size);g.restore();
+    rect(g,P.ink,0,0,target.width,target.height);
+    if(s.conversing)g.drawImage(cached,speechFrame(s)*32,0,32,32,x,y,size,size);else g.drawImage(cached,x,y,size,size);g.restore();
     target.setAttribute?.('role','img');target.setAttribute?.('aria-label','Retrato de '+(opts.name||profile(id,gender).name));return true;
   }
   window.FarmCharacterArt=Object.freeze({
@@ -7265,7 +7472,7 @@ body.hud-game #legend{display:none !important;}
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
     // Diagnóstico de baixo custo para integração; não revela nem altera saves.
-    cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,maxSprites:MAX_SPRITES};}
+    cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,speechBanks:speechBanks.size,maxSprites:MAX_SPRITES,maxPortraits:MAX_PORTRAITS,maxSpeechBanks:MAX_SPEECH_BANKS};}
   });
 })();
 
@@ -8059,6 +8266,208 @@ body.hud-game #legend{display:none !important;}
   info(){return{version:3,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
  };
  (window.__farmBiomes=window.__farmBiomes||[]).push(api=>{api.registerObjectDrawer('animal',(animal,g)=>draw(g,animal));});
+})();
+
+/* ==================================
+   src/modules/34-story-cinematics.js
+   ================================== */
+/* Pequenos filmes do Vale: palco original, sem mover o mundo nem dar recompensas.
+   init({readState,beforeOpen,afterClose,onChange,drawWorld}); update(dt) é chamado
+   pela barreira de leitura do jogo. As cenas aguardam avanço do jogador. */
+(function(){
+  'use strict';
+  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',player:'Você'};
+  const shot=(speaker,line,expression='warm',gesture='explain',focus=0)=>({speaker,line,expression,gesture,focus});
+  const films=[
+    {id:'carta',title:'Uma cadeira guardada',chapter:0,region:'farm',scene:'main',focusX:264,focusY:920,
+      description:'Rosa abre o embrulho da semente e faz um convite.',cast:['rosa','player'],prop:'seed',
+      shots:[shot('rosa','Guardei esta semente no papel dos três ventos. Pensei que você gostaria de abrir o embrulho comigo.','warm','invite',-1),
+        shot('player','Eu lembrava dos riscos. Não lembrava que a semente ainda estava aqui.','thoughtful','nod',1),
+        shot('rosa','A ventania levou a placa, mas fomos nós que deixamos a mesa vazia. Lia, Tomás e Nico têm um começo para contar.','thoughtful','explain',-1),
+        shot('rosa','Não precisamos fazer tudo hoje. Guardei uma cadeira. Vamos começar pela conversa?','warm','invite',0)]},
+    {id:'horta',title:'Antes da placa',chapter:1,region:'farm',scene:'main',focusX:376,focusY:968,
+      description:'Nico troca seus sete desenhos por uma primeira experiência.',cast:['nico','rosa','player'],prop:'sign',
+      shots:[shot('nico','Fiz sete desenhos para a placa. Este vento parece um macarrão, mas a palavra ficou boa: entre!','joyful','explain',-1),
+        shot('rosa','E o que quem entrar vai encontrar, Nico?','warm','nod',1),
+        shot('nico','Uma horta. Três plantas para começar, água na hora certa e tempo para observar. Desta vez eu não puxo a semente!','joyful','explain',-1),
+        shot('player','Então a placa espera. Primeiro fazemos uma coisa que vale mostrar.','warm','invite',0)]},
+    {id:'rio',title:'O rio também faz pausa',chapter:2,region:'farm',scene:'main',focusX:744,focusY:884,
+      description:'Lia liga a observação do vale ao cuidado com quem trabalha nele.',cast:['lia','player'],prop:'notebook',
+      shots:[shot('lia','Olhe a margem: o rio continua correndo e este pedaço fica tranquilo. O mesmo lugar pode ter ritmos diferentes.','thoughtful','explain',-1),
+        shot('player','Eu estava olhando só para a horta. Esqueci de reparar em quem cuidava dela.','thoughtful','nod',1),
+        shot('lia','Eu também esqueço às vezes. Na Visão da Pele, observe; no mundo, considere o esforço, o abrigo e as reservas. Depois procure uma explicação.','thoughtful','explain',-1),
+        shot('lia','Deixei espaço no caderno para uma pergunta sua. E espaço na sombra para uma pausa nossa.','warm','invite',0)]},
+    {id:'abrigo',title:'A curva e o próximo apoio',chapter:3,region:'mountain',scene:'main',focusX:520,focusY:252,
+      description:'Inês e Tomás combinam uma rota com apoio, sem apressar a travessia.',cast:['ines','tomas','player'],prop:'ribbon',
+      shots:[shot('ines','A fita da curva se perdeu na ventania. A trilha continuou aqui, mas chegar deixou de parecer simples.','concerned','explain',-1),
+        shot('tomas','Trouxe uma marca nova. Primeiro você me mostra onde ela ajuda; depois eu aperto o nó.','thoughtful','nod',1),
+        shot('ines','Curva, abrigo, volta. Lã e casaco fazem parte do preparo. Nosso próximo ponto de apoio não precisa ser o ponto mais longe.','thoughtful','explain',-1),
+        shot('player','Vou conferir o equipamento e seguir no meu ritmo. A rota também inclui saber voltar.','warm','nod',0)]},
+    {id:'oasis',title:'Mais que uma entrega',chapter:4,region:'desert',scene:'main',focusX:632,focusY:1816,
+      description:'Caio e Nico descobrem o que uma caixa pode levar além de uma carga.',cast:['caio','nico','player'],prop:'vessel',
+      shots:[shot('caio','Este recipiente tem três marcas: a minha, a de Rosa e a de Inês. Nenhuma reserva chegou sozinha.','thoughtful','explain',-1),
+        shot('nico','Posso desenhar as marcas na placa? Assim quem chega entende de onde vem a água.','joyful','explain',1),
+        shot('caio','Pode. O ponto de coleta fica na margem sul. Vamos combinar as reservas e deixar tempo para conversar no caminho.','warm','invite',-1),
+        shot('player','A próxima viagem pode levar uma história junto das caixas. Quero ouvir a sua também.','warm','nod',0)]},
+    {id:'reabertura',title:'A mesa dos três ventos',chapter:6,region:'farm',scene:'main',focusX:608,focusY:1212,
+      description:'Os seis moradores voltam à mesa. O fim da história abre o próximo dia.',cast:['rosa','lia','tomas','ines','caio','nico'],prop:'table',
+      shots:[shot('tomas','A mesa tem três madeiras. Deixei as emendas à vista: uma peça de cada lugar.','warm','explain',-1),
+        shot('ines','Ouvi o sino da curva. Desta vez, sabia que havia uma cadeira esperando.','warm','nod',1),
+        shot('caio','Trouxe uma caixa menor e tempo sem encomenda. Foi o trecho que mais precisei aprender.','warm','explain',1),
+        shot('lia','Meu caderno tem novas perguntas. A casa aberta nos dá um lugar para observá-las juntos.','thoughtful','explain',-1),
+        shot('nico','Pendurei a placa! Está um pouco torta. E deixei uma página vazia para amanhã.','joyful','invite',1),
+        shot('rosa','Então entrem. Hoje celebramos; amanhã plantamos de novo. O vale continua, e ninguém precisa conhecer sozinho a história inteira.','joyful','invite',0)]}
+  ];
+  const byId=new Map(films.map(f=>[f.id,f]));
+  let adapter={},seen=new Set(),unlockedChapter=0,active=null,root=null,stage=null,portrait=null,textEl=null,fullTextEl=null,heading=null,subheading=null,counter=null,nextButton=null,stageContext=null;
+  let previousFocus=null,previousOverflow='',initialized=false,reduced=false;
+  const ease=n=>{n=Math.max(0,Math.min(1,n));return n*n*(3-2*n);};
+  const safely=(fn,...args)=>{if(typeof fn!=='function')return undefined;try{return fn(...args);}catch(err){console.warn('Cena do vale:',err);return undefined;}};
+  const read=()=>safely(adapter.readState||adapter.read)||{};
+  const isReduced=()=>!!read().reducedMotion||!!read().reduceMotion||!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  function install(){
+    if(root)return;
+    const css=document.createElement('style');css.id='vale-cinema-style';css.textContent=`
+      #valeCinema{position:fixed;inset:0;z-index:24000;display:none;background:rgba(9,18,22,.97);color:#f7eed8;font-family:inherit;box-sizing:border-box;overscroll-behavior:contain;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+      #valeCinema[aria-hidden="false"]{display:flex;align-items:center;justify-content:center}#valeCinema *{box-sizing:border-box}#valeCinema [hidden]{display:none!important}#valeCinema .vc-film{width:min(1040px,100%);max-height:100%;display:flex;flex-direction:column;gap:12px}
+      #valeCinema .vc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}#valeCinema h2{font-size:clamp(18px,3vw,27px);margin:3px 0;font-weight:750;letter-spacing:.01em}#valeCinema .vc-eyebrow{color:#c5b489;font-size:11px;letter-spacing:.2em;text-transform:uppercase}#valeCinema .vc-subtitle{font-size:12px;color:#b2c8bc;margin:4px 0 0}
+      #valeCinema button{min-height:44px;border:1px solid #768f83;border-radius:9px;background:#1b332d;color:#f7eed8;font:inherit;padding:9px 16px;cursor:pointer;touch-action:manipulation}#valeCinema button:hover{background:#2c5142}#valeCinema button:focus-visible{outline:3px solid #f4cb77;outline-offset:3px}#valeCinema .vc-skip{background:transparent;font-size:13px;flex-shrink:0}
+      #valeCinema .vc-stage{width:100%;height:auto;aspect-ratio:2/1;max-height:50vh;object-fit:contain;background:#183329;border:1px solid #536b59;border-radius:12px;image-rendering:pixelated;flex-shrink:1;min-height:0}#valeCinema .vc-dialogue{display:grid;grid-template-columns:92px 1fr;gap:16px;border:1px solid #627765;border-radius:12px;padding:15px 19px;background:linear-gradient(110deg,#1a302a,#162923);min-height:140px;box-shadow:0 12px 32px #0004}#valeCinema .vc-portrait{width:88px;height:88px;image-rendering:pixelated;border:1px solid #ab9470;border-radius:5px;align-self:start}#valeCinema .vc-speaker{font-weight:750;color:#f2cd7b;display:block;margin:0 0 7px}#valeCinema .vc-line{font-size:clamp(15px,2vw,18px);line-height:1.5;margin:0;min-height:2.5em}#valeCinema .vc-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;color:#b7c7bd;font-size:12px}#valeCinema .vc-next{background:#d5b76a;border-color:#d5b76a;color:#162620;font-weight:750;min-width:160px}#valeCinema .vc-next:hover{background:#ebcf85}#valeCinema .vc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+      #valeCinema .vc-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;overflow:auto;padding:5px;max-height:70vh}#valeCinema .vc-card{text-align:left;padding:16px;display:flex;flex-direction:column;gap:6px;min-height:118px}#valeCinema .vc-card strong{font-size:17px;color:#f0d99b}#valeCinema .vc-card span{font-size:13px;line-height:1.4;color:#cad8cd}#valeCinema .vc-card:disabled{opacity:.5;cursor:default;background:#17231f}#valeCinema .vc-card small{font-size:11px;color:#c3b27e}
+      @media(max-width:600px){#valeCinema{padding:12px 10px}#valeCinema .vc-film{gap:10px}#valeCinema .vc-stage{aspect-ratio:1.7/1;max-height:36vh}#valeCinema .vc-dialogue{grid-template-columns:58px 1fr;gap:10px;padding:12px;min-height:172px;overflow:auto}#valeCinema .vc-portrait{width:56px;height:56px}#valeCinema .vc-line{font-size:15px}#valeCinema .vc-next{min-width:124px;padding:9px 12px}#valeCinema .vc-controls{font-size:11px;gap:10px}#valeCinema .vc-subtitle{font-size:11px}#valeCinema .vc-gallery{grid-template-columns:1fr}#valeCinema h2{font-size:20px}}
+      @media(max-height:580px) and (min-width:601px){#valeCinema .vc-stage{max-height:39vh}#valeCinema .vc-dialogue{min-height:108px;padding:10px 16px}#valeCinema .vc-portrait{width:68px;height:68px}#valeCinema .vc-line{font-size:15px}#valeCinema .vc-film{gap:8px}}
+      @media(prefers-reduced-motion:reduce){#valeCinema *{scroll-behavior:auto}}
+    `;document.head.appendChild(css);
+    root=document.createElement('section');root.id='valeCinema';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-hidden','true');root.setAttribute('aria-labelledby','valeCinemaTitle');
+    root.innerHTML='<div class="vc-film"><div class="vc-top"><div><div class="vc-eyebrow">Vale dos Três Ventos</div><h2 id="valeCinemaTitle"></h2><p class="vc-subtitle"></p></div><button type="button" class="vc-skip">Pular cena</button></div><canvas class="vc-stage" width="960" height="480" aria-hidden="true"></canvas><div class="vc-dialogue"><canvas class="vc-portrait" width="96" height="96" aria-hidden="true"></canvas><div><strong class="vc-speaker"></strong><p class="vc-line" aria-hidden="true"></p><span class="vc-sr" aria-live="polite" aria-atomic="true"></span></div></div><div class="vc-controls"><span class="vc-hint">Espaço ou Enter · continuar</span><span class="vc-counter"></span><button type="button" class="vc-next">Continuar</button></div><div class="vc-gallery" hidden></div></div>';
+    document.body.appendChild(root);stage=root.querySelector('.vc-stage');stageContext=stage.getContext('2d');portrait=root.querySelector('.vc-portrait');textEl=root.querySelector('.vc-line');fullTextEl=root.querySelector('.vc-sr');heading=root.querySelector('h2');subheading=root.querySelector('.vc-subtitle');counter=root.querySelector('.vc-counter');nextButton=root.querySelector('.vc-next');
+    nextButton.addEventListener('click',advance);root.querySelector('.vc-skip').addEventListener('click',()=>close({skipped:true}));
+    document.addEventListener('keydown',onKey,true);
+  }
+  function showOverlay(){
+    install();safely(adapter.beforeOpen);previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';root.setAttribute('aria-hidden','false');reduced=isReduced();
+  }
+  function play(id,opts={}){
+    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay)return false;
+    showOverlay();const state=read();active={kind:'film',film,index:0,elapsed:0,speech:0,reveal:0,replay:!!opts.replay,player:{name:typeof state.name==='string'?state.name.slice(0,40):'Você',gender:state.gender==='f'?'f':'m'},backdrop:null};
+    root.querySelector('.vc-gallery').hidden=true;stage.hidden=false;root.querySelector('.vc-dialogue').hidden=false;root.querySelector('.vc-controls').hidden=false;root.querySelector('.vc-skip').textContent='Pular cena';
+    heading.textContent=film.title;subheading.textContent='Uma lembrança do vale · avance no seu ritmo';enterShot();nextButton.focus({preventScroll:true});return true;
+  }
+  function enterShot(){
+    const s=active.film.shots[active.index];active.elapsed=0;active.speech=0;active.reveal=reduced?s.line.length:0;
+    root.querySelector('.vc-speaker').textContent=s.speaker==='player'?active.player.name:names[s.speaker];fullTextEl.textContent=(s.speaker==='player'?active.player.name:names[s.speaker])+': '+s.line;
+    counter.textContent=(active.index+1)+' / '+active.film.shots.length;nextButton.textContent=reduced?(active.index===active.film.shots.length-1?'Voltar ao vale':'Continuar'):'Mostrar fala';
+    textEl.textContent=reduced?s.line:'';safely(window.synthSfx?.dialogue?.bind(window.synthSfx),s.speaker,'greet');prepareBackdrop();render();
+  }
+  function prepareBackdrop(){
+    const c=document.createElement('canvas');c.width=960;c.height=480;const g=c.getContext('2d'),film=active.film,s=film.shots[active.index];g.imageSmoothingEnabled=false;
+    const drawn=safely(adapter.drawWorld,g,{width:960,height:480,focusX:film.focusX+s.focus*24,focusY:film.focusY,zoom:3,region:film.region,scene:film.scene});
+    if(drawn!==true){g.setTransform(2,0,0,2,0,0);background(g,film,0,s.focus);}
+    active.backdrop=c;
+  }
+  function advance(){
+    if(active?.kind!=='film')return;
+    const s=active.film.shots[active.index];if(active.reveal<s.line.length){active.reveal=s.line.length;active.speech=0;textEl.textContent=s.line;nextButton.textContent=active.index===active.film.shots.length-1?'Voltar ao vale':'Continuar';render();return;}
+    if(active.index===active.film.shots.length-1){close();return;}
+    active.index++;safely(window.synthSfx?.pageTurn?.bind(window.synthSfx));enterShot();
+  }
+  function dismiss(mark,notify=true){
+    if(!active)return false;const ending=active;active=null;root?.setAttribute('aria-hidden','true');document.body.style.overflow=previousOverflow;
+    if(mark&&ending.kind==='film'&&!seen.has(ending.film.id)){seen.add(ending.film.id);safely(adapter.onChange);}
+    const focus=previousFocus;previousFocus=null;if(focus?.isConnected)safely(focus.focus.bind(focus),{preventScroll:true});if(notify)safely(adapter.afterClose||adapter.onClose,{id:ending.film?.id||null,skipped:!!ending.skipped,replay:!!ending.replay});return true;
+  }
+  function close(opts={}){if(active)active.skipped=!!opts.skipped;return dismiss(true);}
+  function onKey(e){
+    if(!active)return;
+    if(e.key.toLowerCase()==='m'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)safely(adapter.toggleSound||window.toggleSound);return;}
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close({skipped:true});return;}
+    if(active.kind==='film'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)advance();return;}
+    if(e.key==='Tab'){
+      const buttons=[...root.querySelectorAll('button')].filter(b=>!b.disabled&&!b.hidden&&b.getClientRects().length);if(!buttons.length)return;
+      const current=buttons.indexOf(document.activeElement);if(e.shiftKey&&(current<=0)){e.preventDefault();buttons.at(-1).focus();}else if(!e.shiftKey&&(current===buttons.length-1||current<0)){e.preventDefault();buttons[0].focus();}e.stopImmediatePropagation();
+    }else if(['e','j','r','i','g','h','q','f','c','z','v','b','1','2','3','4','5','6','arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','shift'].includes(e.key.toLowerCase())){e.preventDefault();e.stopImmediatePropagation();}
+  }
+  function openGallery(){
+    if(active)return false;showOverlay();active={kind:'gallery'};heading.textContent='Lembranças em movimento';subheading.textContent='Reveja as cenas que já encontrou na jornada';stage.hidden=true;root.querySelector('.vc-dialogue').hidden=true;root.querySelector('.vc-controls').hidden=true;root.querySelector('.vc-skip').textContent='Voltar ao vale';
+    const gallery=root.querySelector('.vc-gallery');gallery.hidden=false;gallery.replaceChildren();
+    const chapter=chapterIndex();for(const film of films){const button=document.createElement('button');button.type='button';button.className='vc-card';button.disabled=!seen.has(film.id)&&film.chapter>chapter;const title=document.createElement('strong'),description=document.createElement('span'),status=document.createElement('small');title.textContent=film.title;description.textContent=film.description;status.textContent=seen.has(film.id)?'Rever cena':button.disabled?'Encontre esta lembrança na jornada':'Ver cena';button.append(title,description,status);button.addEventListener('click',()=>{const replay=seen.has(film.id);dismiss(false,false);play(film.id,{replay});});gallery.appendChild(button);}
+    (gallery.querySelector('button:not(:disabled)')||root.querySelector('.vc-skip')).focus({preventScroll:true});return true;
+  }
+  function update(dt){
+    if(active?.kind!=='film')return;dt=Number.isFinite(dt)?Math.max(0,Math.min(.1,dt)):0;active.elapsed+=dt;active.speech+=dt;const s=active.film.shots[active.index];
+    const count=reduced?s.line.length:Math.min(s.line.length,Math.floor(active.elapsed*43));if(count>active.reveal){active.reveal=count;textEl.textContent=s.line.slice(0,count);if(count===s.line.length)nextButton.textContent=active.index===active.film.shots.length-1?'Voltar ao vale':'Continuar';}render();
+  }
+  const rect=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
+  function polygon(g,color,points){g.fillStyle=color;g.beginPath();g.moveTo(...points[0]);for(let i=1;i<points.length;i++)g.lineTo(...points[i]);g.closePath();g.fill();}
+  function tree(g,x,y,scale=1,palm=false){
+    g.save();g.translate(x,y);g.scale(scale,scale);rect(g,'#745843',-4,-6,8,44);rect(g,'#a97d52',-2,-5,3,42);
+    if(palm){for(const p of [[-45,4,-4,-20,17,3],[-32,-17,0,-32,34,-16],[5,-18,48,-5,20,8],[-4,-25,26,-41,31,-16]])polygon(g,'#3d785f',[[p[0],p[1]],[p[2],p[3]],[p[4],p[5]]]);rect(g,'#75a777',-17,-19,24,5);}
+    else{rect(g,'#244b3c',-29,-43,58,34);rect(g,'#3f7255',-34,-29,65,24);rect(g,'#5f8d61',-22,-44,37,16);rect(g,'#8ead73',-15,-40,18,5);rect(g,'#244b3c',-20,-7,45,8);}g.restore();
+  }
+  function house(g,x,y,w=145,open=false){
+    rect(g,'#263d31',x-6,y+67,w+12,8);rect(g,'#b7a081',x,y,w,73);rect(g,'#d8c8a0',x+4,y+4,w-8,61);
+    for(let a=0;a<w;a+=21)rect(g,'#a88e72',x+a,y+7,2,59);polygon(g,'#553e39',[[x-11,y],[x+w/2,y-54],[x+w+11,y]]);polygon(g,'#956556',[[x-8,y-2],[x+w/2,y-49],[x+w+5,y-2]]);
+    for(let a=0;a<4;a++)rect(g,'#c08a6c',x+16+a*21,y-10-a*6,w-33-a*36,2);
+    rect(g,'#796150',x+w/2-18,y+22,36,51);rect(g,open?'#203b30':'#93775a',x+w/2-14,y+26,28,46);if(!open)rect(g,'#eed184',x+w/2+7,y+50,3,3);
+    for(const wx of [x+15,x+w-39]){rect(g,'#725447',wx,y+17,25,24);rect(g,'#c6e0d0',wx+3,y+20,19,18);rect(g,'#748c77',wx+12,y+20,2,18);rect(g,'#748c77',wx+3,y+29,19,2);}rect(g,'#e8d6a1',x+w/2-25,y+7,50,11);rect(g,'#617c5b',x+w/2-19,y+11,38,2);
+  }
+  function background(g,film,t,focus){
+    const w=480,h=240;rect(g,film.region==='desert'?'#e7b98a':film.region==='mountain'?'#b6d0d0':'#b9c9ac',0,0,w,h);
+    const drift=reduced?0:Math.sin(t*.16)*3;
+    polygon(g,film.region==='desert'?'#bc8764':'#6f967e',[[0,109],[52,72],[91,90],[162,43],[214,74],[280,34],[359,82],[415,58],[480,95],[480,175],[0,175]]);
+    polygon(g,film.region==='desert'?'#d49c70':film.region==='mountain'?'#e5ece0':'#8aa483',[[0,129],[82,96],[143,113],[209,73],[274,111],[347,81],[417,111],[480,91],[480,180],[0,180]]);
+    rect(g,film.region==='desert'?'#d8b47a':film.region==='mountain'?'#dce4d3':'#7c9c68',0,143,480,97);
+    for(let i=0;i<60;i++){const x=(i*79+17)%480,y=147+(i*23)%94;rect(g,film.region==='desert'?'#b89460':film.region==='mountain'?'#c5d4c6':'#688958',x,y,i%3+1,2);}
+    g.save();g.translate(-focus*6+drift,0);
+    if(film.id==='carta'||film.id==='reabertura'){
+      rect(g,'#b9a174',0,213,490,27);rect(g,'#c6af83',7,210,486,4);tree(g,40,135,1.6);tree(g,429,126,1.7);house(g,158,102,164,film.id==='reabertura');
+      rect(g,'#6e523e',134,177,29,36);rect(g,'#b3905d',136,178,25,29);for(let i=0;i<3;i++)rect(g,'#dbc49a',139+i*7,178,2,29);rect(g,'#d8ba7a',344,181,28,21);rect(g,'#71523c',344,181,28,3);
+      if(film.id==='reabertura'){for(let i=0;i<11;i++){const x=117+i*24;rect(g,'#916d47',x,60,24,1);polygon(g,i%2?'#dfa066':'#d9c079',[[x+5,60],[x+15,60],[x+10,71]]);}rect(g,'#694b36',195,216,90,9);rect(g,'#bf9160',193,212,94,9);rect(g,'#e1c38e',204,211,12,3);rect(g,'#547547',261,207,9,7);}
+    }else if(film.id==='horta'){
+      tree(g,48,131,1.45);house(g,292,93,130);rect(g,'#a68a60',115,142,158,11);
+      for(let row=0;row<3;row++){rect(g,'#6f5339',81,165+row*22,204,15);rect(g,'#9c7250',87,168+row*22,192,2);for(let i=0;i<7;i++){const x=93+i*27,y=172+row*22;rect(g,'#384f32',x,y,8,4);rect(g,'#6d9950',x+2,y-7,3,9);rect(g,'#8eb166',x-2,y-5,5,3);rect(g,'#79a35c',x+4,y-8,5,4);}}rect(g,'#795642',363,181,4,44);rect(g,'#d1b687',338,167,55,21);rect(g,'#786948',346,176,37,3);
+    }else if(film.id==='rio'){
+      tree(g,47,111,1.6);tree(g,349,127,1.5);tree(g,439,133,1.15);polygon(g,'#527f7c',[[89,151],[186,150],[229,188],[270,203],[290,240],[150,240],[174,216],[135,201]]);polygon(g,'#88b2a5',[[110,153],[172,155],[215,190],[250,208],[267,239],[186,240],[197,218],[151,194]]);
+      for(let i=0;i<11;i++){const x=142+(i*19)%87,y=163+i*7;rect(g,'#b8d1b8',x+(reduced?0:Math.sin(t+i)*2),y,14,1);}rect(g,'#977955',141,186,107,14);for(let i=0;i<8;i++)rect(g,'#d0ac79',145+i*13,187,10,11);rect(g,'#70543d',139,184,111,3);rect(g,'#70543d',143,196,111,3);
+    }else if(film.id==='abrigo'){
+      house(g,276,98,150,true);for(const x of [40,105,449]){polygon(g,'#315a49',[[x-28,169],[x,66],[x+28,169]]);polygon(g,'#f1eee0',[[x-19,117],[x,64],[x+19,117]]);rect(g,'#6d6252',x-4,164,8,26);}rect(g,'#a19079',0,211,490,29);rect(g,'#c6c8af',0,205,490,6);
+      rect(g,'#797961',139,197,43,9);rect(g,'#b1aa8b',144,193,10,8);rect(g,'#b1aa8b',166,193,10,8);polygon(g,'#cd6f39',[[148,195],[151,176],[158,188],[165,174],[173,195]]);polygon(g,'#efbb64',[[154,195],[159,182],[166,193]]);rect(g,'#885f49',214,153,5,62);rect(g,'#bfa984',205,153,23,17);rect(g,'#a95648',216,139,15,5);
+    }else if(film.id==='oasis'){
+      polygon(g,'#b98d61',[[0,175],[50,151],[132,172],[151,185],[0,211]]);polygon(g,'#ba895f',[[328,174],[400,135],[480,152],[480,220],[319,199]]);polygon(g,'#537f79',[[130,181],[170,167],[279,170],[333,190],[291,225],[191,229],[132,211]]);polygon(g,'#78ac91',[[148,184],[181,175],[276,178],[312,192],[283,215],[195,219],[148,205]]);tree(g,96,162,1.5,true);tree(g,330,151,1.8,true);tree(g,394,180,1.2,true);
+      for(let i=0;i<8;i++)rect(g,'#b1c6a3',174+(i*33)%122+(reduced?0:Math.sin(t+i)*2),184+(i*11)%25,17,1);rect(g,'#8d5f3c',55,204,27,19);rect(g,'#cb995e',58,199,21,6);rect(g,'#e2c890',61,201,15,2);
+    }g.restore();
+    if(!reduced){for(let i=0;i<10;i++){const x=(i*73+t*(film.region==='desert'?3:5))%480,y=70+(i*29)%132+Math.sin(t*.7+i)*4;rect(g,film.region==='mountain'?'#f5f4e8':'#d9d29b',x,y,film.region==='mountain'?2:1,2);}}
+    // Vinheta em degraus: preserva contraste dos sprites, sem borrar a arte.
+    rect(g,'#172f2822',0,0,w,12);rect(g,'#14241e33',0,h-8,w,8);
+  }
+  function drawProp(g,film,x,y){
+    if(film.prop==='seed'){rect(g,'#e4d6ad',x-12,y-7,24,15);for(let i=0;i<3;i++)rect(g,'#8d7551',x-7+i*5,y-5,1,6);rect(g,'#9e753e',x-2,y-1,4,3);}
+    else if(film.prop==='notebook'){rect(g,'#596f53',x-10,y-9,22,17);rect(g,'#e6d7b3',x-8,y-7,18,13);rect(g,'#b29672',x,y-7,1,13);for(let i=0;i<3;i++)rect(g,'#8b8d6b',x-6,y-5+i*4,5,1);}
+    else if(film.prop==='sign'){rect(g,'#73503a',x-2,y+7,4,15);rect(g,'#dbbd86',x-23,y-8,46,16);g.fillStyle='#405b3f';g.font='bold 9px sans-serif';g.textAlign='center';g.fillText('ENTRE',x,y+3);}
+    else if(film.prop==='vessel'){rect(g,'#a7744b',x-9,y-10,18,20);rect(g,'#dbb474',x-11,y-10,22,4);rect(g,'#e6ce9a',x-6,y-6,3,14);for(let i=0;i<3;i++)rect(g,'#684d3a',x-4+i*4,y+3,2,3);}
+  }
+  function render(){
+    if(active?.kind!=='film'||!stageContext)return;const {film,index,elapsed,speech}=active,s=film.shots[index],g=stageContext;const blend=reduced?1:ease(elapsed/3),focus=s.focus*blend;
+    g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,960,480);g.imageSmoothingEnabled=false;
+    const zoom=reduced?1:1.025+blend*.025,pan=reduced?0:focus*6;g.drawImage(active.backdrop,-(960*(zoom-1)/2)-pan,-480*(zoom-1)/2,960*zoom,480*zoom);g.scale(2,2);
+    const art=window.FarmCharacterArt,cast=film.cast,meeting=film.id==='reabertura';
+    const positions=meeting?[[110,204],[164,185],[219,183],[269,183],[322,185],[374,204]]:film.id==='rio'?[[151,210],[330,215]]:cast.length===3?[[172,209],[306,205],[249,223]]:[[178,210],[304,215]];
+    for(let i=0;i<cast.length;i++){
+      const id=cast[i],[x0,y]=positions[i],x=x0-focus*4,actor={npcId:id,gender:active.player.gender,dir:0,x:0,y:0,moving:false,running:false,equipment:{},temp:37,gaitBlend:0};const speaking=id===s.speaker&&(active.reveal<s.line.length||elapsed<1.4),opts={x:0,y:0,speaking,speechTime:speech,expression:id===s.speaker?s.expression:'warm',gesture:id===s.speaker?s.gesture:'listen',reducedMotion:reduced,time:elapsed*1000};
+      g.save();g.translate(x,y);g.scale(meeting?1.3:1.6,meeting?1.3:1.6);if(art){if(id==='player')art.drawPlayer(g,actor,opts);else art.drawNPC(g,actor,opts);}else{rect(g,id==='player'?'#b99654':'#6c8a69',-7,-21,14,24);rect(g,'#dbb08a',-5,-31,10,11);}g.restore();
+      if(id===s.speaker){g.fillStyle='#f8de9b';g.textAlign='center';g.font='bold 9px sans-serif';g.fillText(id==='player'?active.player.name:names[id],x,y-(meeting?48:59));rect(g,'#f8de9b',x-1,y-(meeting?44:55),2,2);}
+    }
+    if(film.prop!=='table')drawProp(g,film,240,film.id==='rio'?210:204);
+    g.restore();if(art?.drawPortrait)art.drawPortrait(portrait,s.speaker,{name:s.speaker==='player'?active.player.name:names[s.speaker],gender:active.player.gender,speaking:active.reveal<s.line.length,speechTime:speech,expression:s.expression,gesture:s.gesture,reducedMotion:reduced,time:elapsed*1000});
+  }
+  function chapterIndex(){const state=read(),value=state?.story?.chapter?.index??state?.story?.chaptersCompleted??state?.story?.chapterIndex??state?.chapterIndex;return Number.isFinite(value)?Math.max(unlockedChapter,Math.max(0,Math.min(6,Math.floor(value)))):unlockedChapter;}
+  const catalogue=()=>{const available=chapterIndex();return films.map(({id,title,chapter,description})=>({id,title,chapter,description,seen:seen.has(id),unlocked:seen.has(id)||chapter<=available,available:seen.has(id)||chapter<=available}));};
+  function restore(data,opts={}){dismiss(false,false);seen=new Set();unlockedChapter=Number.isFinite(opts.chapterIndex)?Math.max(0,Math.min(6,Math.floor(opts.chapterIndex))):0;if(data&&typeof data==='object'&&Array.isArray(data.seenScenes))for(const id of data.seenScenes.slice(0,films.length*2))if(byId.has(id))seen.add(id);}
+  window.FarmStoryCinematics=Object.freeze({
+    init(value={}){adapter=value&&typeof value==='object'?value:{};initialized=true;return catalogue();},play,update,isOpen:()=>!!active,close,
+    reset(){dismiss(false,false);seen.clear();unlockedChapter=0;},restore,serialize:()=>({version:1,seenScenes:films.filter(f=>seen.has(f.id)).map(f=>f.id)}),catalogue,openGallery,
+    info:()=>({initialized,open:!!active,kind:active?.kind||null,id:active?.film?.id||null,shot:active?.index??null,replay:!!active?.replay,reducedMotion:reduced})
+  });
 })();
 
 /* ============================
@@ -10151,6 +10560,7 @@ function startGame(newGame=false){
     }
   }
   gameStarted = true;
+  if(newGame)window.FarmStoryIntegration?.notifyNewGame();
   document.body.classList.add('game-on');   // libera os botões flutuantes só em jogo (evita sobreposição no menu)
   document.getElementById('startMenu').classList.add('hide');
   AudioManager.init();
@@ -12147,6 +12557,7 @@ function saveGame(auto=false){
       histologyCompleted: histologyMissions.filter(m=>m.completed).map(m=>m.id),
       learningJourney: window.FarmLearningJourney.serialize(),
       storyWorld: window.FarmStoryWorld?.serialize(),
+      storyCinematics: window.FarmStoryCinematics?.serialize(),
       homeostasisTimer, hotExposureTimer,
       histologyPlayTime,lastHistMissionAt:_lastHistMissionAt,
       objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0}))
@@ -12221,6 +12632,7 @@ function loadGameFromData(data){
   tasks = isFrio() ? coldTasks : hotTasks;
   window.FarmLearningJourney.restore(data.learningJourney,learningContext());
   window.FarmStoryIntegration?.restore(data.storyWorld);
+  window.FarmStoryCinematics?.restore(data.storyCinematics,{chapterIndex:window.FarmStoryWorld?.snapshot()?.chapter?.index||0});
   renderTasks(); renderInv(); renderShop(); renderJournal(); renderHistologyHud(); updateBars(); renderAchievements?.();
   return true;
 }
@@ -14978,7 +15390,7 @@ function learningContext(){
 }
 function readingPanelOpen(){
   const shown=id=>!!document.getElementById(id)?.classList.contains('show');
-  return window.FarmWorldMap?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || journalOpen || inventoryOpen || shopOpen
+  return window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || journalOpen || inventoryOpen || shopOpen
     || ['summary','accessMenu','achPanel','creditsPanel','tutorialOverlay'].some(shown);
 }
 function resetSeasonTasks(list){
@@ -14994,6 +15406,7 @@ function resetSeasonTasks(list){
   }
 }
 function resetSandboxRun(){
+  window.FarmStoryCinematics?.reset();
   window.FarmWorldMap?.reset();
   window.FarmAnimalLife?.reset();
   window.FarmRestVisual?.reset();
@@ -19804,8 +20217,12 @@ function endCutscene(){
   // fazia a câmera deslizar lentamente até o jogador — parecia travado.
   if(typeof snapCamera === 'function') snapCamera();
   if(_pendingTutorialAfterCutscene){
-    _pendingTutorialAfterCutscene = false;
-    setTimeout(()=>{ try{ maybeStartTutorial(true); }catch(e){} }, 800);
+    // A carta animada aguarda também o intervalo até o tutorial aparecer.
+    setTimeout(()=>{
+      if(!_pendingTutorialAfterCutscene||!gameStarted)return;
+      _pendingTutorialAfterCutscene=false;
+      try{maybeStartTutorial(true);}catch(e){}
+    },800);
   }
 }
 function cutsceneCamera(){
@@ -19997,6 +20414,43 @@ function drawSunShadows(list){
   ctx.restore();
 }
 
+/* Recorte do cenário real para o palco. Executa somente ao trocar de plano;
+   não chama render/update nem altera jogador, clima, objetos ou recompensas.
+   O contexto de desenho e as referências de cena são restaurados no finally. */
+function drawCinematicWorld(g,view={}){
+  const main=scenes.main;if(!main||!g)return false;
+  const width=Math.max(1,Math.min(1920,Number(view.width)||960)),height=Math.max(1,Math.min(960,Number(view.height)||480));
+  const zoom=Math.max(1,Math.min(6,Number(view.zoom)||3)),visibleW=width/zoom,visibleH=height/zoom;
+  const centerX=Math.max(visibleW/2,Math.min(main.MW*TS-visibleW/2,Number(view.focusX)||main.MW*TS/2));
+  const centerY=Math.max(visibleH/2,Math.min(main.MH*TS-visibleH/2,Number(view.focusY)||main.MH*TS/2));
+  const left=centerX-visibleW/2,top=centerY-visibleH/2;
+  const prior={ctx,map,objects,crops,MW,MH,currentScene};
+  const fallback={tree:drawTree,bush:drawBush,flower:drawFlower,house:drawHouse,barn:drawBarn,well:drawWell,
+    sellbox:drawSellBox,woodpile:drawWoodpile,fireplace:drawFireplace,loom:drawLoom,bench:drawBench,
+    animal:drawAnimal,scarecrow:drawScarecrow,sunflower:drawSunflower,bridge:drawBridge,
+    river_cattail:drawRiverCattail,river_lily:drawRiverLily,fishing_spot:drawFishingSpot};
+  g.save();
+  try{
+    ctx=g;map=main.map;objects=main.objects;crops=main.crops;MW=main.MW;MH=main.MH;currentScene='main';
+    g.setTransform(1,0,0,1,0,0);g.imageSmoothingEnabled=false;
+    g.fillStyle=view.region==='mountain'?'#c9d7d3':view.region==='desert'?'#c9a16b':'#6d8957';g.fillRect(0,0,width,height);
+    g.scale(zoom,zoom);g.translate(-left,-top);
+    for(let y=Math.max(0,Math.floor(top/TS));y<Math.min(MH,Math.ceil((top+visibleH)/TS));y++)
+      for(let x=Math.max(0,Math.floor(left/TS));x<Math.min(MW,Math.ceil((left+visibleW)/TS));x++)drawTile(x,y,map[y][x],g);
+    window.FarmWorldDepth?.drawGround(g);
+    for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
+    const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
+    for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
+    visible.sort((a,b)=>(window.FarmWorldDepth?FarmWorldDepth.depth(a)-FarmWorldDepth.depth(b):a.y-b.y));
+    drawSunShadows(visible);
+    for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
+    return true;
+  }finally{
+    ({ctx,map,objects,crops,MW,MH,currentScene}=prior);g.restore();
+  }
+}
+window.drawCinematicWorld=drawCinematicWorld;
+
 /* ---------- Pós-processamento: BLOOM (light bleed cinematográfico) ----------
    Copia o frame para um buffer pequeno aplicando brightness+contrast (isola as
    áreas CLARAS) e blur; depois re-projeta por cima em 'lighter'. Resultado: sol,
@@ -20092,6 +20546,14 @@ function render(){
     const cs = cutsceneCamera();
     if(cs){ camTargetX = cs.x; camTargetY = cs.y; }
   }
+  // Deixa os dois interlocutores acima da caixa de conversa no desktop.
+  // Muda apenas o enquadramento; posições e simulação continuam pausadas.
+  const dialogueNpc=window.FarmStoryWorld?.currentDialogue?.()?.npcId;
+  if(!cutsceneActive&&currentScene==='main'&&innerWidth>700&&innerHeight>600
+    &&window.FarmStoryUI?.speechState?.(dialogueNpc)?.expression){
+    const speaker=window.FarmStoryIntegration?.read?.().npcs?.find(o=>o.npcId===dialogueNpc);
+    if(speaker){camTargetX=(player.x+speaker.x)/2;camTargetY=(player.y+speaker.y)/2+visH*.24;}
+  }
   // ----- Alvo da câmera (clampeado aos limites do mapa) -----
   let targetCamX, targetCamY;
   if(MW*TS < visW){
@@ -20105,7 +20567,7 @@ function render(){
     targetCamY = Math.max(0, Math.min(MH*TS - visH, camTargetY - visH/2));
   }
   // ----- Suavização (lerp) -----
-  if(_camX === null || _camSnap || cutsceneActive){
+  if(_camX === null || _camSnap || cutsceneActive || A11Y.reduceMotion){
     // Snap: primeira frame, troca de cena, ou durante cutscene (que já interpola)
     _camX = targetCamX; _camY = targetCamY; _camSnap = false;
   } else {
@@ -20944,6 +21406,7 @@ function loop(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   // Sem simulação/renderização em abas ocultas; retoma sem acumular tempo.
   if(document.hidden){requestAnimationFrame(loop);return;}
+  window.FarmStoryIntegration?.visualUpdate(dt);
   // Cutscene avança independente do pause
   if(cutsceneActive) cutsceneT += dt;
   // Pause: skip update logic but keep rendering animated
@@ -21218,6 +21681,12 @@ function toggleFullscreen(){
 }
 // Captura ESC antes do handler antigo para abrir menu de pause / acessibilidade quando não houver modal prioritário.
 window.addEventListener('keydown', function(e){
+  // O diretor instalado ao abrir uma cena vem depois deste listener.
+  // Escape precisa fechar a cena antes de chegar ao menu de pausa.
+  if(window.FarmStoryCinematics?.isOpen()){
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();FarmStoryCinematics.close({skipped:true});}
+    return;
+  }
   // Skip ESC handling while the user is in the character-select modal
   // (otherwise pressing ESC in the name input opens the access menu).
   const cs = document.getElementById('characterSelect');

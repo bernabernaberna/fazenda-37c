@@ -36,8 +36,8 @@
   Object.values(profiles).forEach(Object.freeze);Object.freeze(profiles);Object.freeze(heroM);Object.freeze(heroF);
   // A margem é transparente: reserva o arco de passada e a ponta da ferramenta.
   // O contato com o chão continua em y+10, sem alterar colisão ou profundidade.
-  const W=48,H=52,AX=24,AY=38,FEET_Y=10,MAX_SPRITES=768;
-  const sprites=new Map(),portraits=new Map();
+  const W=48,H=52,AX=24,AY=38,FEET_Y=10,MAX_SPRITES=768,MAX_PORTRAITS=256,MAX_SPEECH_BANKS=48;
+  const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
     if(typeof OffscreenCanvas!=='undefined') return new OffscreenCanvas(w,h);
     const c=document.createElement('canvas');c.width=w;c.height=h;return c;
@@ -54,6 +54,18 @@
   function blend(value,fallback){return Math.round(Math.max(0,Math.min(1,Number.isFinite(value)?value:fallback))*8);}
   function position(actor,opts){return {x:Number.isFinite(opts.x)?opts.x:Math.round(Number(actor.x)||0),
     y:Number.isFinite(opts.y)?opts.y:Math.round(Number(actor.y)||0)};}
+  function conversation(opts,allowed=true){
+    const conversing=allowed&&(!!opts.speaking||['explain','invite','nod','listen'].includes(opts.gesture));
+    const expression=conversing&&['warm','thoughtful','concerned','joyful'].includes(opts.expression)?opts.expression:'neutral';
+    const gesture=conversing&&['explain','invite','nod','listen'].includes(opts.gesture)?opts.gesture:'';
+    const t=Math.max(0,Number.isFinite(opts.speechTime)?opts.speechTime:clock(opts)/1000);
+    // A cadência tem pausas entre sílabas, em vez de abrir e fechar como um
+    // metrônomo. São quatro bocas e três níveis de gesto, sempre cacheáveis.
+    const mouth=conversing&&opts.speaking&&!opts.reducedMotion?[0,1,2,1,0,3,1,2,0,1,3,0][Math.floor(t/.12)%12]:0;
+    const speechPhase=conversing&&!opts.reducedMotion&&gesture?[0,0,1,1,2,2,1,0][Math.floor(t/.24)%8]:0;
+    const speechBlink=conversing&&!opts.reducedMotion&&t%4.6>4.42;
+    return{conversing,expression,gesture,mouth,speechPhase,speechBlink};
+  }
   function state(actor,opts,hero){
     const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
     const restMode=rest&&opts.restMode==='bed'?'bed':rest?'sit':'';
@@ -64,19 +76,20 @@
     // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
     const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
     const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
-    const job=!hero&&!actor.moving&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
+    const speech=conversation(opts,!actor.dead&&!rest);
+    const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
-    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion;
+    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion&&!speech.conversing;
     // A simulação conserva a fase ao parar. A amplitude recolhe a passada até
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
     return {dir:dirOf(actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
-      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,
+      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
       actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
-      blink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
+      blink:speech.conversing?speech.speechBlink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
       hat:hero&&!!actor.hat,coat:hero&&!!actor.coatEquipped,scarf:hero&&!!actor.scarf,
       boots:hero&&!!actor.boots,gloves:hero&&!!actor.glovesEquipped,
       blanket:hero&&!!actor.blanketEquipped,towel:hero&&actor.towelTimer>0};
@@ -125,6 +138,7 @@
   // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
   function paintHead(g,d,s){
+    if(s.conversing){g.save();if(['nod','listen'].includes(s.gesture)&&s.speechPhase===2)g.translate(0,1);}
     const side=s.dir===1||s.dir===2,back=s.dir===3;
     // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
     rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
@@ -177,7 +191,36 @@
       rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
       rect(g,P.terra,side?2:3,-15,2,5);rect(g,'#794b43',side?3:4,-14,1,4);
     }
+    if(s.conversing&&!back){
+      // O queixo continua no mesmo rosto, inclusive sob a barba do Caio.
+      // Expressão e boca não atravessam os equipamentos ou o penteado.
+      const mx=side?3:-1,my=-18;
+      rect(g,d.skin,side?2:-2,-19,side?3:5,2);
+      if(s.mouth===1){rect(g,d.skinSh,mx,my-1,side?2:3,2);rect(g,P.cream,mx,my-1,side?1:2,1);}
+      else if(s.mouth===2){rect(g,P.ink,mx,my-1,side?2:3,2);rect(g,d.skinSh,mx,my+1,side?2:3,1);}
+      else if(s.mouth===3){rect(g,d.skinSh,mx,my-1,2,2);rect(g,P.ink,mx+1,my-1,1,1);}
+      else{rect(g,d.skinSh,mx,my,side?2:3,1);if(['warm','joyful'].includes(s.expression))rect(g,P.cream,mx,my,side?1:2,1);}
+      if(s.expression==='concerned'){
+        rect(g,d.hairSh,side?2:-3,-24,side?2:2,1);if(!side)rect(g,d.hairSh,2,-24,2,1);
+        rect(g,d.hairSh,side?3:-2,-23,1,1);if(!side)rect(g,d.hairSh,2,-23,1,1);
+      }else if(s.expression==='thoughtful'){
+        rect(g,d.hairSh,side?2:-3,-24,side?2:3,1);if(!side)rect(g,d.hairSh,2,-23,2,1);
+      }else if(s.expression==='joyful'){
+        rect(g,d.skinSh,side?4:-4,-20,1,1);if(!side)rect(g,d.skinSh,3,-20,1,1);
+        rect(g,P.cream,mx,my-1,side?1:2,1);
+      }
+    }
     if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
+    if(s.conversing)g.restore();
+  }
+  function paintSpeechGesture(g,d,s,hand,behind){
+    if(!s.conversing||s.moving||(s.dir===3)!==behind||!['explain','invite'].includes(s.gesture))return;
+    const side=s.dir===1||s.dir===2,back=s.dir===3,phase=s.speechPhase;
+    const invite=s.gesture==='invite',hx=side?3+phase:back?5:6+phase,hy=-9-phase*(invite?1:2);
+    const sleeve=s.coat?'#739598':d.shirtHi;
+    limb(g,sleeve,side?0:5,-14,side?1:6,-11,3);limb(g,sleeve,side?1:6,-11,hx-1,hy-1,2);
+    rect(g,hand,hx,hy,invite?3:2,2);rect(g,d.skinHi,hx,hy,invite?2:1,1);
+    if(invite&&phase>0)rect(g,hand,hx+2,hy-1,1,1);
   }
   function paintRest(g,d,s){
     // O primeiro estágio conserva a silhueta anterior ao agachar. A mesma
@@ -281,6 +324,7 @@
       }
     }
     paintAction(g,d,s,hand,true);
+    paintSpeechGesture(g,d,s,hand,true);
     // Na corrida o peito avança um pixel sobre o apoio; cabeça e roupa seguem
     // o mesmo volume, sem sacudir os pés ou deslocar a sombra.
     g.translate(side?Math.round(run*strength):0,lift);
@@ -292,7 +336,7 @@
       limb(g,shirtSh,-2,-15,Math.round(rearHand*.45)-2,-11,3);
       limb(g,shirtSh,Math.round(rearHand*.45)-2,-11,rearHand-1,handY-1,2);rect(g,hand,rearHand,handY,2,2);
       rect(g,shirt,-4,-16,8,9);rect(g,shirtHi,-4,-15,2,7);rect(g,shirtSh,2,-15,2,9);
-      if(!s.action){
+      if(!s.action&&!(s.conversing&&!s.moving&&['explain','invite'].includes(s.gesture))){
         limb(g,shirtHi,-1,-14,Math.round(frontHand*.4)-1,-10,3);
         limb(g,shirtHi,Math.round(frontHand*.4)-1,-10,frontHand,handY-1,2);rect(g,hand,frontHand+1,handY,2,2);
       }
@@ -301,7 +345,7 @@
       rect(g,shirt,-6,-16,12,9);rect(g,shirtHi,-6,-15,2,7);rect(g,shirtSh,4,-15,2,8);
       rect(g,shirt,-6,-7,12,1);rect(g,shirt,-6,-15,12,2);
       rect(g,shirt,-6,-15,12,2);
-      if(!s.action){rect(g,shirtHi,5,-14-swing,3,6);rect(g,hand,6,-8-swing,2,2);}
+      if(!s.action&&!(s.conversing&&!s.moving&&['explain','invite'].includes(s.gesture))){rect(g,shirtHi,5,-14-swing,3,6);rect(g,hand,6,-8-swing,2,2);}
     }
     if(d.style==='apron'&&!s.coat){
       rect(g,d.shirt,side?-5:-7,-8,side?10:14,4);rect(g,d.shirtSh,side?3:5,-8,2,4);
@@ -338,6 +382,7 @@
     }
     paintHead(g,d,s);
     paintAction(g,d,s,hand,false);
+    paintSpeechGesture(g,d,s,hand,false);
     g.restore();
   }
   function sprite(id,gender,s){
@@ -348,6 +393,27 @@
     g.globalCompositeOperation='source-in';rect(g,P.ink,0,0,W,H);g.globalCompositeOperation='source-over';g.drawImage(raw,0,0);
     if(sprites.size>=MAX_SPRITES) sprites.delete(sprites.keys().next().value);sprites.set(key,c);return c;
   }
+  function speechFrame(s){return (s.speechPhase*2+Number(s.blink))*4+s.mouth;}
+  function drawSprite(g,id,gender,s,x,y){
+    if(!s.conversing){g.drawImage(sprite(id,gender,s),x,y);return;}
+    // Cada banco contém a combinação inteira: 4 bocas × 2 olhos × 3 gestos.
+    // Abrir uma fala aquece um banco; avançar o texto só recorta drawImage.
+    // A identidade, roupa e fase da passada continuam no mesmo desenho.
+    const bankState={...s,mouth:0,blink:false,speechBlink:false,speechPhase:0};
+    const key=id+'|'+(id==='player'?gender:'m')+'|'+Object.values(bankState).join(',');let bank=speechBanks.get(key);
+    if(!bank){
+      const raw=canvas(W*24,H),rg=raw.getContext('2d');rg.imageSmoothingEnabled=false;
+      for(let phase=0;phase<3;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
+        const frame=(phase*2+blink)*4+mouth;rg.save();rg.translate(frame*W,0);
+        paintBody(rg,profile(id,gender),{...s,mouth,blink:!!blink,speechBlink:!!blink,speechPhase:phase});rg.restore();
+      }
+      bank=canvas(W*24,H);const bg=bank.getContext('2d');bg.imageSmoothingEnabled=false;
+      bg.drawImage(raw,-1,0);bg.drawImage(raw,1,0);bg.drawImage(raw,0,-1);bg.drawImage(raw,0,1);
+      bg.globalCompositeOperation='source-in';rect(bg,P.ink,0,0,W*24,H);bg.globalCompositeOperation='source-over';bg.drawImage(raw,0,0);
+      if(speechBanks.size>=MAX_SPEECH_BANKS)speechBanks.delete(speechBanks.keys().next().value);speechBanks.set(key,bank);
+    }
+    g.drawImage(bank,speechFrame(s)*W,0,W,H,x,y,W,H);
+  }
   function shadow(g,x,feet,rest){
     rect(g,'rgba(24,59,54,0.13)',x-(rest?10:8),feet-2,rest?20:16,4);
     rect(g,'rgba(24,59,54,0.22)',x-(rest?8:6),feet-1,rest?16:12,2);
@@ -357,7 +423,7 @@
     if(!g||!actor) return false;const p=position(actor,opts),s=state(actor,opts,hero);
     g.save();g.imageSmoothingEnabled=false;if(s.restMode!=='bed')shadow(g,p.x,p.y+FEET_Y,s.rest);
     if(actor.dead) g.globalAlpha*=0.65;
-    g.drawImage(sprite(id,actor.gender==='f'?'f':'m',s),p.x-AX,p.y+FEET_Y-AY);
+    drawSprite(g,id,actor.gender==='f'?'f':'m',s,p.x-AX,p.y+FEET_Y-AY);
     if(hero&&!opts.reducedMotion&&!actor.dead&&s.restMode!=='bed'){
       const phase=Math.floor(clock(opts)/180)%4;
       if(opts.winter&&actor.temp<36.2&&s.dir!==3){
@@ -370,12 +436,13 @@
   }
   // Retrato de 32×32 ampliado sem suavização: desenhado para a tela, não
   // um recorte do sprite. Traços, expressão e penteado pertencem ao elenco.
-  function paintPortrait(g,d,id,gender){
+  function paintPortrait(g,d,id,gender,s=null){
     rect(g,P.ink,0,0,32,32);rect(g,P.amber,1,1,30,30);rect(g,P.edge,2,2,28,28);
     rect(g,P.sage,3,3,26,26);rect(g,'#7c946b',3,3,16,14);
     rect(g,'#91a676',4,4,9,10);rect(g,P.leaf,5,5,5,1);
     // Pequeno ramo bordado no fundo, coerente com o vale.
     for(let i=0;i<4;i++){rect(g,P.edge,25-i,18+i*2,1,2);rect(g,P.leaf,24-i,17+i*2,2,1);}
+    if(s){g.save();if(['nod','listen'].includes(s.gesture)&&s.speechPhase===2)g.translate(0,1);}
     rect(g,d.shirtSh,6,26,21,4);rect(g,d.shirt,8,24,17,6);rect(g,d.shirtHi,8,25,5,5);
     rect(g,d.shirtSh,23,26,3,4);rect(g,d.skinSh,13,21,7,5);rect(g,d.skin,14,21,4,4);
     rect(g,d.trim,11,25,3,2);rect(g,P.cream,13,25,3,3);rect(g,P.cream,18,25,3,2);
@@ -442,18 +509,62 @@
       rect(g,P.edge,9,8,16,1);rect(g,'#bd9450',6,9,22,3);rect(g,P.amber,6,9,20,1);rect(g,P.cream,7,9,6,1);
       rect(g,P.soil,21,26,2,4);rect(g,P.amber,22,27,2,1);rect(g,P.edge,16,28,1,2);
     }
+    if(s){paintPortraitSpeech(g,d,s);g.restore();}
     // A borda em degraus enquadra a figura, preservando a grade de pixel.
     rect(g,P.ink,0,0,32,1);rect(g,P.ink,0,31,32,1);rect(g,P.ink,0,0,1,32);rect(g,P.ink,31,0,1,32);
     rect(g,P.cream,2,2,1,1);rect(g,P.cream,29,29,1,1);
   }
+  function paintPortraitSpeech(g,d,s){
+    const bright=d.expression==='curious'||d.expression==='bright';
+    // Óculos e sardas ficam fora das duas janelas dos olhos. O fundo do rosto
+    // é recomposto antes do piscar para não deixar a pupila antiga aparente.
+    for(const [x,w]of [[12,4],[19,3]]){
+      rect(g,d.skin,x,14,w,2);
+      if(s.blink)rect(g,d.hairSh,x,15,w-1,1);
+      else{rect(g,P.cream,x,14,w,bright||s.expression==='joyful'?2:1);rect(g,P.ink,x+(x===12?2:1),14,1,bright||s.expression==='joyful'?2:1);}
+    }
+    rect(g,d.skin,12,12,4,2);rect(g,d.skin,19,12,3,2);
+    if(s.expression==='concerned'){
+      rect(g,d.hairSh,12,13,2,1);rect(g,d.hairSh,14,12,2,1);rect(g,d.hairSh,19,12,2,1);rect(g,d.hairSh,21,13,1,1);
+    }else if(s.expression==='thoughtful'){
+      rect(g,d.hairSh,12,12,4,1);rect(g,d.hairSh,19,13,3,1);
+    }else{
+      rect(g,d.hairSh,12,13-(s.expression==='joyful'?1:0),4,1);rect(g,d.hairSh,19,13-(s.expression==='joyful'?1:0),3,1);
+    }
+    // A armação da Rosa continua dourada; sobrancelhas ficam logo acima dela.
+    if(d.hairStyle==='bun'){rect(g,P.amber,11,13,6,1);rect(g,P.amber,18,13,5,1);}
+    rect(g,d.skin,14,19,7,3);rect(g,d.skinHi,16,21,3,1);
+    if(s.mouth===1){rect(g,d.skinSh,15,19,5,2);rect(g,P.cream,16,19,3,1);}
+    else if(s.mouth===2){rect(g,P.ink,16,19,3,3);rect(g,d.skinSh,15,20,1,1);rect(g,d.skinSh,19,20,1,1);rect(g,P.cream,16,19,3,1);}
+    else if(s.mouth===3){rect(g,d.skinSh,17,19,3,2);rect(g,P.ink,18,19,1,2);}
+    else{
+      rect(g,d.skinSh,15,20,5,1);
+      if(['warm','joyful'].includes(s.expression)){rect(g,P.cream,16,20,3,1);rect(g,d.skinSh,15,19,1,1);rect(g,d.skinSh,19,19,1,1);}
+      if(s.expression==='concerned'){rect(g,d.skinSh,16,19,3,1);rect(g,d.skin,16,20,3,1);}
+      if(s.expression==='thoughtful'){rect(g,d.skinSh,18,19,3,1);}
+    }
+    if(s.expression==='joyful'){rect(g,d.skinSh,12,18,2,1);rect(g,d.skinSh,21,18,1,1);}
+    if(['explain','invite'].includes(s.gesture)&&s.speechPhase>0){
+      const x=s.gesture==='invite'?24:22,y=28-s.speechPhase;
+      rect(g,d.shirtHi,x-1,y+1,3,3);rect(g,d.skin,x,y,3,2);rect(g,d.skinHi,x,y,2,1);
+    }
+  }
   function drawPortrait(target,id,opts={}){
     if(!target?.getContext) return false;id=profiles[id]?id:'player';const gender=opts.gender==='f'?'f':'m';
-    const key=id+'|'+gender;let cached=portraits.get(key);
-    if(!cached){cached=canvas(32,32);paintPortrait(cached.getContext('2d'),profile(id,gender),id,gender);portraits.set(key,cached);}
+    const speech=conversation(opts),s={...speech,blink:speech.speechBlink};
+    const key=s.conversing?'fala|'+id+'|'+(id==='player'?gender:'m')+'|'+s.expression+'|'+s.gesture:id+'|'+gender;let cached=portraits.get(key);
+    if(!cached){
+      cached=canvas(s.conversing?32*24:32,32);const cg=cached.getContext('2d');
+      if(s.conversing){for(let phase=0;phase<3;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
+        const frame=(phase*2+blink)*4+mouth;cg.save();cg.translate(frame*32,0);paintPortrait(cg,profile(id,gender),id,gender,{...s,mouth,blink:!!blink,speechPhase:phase});cg.restore();
+      }}else paintPortrait(cg,profile(id,gender),id,gender);
+      if(portraits.size>=MAX_PORTRAITS)portraits.delete(portraits.keys().next().value);portraits.set(key,cached);
+    }
     if(!target.width) target.width=96;if(!target.height) target.height=96;
     const g=target.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,target.width,target.height);
     g.imageSmoothingEnabled=false;const size=Math.min(target.width,target.height),x=Math.floor((target.width-size)/2),y=Math.floor((target.height-size)/2);
-    rect(g,P.ink,0,0,target.width,target.height);g.drawImage(cached,x,y,size,size);g.restore();
+    rect(g,P.ink,0,0,target.width,target.height);
+    if(s.conversing)g.drawImage(cached,speechFrame(s)*32,0,32,32,x,y,size,size);else g.drawImage(cached,x,y,size,size);g.restore();
     target.setAttribute?.('role','img');target.setAttribute?.('aria-label','Retrato de '+(opts.name||profile(id,gender).name));return true;
   }
   window.FarmCharacterArt=Object.freeze({
@@ -462,6 +573,6 @@
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
     // Diagnóstico de baixo custo para integração; não revela nem altera saves.
-    cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,maxSprites:MAX_SPRITES};}
+    cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,speechBanks:speechBanks.size,maxSprites:MAX_SPRITES,maxPortraits:MAX_PORTRAITS,maxSpeechBanks:MAX_SPEECH_BANKS};}
   });
 })();
