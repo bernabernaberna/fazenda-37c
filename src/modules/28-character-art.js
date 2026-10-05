@@ -55,7 +55,15 @@
   function position(actor,opts){return {x:Number.isFinite(opts.x)?opts.x:Math.round(Number(actor.x)||0),
     y:Number.isFinite(opts.y)?opts.y:Math.round(Number(actor.y)||0)};}
   function state(actor,opts,hero){
-    const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest');
+    const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
+    const restMode=rest&&opts.restMode==='bed'?'bed':rest?'sit':'';
+    const restElapsed=Math.max(0,Number.isFinite(opts.restElapsed)?opts.restElapsed:Number(hero?actor.restTimer:actor.activityPhase)||0);
+    const restBlend=Number.isFinite(opts.restBlend)?Math.max(0,Math.min(1,opts.restBlend)):Math.min(1,restElapsed/.24);
+    const restStage=rest?(opts.reducedMotion?2:Math.round(restBlend*2)):0;
+    // Respiração de 4,8s mexe apenas no tórax/tecido. Cabeça, mãos e pés ficam
+    // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
+    const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
+    const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
     const job=!hero&&!actor.moving&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
@@ -65,7 +73,7 @@
     const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
     return {dir:dirOf(actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
-      moving,gait,runMix,rest,
+      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
       actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
       blink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
@@ -114,8 +122,119 @@
     }
     g.restore();
   }
+  // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
+  // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
+  function paintHead(g,d,s){
+    const side=s.dir===1||s.dir===2,back=s.dir===3;
+    // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
+    rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
+    const hx=side?-4:-5,hw=side?9:10;
+    rect(g,d.hair,side?-5:-6,-27,side?10:12,10);
+    rect(g,d.skin,hx,-24,hw,7);rect(g,d.skinHi,hx,-23,2,5);rect(g,d.skinSh,hx+hw-2,-22,2,5);
+    rect(g,d.skin,side?5:-6,-22,side?1:2,3);if(!side) rect(g,d.skinSh,5,-22,1,3);
+    if(back){rect(g,d.hair,-6,-26,12,9);rect(g,d.hairHi,-5,-25,2,7);rect(g,d.hairSh,4,-25,2,8);}
+    else{
+      rect(g,d.hair,hx,-25,hw,2);rect(g,d.hairHi,hx,-25,3,1);
+      rect(g,d.hair,hx,-23,2,2);rect(g,d.hairSh,hx+hw-1,-24,1,3);
+      if(side){rect(g,P.ink,s.restDoze?2:3,-22,s.restDoze?2:1,s.restDoze||s.blink?1:2);rect(g,d.skinHi,5,-20,1,1);rect(g,d.skinSh,3,-18,2,1);}
+      else{
+        if(!s.restDoze){rect(g,P.cream,-3,-22,2,1);rect(g,P.cream,2,-22,2,1);}
+        rect(g,P.ink,s.restDoze?-3:-2,-22,s.restDoze?2:1,s.restDoze||s.blink?1:2);rect(g,P.ink,2,-22,s.restDoze?2:1,s.restDoze||s.blink?1:2);
+        rect(g,d.skinSh,0,-20,1,1);rect(g,d.skinSh,-1,-18,3,1);
+        if(d.expression==='curious'){rect(g,'#a86748',-4,-20,1,1);rect(g,'#a86748',3,-20,1,1);}
+        if(d.expression==='kind'){rect(g,P.edge,-4,-23,4,1);rect(g,P.edge,1,-23,4,1);rect(g,P.amber,-4,-21,1,1);}
+      }
+    }
+    if(d.hairStyle==='curls'){
+      for(const [x,y] of [[-7,-25],[-5,-28],[-1,-29],[3,-28],[5,-26],[-7,-21],[5,-21]]){
+        rect(g,d.hair,x,y,3,3);rect(g,d.hairHi,x,y,1,1);
+      }
+    }else if(d.hairStyle==='bun'){
+      rect(g,d.hair,side?-7:-3,-29,side?4:6,4);rect(g,d.hairHi,side?-7:-3,-29,3,1);
+      rect(g,P.amber,side?-5:3,-26,2,1);
+    }else if(d.hairStyle==='beanie'){
+      rect(g,d.shirtSh,-6,-28,12,4);rect(g,d.shirt,-5,-29,10,3);rect(g,d.shirtHi,-5,-28,3,1);
+      rect(g,d.shirtHi,-6,-25,12,2);rect(g,P.amber,side?3:3,-25,2,1);
+    }else if(d.hairStyle==='headwrap'){
+      rect(g,'#a07839',-6,-28,12,5);rect(g,d.trim,-5,-29,10,4);rect(g,P.amber,-5,-29,3,1);
+      rect(g,P.cream,-6,-25,12,1);rect(g,d.trim,side?-6:5,-23,2,7);
+      if(!back){rect(g,d.hair,side?2:-3,-19,side?3:7,2);rect(g,d.skin,side?3:-1,-19,side?1:3,1);}
+    }else if(d.hairStyle==='braid'||d.hairStyle==='ponytail'){
+      if(d.hairStyle==='braid'){
+        for(let i=0;i<4;i++){rect(g,d.hair,side?-6:5,-23+i*2,3,2);rect(g,d.hairHi,side?-6:5,-23+i*2,1,1);}
+        rect(g,d.trim,side?-6:5,-15,2,1);
+      }else{rect(g,d.hair,side?-7:5,-24,3,8);rect(g,d.hairHi,side?-7:5,-24,1,6);rect(g,d.trim,side?-7:5,-24,2,1);}
+    }else if(d.hairStyle==='messy'){
+      rect(g,d.hair,-5,-28,3,2);rect(g,d.hair,0,-29,3,3);rect(g,d.hairHi,0,-28,1,1);
+      rect(g,d.hair,4,-27,2,3);
+    }
+    if(s.hat){
+      rect(g,'#9b793d',-7,-29,14,3);rect(g,P.amber,-6,-30,12,3);rect(g,P.cream,-6,-30,5,1);
+      rect(g,P.edge,-7,-27,14,1);rect(g,'#bd9450',-9,-26,18,2);rect(g,P.amber,-9,-26,16,1);
+      rect(g,P.cream,-8,-26,5,1);rect(g,'#9b793d',6,-25,3,1);
+    }
+    if(s.scarf){
+      rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
+      rect(g,P.terra,side?2:3,-15,2,5);rect(g,'#794b43',side?3:4,-14,1,4);
+    }
+    if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
+  }
+  function paintRest(g,d,s){
+    // O primeiro estágio conserva a silhueta anterior ao agachar. A mesma
+    // sequência ao contrário serve para levantar, sem reiniciar a passada.
+    if(s.restStage===0){paintBody(g,d,{...s,rest:false,restDoze:false,gait:0,runMix:0,action:'',blink:false});return;}
+    g.save();g.translate(AX,AY);
+    const bed=s.restMode==='bed'&&s.restStage===2;
+    if(!bed&&s.dir===1)g.scale(-1,1);
+    const side=!bed&&(s.dir===1||s.dir===2),back=!bed&&s.dir===3;
+    const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
+    const hand=s.gloves?'#b79562':d.skin,boot=s.boots?'#40534a':P.soil;
+    if(bed){
+      // Âncora fornecida pela integração: pés = margem inferior do colchão-5.
+      // A cabeça repousa no travesseiro, e a manta cobre as pernas sem sombra
+      // projetada no piso. O chapéu equipado fica ao lado, sobre o colchão.
+      rect(g,shirtSh,-6,-11,12,9);rect(g,shirt,-5,-11,10,7);rect(g,shirtHi,-5,-11-s.restBreath,4,5);
+      rect(g,hand,-6,-8,3,3);rect(g,hand,3,-8,3,3);
+      const quilt=s.blanket?P.sage:'#819494',quiltHi=s.blanket?P.leaf:'#a2b4aa';
+      rect(g,P.edge,-8,-7,16,7);rect(g,quilt,-7,-7,14,6);rect(g,quiltHi,-7,-7-s.restBreath,14,2);
+      for(let x=-5;x<=5;x+=5){rect(g,s.blanket?P.amber:'#bbccc0',x,-4,1,3);}
+      rect(g,P.edge,-7,-1,14,1);
+      g.save();g.translate(0,6);paintHead(g,d,{...s,dir:0,hat:false});g.restore();
+      if(s.hat){rect(g,'#9b793d',9,-19,9,5);rect(g,P.amber,10,-20,7,4);rect(g,P.cream,10,-20,3,1);rect(g,P.edge,9,-16,9,1);}
+    }else{
+      const drop=s.restStage===1?3:5;
+      // Apoio dobrado e compacto. Os pés permanecem no y=0 da mesma âncora de
+      // colisão/profundidade; não deslizam com a respiração nem com o cochilo.
+      if(side){
+        limb(g,d.pants,-3,-9,4,-6,4);limb(g,d.pantsHi,0,-8,5,-5,3);
+        limb(g,d.pantsHi,5,-5,4,-2,3);rect(g,boot,4,-2,5,2);rect(g,P.ink,4,-1,5,1);
+        limb(g,d.pants,-3,-7,-4,-3,3);rect(g,boot,-5,-2,5,2);rect(g,P.ink,-5,-1,5,1);
+      }else{
+        rect(g,d.pants,-5,-9,10,6);limb(g,d.pants,-4,-6,-7,-3,4);limb(g,d.pantsHi,2,-6,5,-3,4);
+        limb(g,d.pantsHi,-5,-3,2,-2,3);limb(g,d.pants,4,-3,-2,-2,3);
+        rect(g,boot,-7,-2,4,2);rect(g,boot,4,-2,4,2);rect(g,P.ink,-7,-1,4,1);rect(g,P.ink,4,-1,4,1);
+      }
+      if(s.boots){rect(g,P.amber,side?5:-6,-2,2,1);if(!side)rect(g,P.amber,5,-2,2,1);}
+      const top=-16+drop;
+      rect(g,shirt,side?-4:-6,top-s.restBreath,side?8:12,9);rect(g,shirtHi,side?-4:-6,top-s.restBreath,2,7);rect(g,shirtSh,side?2:4,top,2,9);
+      if(!back){
+        if(d.style==='apron'||d.style==='vest'||d.style==='overalls'){rect(g,d.style==='overalls'?d.pants:P.cream,-2,top+2,4,5);rect(g,d.trim,1,top+3,1,1);}
+        else{rect(g,P.cream,side?-1:-2,top,side?2:4,2);rect(g,shirtSh,0,top+3,1,3);}
+        if(d.style==='wrap'){rect(g,d.trim,-4,top+1,8,2);rect(g,'#a07839',3,top+3,2,4);}
+        if(d.style==='field'&&!s.coat){rect(g,P.soil,side?-4:-6,top+5,3,3);rect(g,P.amber,side?-4:-6,top+5,3,1);}
+        if(d.style==='patch'){rect(g,d.trim,3,top+4,2,2);}
+      }
+      // Antebraços desenhados sobre as coxas: mãos soltas apoiadas no colo.
+      if(side){limb(g,shirtHi,-1,top+2,1,top+6,3);limb(g,shirtHi,1,top+6,5,-5,2);rect(g,hand,5,-5,3,2);}
+      else{limb(g,shirtSh,-7,top+2,-5,-6,3);limb(g,shirtHi,5,top+2,3,-6,3);rect(g,hand,-4,-5,3,2);rect(g,hand,1,-5,3,2);}
+      if(s.blanket){rect(g,P.sage,side?-5:-7,-9,side?13:14,6);rect(g,P.leaf,side?-5:-7,-9-s.restBreath,side?13:14,2);for(let i=0;i<4;i++)rect(g,P.amber,-5+i*3,-6,1,2);}
+      g.save();g.translate(side&&s.restDoze?1:0,drop);paintHead(g,d,s);g.restore();
+    }
+    g.restore();
+  }
   // Pincel no espaço dos pés. Todas as arestas são passos inteiros da grade.
   function paintBody(g,d,s){
+    if(s.rest){paintRest(g,d,s);return;}
     g.save();g.translate(AX,AY);if(s.dir===1) g.scale(-1,1);
     const side=s.dir===1||s.dir===2,back=s.dir===3;
     const strength=s.gait/8,run=s.runMix/8;
@@ -217,58 +336,7 @@
       rect(g,P.sage,side?-5:-7,-16,side?9:14,10);rect(g,P.leaf,side?-5:-7,-16,side?9:14,1);
       for(let i=0;i<4;i++) rect(g,P.amber,(side?-4:-6)+i*3,-9,1,2);
     }
-    // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
-    rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
-    const hx=side?-4:-5,hw=side?9:10;
-    rect(g,d.hair,side?-5:-6,-27,side?10:12,10);
-    rect(g,d.skin,hx,-24,hw,7);rect(g,d.skinHi,hx,-23,2,5);rect(g,d.skinSh,hx+hw-2,-22,2,5);
-    rect(g,d.skin,side?5:-6,-22,side?1:2,3);if(!side) rect(g,d.skinSh,5,-22,1,3);
-    if(back){rect(g,d.hair,-6,-26,12,9);rect(g,d.hairHi,-5,-25,2,7);rect(g,d.hairSh,4,-25,2,8);}
-    else{
-      rect(g,d.hair,hx,-25,hw,2);rect(g,d.hairHi,hx,-25,3,1);
-      rect(g,d.hair,hx,-23,2,2);rect(g,d.hairSh,hx+hw-1,-24,1,3);
-      if(side){rect(g,P.ink,3,-22,1,s.blink?1:2);rect(g,d.skinHi,5,-20,1,1);rect(g,d.skinSh,3,-18,2,1);}
-      else{
-        rect(g,P.cream,-3,-22,2,1);rect(g,P.cream,2,-22,2,1);
-        rect(g,P.ink,-2,-22,1,s.blink?1:2);rect(g,P.ink,2,-22,1,s.blink?1:2);
-        rect(g,d.skinSh,0,-20,1,1);rect(g,d.skinSh,-1,-18,3,1);
-        if(d.expression==='curious'){rect(g,'#a86748',-4,-20,1,1);rect(g,'#a86748',3,-20,1,1);}
-        if(d.expression==='kind'){rect(g,P.edge,-4,-23,4,1);rect(g,P.edge,1,-23,4,1);rect(g,P.amber,-4,-21,1,1);}
-      }
-    }
-    if(d.hairStyle==='curls'){
-      for(const [x,y] of [[-7,-25],[-5,-28],[-1,-29],[3,-28],[5,-26],[-7,-21],[5,-21]]){
-        rect(g,d.hair,x,y,3,3);rect(g,d.hairHi,x,y,1,1);
-      }
-    }else if(d.hairStyle==='bun'){
-      rect(g,d.hair,side?-7:-3,-29,side?4:6,4);rect(g,d.hairHi,side?-7:-3,-29,3,1);
-      rect(g,P.amber,side?-5:3,-26,2,1);
-    }else if(d.hairStyle==='beanie'){
-      rect(g,d.shirtSh,-6,-28,12,4);rect(g,d.shirt,-5,-29,10,3);rect(g,d.shirtHi,-5,-28,3,1);
-      rect(g,d.shirtHi,-6,-25,12,2);rect(g,P.amber,side?3:3,-25,2,1);
-    }else if(d.hairStyle==='headwrap'){
-      rect(g,'#a07839',-6,-28,12,5);rect(g,d.trim,-5,-29,10,4);rect(g,P.amber,-5,-29,3,1);
-      rect(g,P.cream,-6,-25,12,1);rect(g,d.trim,side?-6:5,-23,2,7);
-      if(!back){rect(g,d.hair,side?2:-3,-19,side?3:7,2);rect(g,d.skin,side?3:-1,-19,side?1:3,1);}
-    }else if(d.hairStyle==='braid'||d.hairStyle==='ponytail'){
-      if(d.hairStyle==='braid'){
-        for(let i=0;i<4;i++){rect(g,d.hair,side?-6:5,-23+i*2,3,2);rect(g,d.hairHi,side?-6:5,-23+i*2,1,1);}
-        rect(g,d.trim,side?-6:5,-15,2,1);
-      }else{rect(g,d.hair,side?-7:5,-24,3,8);rect(g,d.hairHi,side?-7:5,-24,1,6);rect(g,d.trim,side?-7:5,-24,2,1);}
-    }else if(d.hairStyle==='messy'){
-      rect(g,d.hair,-5,-28,3,2);rect(g,d.hair,0,-29,3,3);rect(g,d.hairHi,0,-28,1,1);
-      rect(g,d.hair,4,-27,2,3);
-    }
-    if(s.hat){
-      rect(g,'#9b793d',-7,-29,14,3);rect(g,P.amber,-6,-30,12,3);rect(g,P.cream,-6,-30,5,1);
-      rect(g,P.edge,-7,-27,14,1);rect(g,'#bd9450',-9,-26,18,2);rect(g,P.amber,-9,-26,16,1);
-      rect(g,P.cream,-8,-26,5,1);rect(g,'#9b793d',6,-25,3,1);
-    }
-    if(s.scarf){
-      rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
-      rect(g,P.terra,side?2:3,-15,2,5);rect(g,'#794b43',side?3:4,-14,1,4);
-    }
-    if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
+    paintHead(g,d,s);
     paintAction(g,d,s,hand,false);
     g.restore();
   }
@@ -287,10 +355,10 @@
   }
   function draw(g,actor,id,opts,hero){
     if(!g||!actor) return false;const p=position(actor,opts),s=state(actor,opts,hero);
-    g.save();g.imageSmoothingEnabled=false;shadow(g,p.x,p.y+FEET_Y,s.rest);
+    g.save();g.imageSmoothingEnabled=false;if(s.restMode!=='bed')shadow(g,p.x,p.y+FEET_Y,s.rest);
     if(actor.dead) g.globalAlpha*=0.65;
     g.drawImage(sprite(id,actor.gender==='f'?'f':'m',s),p.x-AX,p.y+FEET_Y-AY);
-    if(hero&&!opts.reducedMotion&&!actor.dead){
+    if(hero&&!opts.reducedMotion&&!actor.dead&&s.restMode!=='bed'){
       const phase=Math.floor(clock(opts)/180)%4;
       if(opts.winter&&actor.temp<36.2&&s.dir!==3){
         const side=s.dir===1?-1:1;rect(g,'rgba(210,227,222,0.60)',p.x+side*(7+phase),p.y-12-phase,2,1);

@@ -3579,12 +3579,16 @@ document.addEventListener('fullscreenchange', ()=>setTimeout(resize, 60));
 document.addEventListener('webkitfullscreenchange', ()=>setTimeout(resize, 60));
 
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && soundEnabled && AmbientMusic.ctx && AmbientMusic.ctx.state === 'suspended'){
-    AmbientMusic.ctx.resume().then(()=>{
-      if(AmbientMusic.active){ AmbientMusic.scheduledUntil = AmbientMusic.ctx.currentTime; AmbientMusic._scheduleLoop(); }
-    }).catch(()=>{});
+  if(document.hidden){
+    for(const key of Object.keys(keys)) delete keys[key];
+    window.FarmOriginalAudio?.suspend();window.synthSfx?.suspend();
+    window.AmbientSynth?.suspend();AmbientMusic.suspend?.();
+  }else{
+    last=performance.now();
+    window.FarmOriginalAudio?.resume();window.synthSfx?.resume();window.AmbientSynth?.resume();AmbientMusic.resume?.();
   }
 });
+window.addEventListener('blur',()=>{for(const key of Object.keys(keys))delete keys[key];});
 
 /* ---------- Input ---------- */
 const keys = {};
@@ -3897,9 +3901,9 @@ const AmbientMusic = {
 window.AmbientMusic = AmbientMusic;
 
 const AudioManager = {
-  master: 0.75,
+  master: Math.max(0,Math.min(1,Number(_savedAudio?.volume??.75)||0)),
   sounds: {},
-  loops: ['farm_ambience','birds_loop','cicadas_loop','cold_wind','fireplace','heavy_breathing','teeth_chatter','heartbeat_warning','grass_steps','dirt_steps'],
+  loops: Object.entries(FarmOriginalAudio.describe()).filter(([,def])=>def.loop).map(([name])=>name),
   files: Object.fromEntries(FarmOriginalAudio.keys.map(name=>[name,'procedural'])),
   init(){
     if(audioStarted) return;
@@ -3919,15 +3923,16 @@ const AudioManager = {
     FarmOriginalAudio.setEnabled(soundEnabled);
     FarmOriginalAudio.setMaster(this.master);
     AmbientMusic.setVolume(soundEnabled?this.master:0);
+    if(gameStarted&&soundEnabled&&this.master>0&&!document.hidden&&!AmbientMusic.active)AmbientMusic.start();
     window.synthSfx?.syncVolume();
     window.AmbientSynth?.syncVolume();
     for(const [name,a] of Object.entries(this.sounds)){
       const target = Number(a.dataset.target || 0);
-      if(a.loop) a.volume = soundEnabled ? target * this.master : 0;
+      if(a.loop){a.volume = soundEnabled ? target * this.master : 0;if(!soundEnabled||this.master===0)a.pause();}
     }
   },
   playSfx(name, vol=0.8){
-    if(!soundEnabled || !audioStarted) return;
+    if(!soundEnabled || !audioStarted || this.master<=0 || document.hidden) return;
     const base = this.sounds[name];
     if(!base || base.dataset.missing==='1') return;
     try{
@@ -3940,20 +3945,21 @@ const AudioManager = {
   ensureLoop(name){
     const a = this.sounds[name];
     if(!a || a.dataset.missing==='1') return null;
-    if(a.paused && soundEnabled){ a.play().catch(()=>{}); }
+    if(a.paused && soundEnabled && this.master>0 && a.volume>0 && !document.hidden){ a.play().catch(()=>{}); }
     return a;
   },
   setLoop(name, targetVol, fade=0.08){
     if(!audioStarted) return;
-    const a = this.ensureLoop(name); if(!a) return;
-    const target = soundEnabled ? Math.max(0, Math.min(1, targetVol)) : 0;
+    const a = this.sounds[name];if(!a||a.dataset.missing==='1')return;
+    const target = soundEnabled&&!document.hidden ? Math.max(0,Math.min(1,targetVol)) : 0;
     a.dataset.target = String(target);
-    const desired = target * this.master;
-    a.volume += (desired - a.volume) * fade;
-    if(a.volume < 0.002 && target===0){ a.volume = 0; }
+    const desired = target*this.master;
+    a.volume += (desired-a.volume)*fade;
+    if(desired===0&&(a.volume<.002||this.master===0||!soundEnabled||document.hidden)){a.volume=0;a.pause();return;}
+    if(desired>0)this.ensureLoop(name);
   },
   muteAll(){
-    for(const a of Object.values(this.sounds)) a.volume = 0;
+    for(const a of Object.values(this.sounds)){a.volume=0;a.pause();}
     FarmOriginalAudio.stopAll();FarmOriginalAudio.setEnabled(false);
     window.synthSfx?.syncVolume();window.AmbientSynth?.syncVolume();
   }
@@ -4045,10 +4051,12 @@ function distanceVolume(playerX, playerY, targetX, targetY, maxDist, baseVol){
   const t = 1 - (d / maxDist);   // 1 muito perto, 0 longe
   return baseVol * t * t;         // curva quadrática (cai mais devagar perto)
 }
+function queryObjects(types,list=objects){
+  return window.FarmObjectQueries?FarmObjectQueries.of(list,types):list.filter(o=>types.includes(o.type));
+}
 function nearestObjectDistance(type){
   let nearest = Infinity;
-  for(const o of objects){
-    if(o.type !== type) continue;
+  for(const o of queryObjects([type])){
     const d = Math.hypot(player.x - o.x, player.y - o.y);
     if(d < nearest) nearest = d;
   }
@@ -4056,8 +4064,8 @@ function nearestObjectDistance(type){
 }
 function findNearestLitFire(){
   let nearest = null, dist = Infinity;
-  for(const o of objects){
-    if(!['fireplace','mtn_fire','i_fireplace','b_stove'].includes(o.type) || (!o.lit&&!['i_fireplace','b_stove'].includes(o.type))) continue;
+  for(const o of queryObjects(['fireplace','mtn_fire','i_fireplace','b_stove'])){
+    if(!o.lit&&!['i_fireplace','b_stove'].includes(o.type))continue;
     const d = Math.hypot(player.x - o.x, player.y - o.y);
     if(d < dist){ dist = d; nearest = o; }
   }
@@ -4065,7 +4073,7 @@ function findNearestLitFire(){
 }
 function updateAudioState(){
   if(!gameStarted || !audioStarted) return;
-  const paused=isPaused||cutsceneActive||readingPanelOpen()||histologyMissionOpen||player.dead;
+  const paused=document.hidden||isPaused||cutsceneActive||readingPanelOpen()||histologyMissionOpen||player.dead;
   const heatStress=Math.max(0,Math.min(1,(player.temp-38.2)/2.2));
   const coldStress=Math.max(0,Math.min(1,(36.3-player.temp)/1.3));
   const fatigueStress=Math.max(0,Math.min(1,(35-player.en)/35));
@@ -4078,12 +4086,12 @@ function updateAudioState(){
   }
   const audioWorldPosition=currentScene==='main'?player:(scenes.main._lastPlayer||player);
   const mix=window.AmbientSynth.mixScene({weights:regionWeights(audioWorldPosition.y/TS),cold:isFrio(),timeOfDay,
-    indoor:isIndoor(),scene:currentScene,riverProximity:Math.max(0,1-waterDistance/70),fireVolume,heatStress,coldStress,paused});
+    indoor:isIndoor(),scene:currentScene,resting:player.resting,riverProximity:Math.max(0,1-waterDistance/70),fireVolume,heatStress,coldStress,paused});
   for(const [name,volume]of Object.entries(mix.loops))AudioManager.setLoop(name,volume,paused?.35:.08);
   window.AmbientSynth.setRiver(mix.river);window.AmbientSynth.setCrickets(mix.crickets);
   AmbientMusic.setScene?.({...mix.music,duck:paused?.35:1});
   // Contatos na mesma fase dos pés; areia, neve, pedra e assoalho têm timbres próprios.
-  const onBridge=objects.some(o=>o.type==='bridge'&&player.x>=o.x&&player.x<=o.x+(o.w||48)&&Math.abs(player.y-o.y)<9);
+  const onBridge=queryObjects(['bridge']).some(o=>player.x>=o.x&&player.x<=o.x+(o.w||48)&&Math.abs(player.y-o.y)<9);
   const surface=isIndoor()||onBridge||tile===T.WOOD?'wood':[T.PATH,T.FIELD].includes(tile)?'dirt':[T.STONE,T.COBBLE,T.ICE].includes(tile)?'stone':[T.SAND,T.DUNE,T.CRACKED].includes(tile)?'sand':[T.SNOW,T.SNOWROCK].includes(tile)||(isFrio()&&currentRegion()==='farm'&&[T.GRASS,T.GRASS2,T.FLOWER].includes(tile))?'snow':'grass';
   AudioManager.setLoop('grass_steps',0,.6);AudioManager.setLoop('dirt_steps',0,.6);
   window.FarmOriginalAudio.updateFootsteps({x:player.x,y:player.y,phase:player.anim,moving:player.moving,running:player.running,surface,scene:currentScene,blocked:paused||!soundEnabled||player.resting});
@@ -4658,7 +4666,7 @@ function setSceneTo(name, spawnX, spawnY){
   } else if(s.spawn){
     player.x = s.spawn.x; player.y = s.spawn.y;
   }
-  player.moving = false;
+  player.moving=false;player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
   // Teleporta a câmera para a nova cena (sem deslizar suavemente entre mapas)
   if(typeof snapCamera === 'function') snapCamera();
   if(s.onEnterMsg) showToast(s.onEnterMsg, 'info', 3400);
@@ -6029,6 +6037,7 @@ function loadGameFromData(data){
     setSceneTo('main');
   }
   Object.assign(player, data.player||{});
+  player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
   if(player.inv && !player.inv.seeds) player.inv.seeds = {tomato:player.inv.seed||0,corn:0,carrot:0,forage:0};
   // Backward-compat: older saves don't have name/gender
   if(typeof player.name !== 'string' || !player.name) player.name = 'Fazendeiro';
@@ -6584,7 +6593,7 @@ function toggleInventory(force){
   }
 }
 
-function updateBars(){
+function updateBars(paintSkin=true){
   const tNorm = Math.max(0, Math.min(1, (player.temp-35)/(41-35)));
   document.getElementById('bTemp').style.width = (tNorm*100)+'%';
   document.getElementById('bTemp').style.background =
@@ -6626,7 +6635,7 @@ function updateBars(){
   setStat('sGland', player.temp>37.4 && player.hyd>20, player.hyd<30?'bad':'on');
 
   // Skin View live update
-  if(skinOpen) drawSkinView();
+  if(paintSkin&&skinOpen) drawSkinView();
 
   const icon = isFrio() ? '❄️' : dayIcon();
   document.getElementById('seasonIcon').textContent = icon;
@@ -7129,13 +7138,13 @@ window.toggleHudTips = toggleHudTips;
 function inShade(){
   // Mesma elipse desenhada por drawTree — inclusive o deslocamento pelo sol.
   const sv = (typeof sunShadowVec === 'function') ? sunShadowVec() : null;
-  for(const o of objects) if(o.type==='tree'){
+  for(const o of queryObjects(['tree'])){
     const e = treeShadowEllipse(o, sv);
     const dx = (player.x - e.cx)/e.rx, dy = (player.y - e.cy)/e.ry;
     if(dx*dx + dy*dy < 1) return true;
   }
   // House/barn shadow (south side)
-  for(const o of objects) if(o.type==='house'||o.type==='barn'){
+  for(const o of queryObjects(['house','barn'])){
     if(player.x>o.x && player.x<o.x+o.w && player.y>o.y+o.h && player.y<o.y+o.h+12) return true;
   }
   return false;
@@ -7143,8 +7152,7 @@ function inShade(){
 function inRect(p,r){ return p.x>r.x && p.x<r.x+r.w && p.y>r.y && p.y<r.y+r.h; }
 function nearObj(types, range=22){
   let best=null, bd=range;
-  for(const o of objects){
-    if(!types.includes(o.type)) continue;
+  for(const o of queryObjects(types)){
     const cx = o.x + (o.w?o.w/2:0), cy = o.y + (o.h?o.h/2:0);
     const d = Math.hypot(player.x-cx, player.y-cy);
     if(d<bd){ bd=d; best=o; }
@@ -7254,6 +7262,7 @@ function tryInteract(){
       player.restTimer = 0;
       if(player.resting){
         stats.restSessionCounted = false;
+        window.FarmRestVisual?.start(currentScene,bed);
         flashFx(player.x, player.y-12, 'descansando…', '#dce9ff');
         try { window.synthSfx && synthSfx.sleep(); } catch(e){}
       }
@@ -7435,7 +7444,7 @@ function tryInteract(){
     if(isFrio()) tickTask('protect');
     flashFx(an.x,an.y-8,woolRegrew?'lã cresceu':(isFrio()?'protegido':'alimentado'),'#cfe57a');
     if(woolRegrew) showAlert('A lã da ovelha voltou a crescer depois de alimentar');
-    sfx.plant();
+    window.synthSfx?.animal(an.kind);
     renderInv();
     return;
   }
@@ -7605,6 +7614,7 @@ function toggleRest(){
   player.resting = !player.resting;
   player.restTimer = 0;
   stats.restSessionCounted = false;
+  if(player.resting){window.FarmRestVisual?.start(currentScene);try{window.synthSfx?.sleep();}catch(e){}}
 }
 
 /* ---------- Scene transition triggers (walk-onto) ---------- */
@@ -8003,28 +8013,28 @@ function switchSeason(){
 function nearShelter(){
   if(isIndoor()) return true;
   if(nearObj(['house','barn'], 50)) return true;
-  for(const o of objects) if((o.type==='fireplace' || o.type==='i_fireplace' || o.type==='b_stove') && o.lit && Math.hypot(player.x-o.x, player.y-o.y)<55) return true;
+  for(const o of queryObjects(['fireplace','i_fireplace','b_stove']))if(o.lit&&Math.hypot(player.x-o.x, player.y-o.y)<55) return true;
   return false;
 }
 
 /* updateThermalUI / resetThermalUI live in src/modules/10-thermal-ui.js */
 function nearFire(){
-  for(const o of objects) if(o.type==='fireplace' && o.lit && Math.hypot(player.x-o.x, player.y-o.y)<45) return true;
+  for(const o of queryObjects(['fireplace']))if(o.lit&&Math.hypot(player.x-o.x, player.y-o.y)<45) return true;
   return false;
 }
 
 function fireWarmthFactor(){
   let best = 0;
-  for(const o of objects){
-    if((o.type!=='fireplace' && o.type!=='i_fireplace' && o.type!=='b_stove') || !o.lit) continue;
+  for(const o of queryObjects(['fireplace','i_fireplace','b_stove'])){
+    if(!o.lit)continue;
     const d = Math.hypot(player.x-o.x, player.y-o.y);
     if(d < 90) best = Math.max(best, 1 - d/90);
   }
   return Math.max(0, Math.min(1, best));
 }
 function updateFireplaces(dt){
-  for(const o of objects){
-    if(o.type!=='fireplace' || !o.lit) continue;
+  for(const o of queryObjects(['fireplace'])){
+    if(!o.lit)continue;
     o.fuel = Math.max(0, (o.fuel||90) - dt);
     if(o.fuel<=0){
       o.lit = false;
@@ -8054,6 +8064,7 @@ function killPlayer(type){
   }
   player.dead = true;
   player.resting = false;
+  window.FarmRestVisual?.reset();
   player.moving = false;
   player.running = false;
   shakeCamera(8, 30);
@@ -8087,6 +8098,7 @@ function killPlayer(type){
   document.getElementById('death').classList.add('show');
 }
 window.respawnPlayer = function(){
+  window.FarmRestVisual?.reset();
   document.getElementById('death').classList.remove('show');
   player.dead = false;
   player.temp = 37.0;
@@ -8228,8 +8240,7 @@ function spawnCrow(){
   });
 }
 function isScarecrowNearby(x, y){
-  for(const o of objects){
-    if(o.type !== 'scarecrow') continue;
+  for(const o of queryObjects(['scarecrow'])){
     if(Math.hypot(o.x - x, o.y - y) < 80) return true;
   }
   return false;
@@ -8511,6 +8522,7 @@ function update(dt){
   if(player.temp<38.7) stats.hotFlag=false;
   if(player.temp>36.4) stats.coldFlag=false;
   player.moving = false;
+  if(player.resting&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].some(key=>keys[key]))player.resting=false;
   if(!player.resting){
     let dx=0,dy=0;
     if(keys['w']||keys['arrowup']) dy-=1;
@@ -8599,6 +8611,8 @@ function update(dt){
       feedback.add('descanso no interior',repouso);
     }
   }
+
+  window.FarmRestVisual?.update(dt,player,currentScene,!!A11Y.reduceMotion);
 
   // Mantém a fase ao soltar a tecla; os pés assentam e retomam sem trocar
   // de pose numa única imagem. As misturas independem da taxa de quadros.
@@ -8826,6 +8840,7 @@ function resetSeasonTasks(list){
 function resetSandboxRun(){
   window.FarmWorldMap?.reset();
   window.FarmAnimalLife?.reset();
+  window.FarmRestVisual?.reset();
   const identity={name:player.name,gender:player.gender};
   if(currentScene!=='main') setSceneTo('main');
   Object.assign(player,JSON.parse(JSON.stringify(initialSandboxRun.player)),identity);
@@ -12926,11 +12941,12 @@ function drawPlayer(){
   // Posição na TELA arredondada a partir da diferença player-câmera (não de
   // player e câmera separados). Isso elimina o tremor ao andar na diagonal:
   // o personagem fica cravado em pixel inteiro em relação ao cenário.
-  let x = _camRenderX + Math.round(player.x - _camFloatX);
-  let y = _camRenderY + Math.round(player.y - _camFloatY);
+  const restPose=window.FarmRestVisual?.pose(player,currentScene)||{x:player.x,y:player.y};
+  let x = _camRenderX + Math.round(restPose.x - _camFloatX);
+  let y = _camRenderY + Math.round(restPose.y - _camFloatY);
   if(window.FarmCharacterArt){
     if(!A11Y.reduceMotion && isFrio() && player.temp<36.2) x+=Math.floor(Math.sin(performance.now()/35));
-    window.FarmCharacterArt.drawPlayer(ctx,player,{x,y,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
+    window.FarmCharacterArt.drawPlayer(ctx,player,{...restPose,x,y,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
     return;
   }
   const dir = player.dir ?? 0; // 0 baixo, 1 esquerda, 2 direita, 3 cima
@@ -13894,6 +13910,7 @@ function applyBloom(){
   }catch(e){ /* nunca derruba o frame por causa do pós-processamento */ }
 }
 
+const _renderDrawables=[],_renderPlayer={type:'player',x:0,y:0};
 function render(){
   // Base do supersampling: todo o desenho continua em coordenadas lógicas (VW×VH),
   // mas é escrito no backing store ampliado (VW*RS × VH*RS). setTransform é absoluto,
@@ -13991,6 +14008,7 @@ function render(){
   for(const k in crops){
     const c=crops[k]; if(!c) continue;
     const [tx,ty]=k.split(',').map(Number);
+    if(tx*TS+TS*2<camX||tx*TS-TS*2>camX+visW||ty*TS+TS*2<camY||ty*TS-TS*2>camY+visH)continue;
     drawCrop(tx,ty,c);
   }
   if(!isIndoor()) drawFootprints();
@@ -14002,8 +14020,11 @@ function render(){
   }
 
   // sort by y, including player
-  const drawables = objects.filter(o=>o.type!=='pen' && o.x+(o.w||0)+128>=camX && o.x-128<=camX+visW && o.y+(o.h||0)+128>=camY && o.y-128<=camY+visH);
-  drawables.push({type:'player', x:player.x, y:player.y});
+  const drawables=_renderDrawables;drawables.length=0;
+  for(const o of objects)if(o.type!=='pen'&&o.x+(o.w||0)+128>=camX&&o.x-128<=camX+visW&&o.y+(o.h||0)+128>=camY&&o.y-128<=camY+visH)drawables.push(o);
+  const restPose=window.FarmRestVisual?.pose(player,currentScene);
+  _renderPlayer.x=restPose?.x??player.x;_renderPlayer.y=restPose?restPose.depth-10:player.y;
+  drawables.push(_renderPlayer);
   if(window.FarmWorldDepth)for(const o of objects)if(o.type==='pen')drawables.push(...FarmWorldDepth.penParts(o));
   if(window.FarmInteriorArt)for(const o of objects)if(o.type==='gh_frame')drawables.push(...FarmInteriorArt.parts(o));
   drawables.sort((a,b)=>{
@@ -14762,8 +14783,11 @@ function lerpColor(a,b,t){
   return [Math.round(a[0]+(b[0]-a[0])*t), Math.round(a[1]+(b[1]-a[1])*t), Math.round(a[2]+(b[2]-a[2])*t)];
 }
 
+let _hudElapsed=0;
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
+  // Sem simulação/renderização em abas ocultas; retoma sem acumular tempo.
+  if(document.hidden){requestAnimationFrame(loop);return;}
   // Cutscene avança independente do pause
   if(cutsceneActive) cutsceneT += dt;
   // Pause: skip update logic but keep rendering animated
@@ -14780,7 +14804,9 @@ function loop(now){
       window.FarmLearningJourney.observe(player.temp);
       checkWin();
     }
-    updateBars();
+    _hudElapsed+=dt;
+    if(_hudElapsed>=.1){updateBars(false);_hudElapsed%=.1;}
+    if(skinOpen)drawSkinView();
     // Background activity timers run across scenes (so soup keeps cooking
     // even while the player is on the main map)
     if(typeof updatePot === 'function') updatePot();

@@ -24,7 +24,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         feedback:!!document.getElementById('thermalFeedback'),
         jornada:!!window.FarmLearningJourney,
         relatorio:!!window.FarmActivityReport,
-        audioOriginal:window.FarmOriginalAudio?.keys.length===20,
+        audioOriginal:window.FarmOriginalAudio?.keys.length===23,
         moradores:window.FarmStoryWorld?.characters.length,
         arteMundo:!!window.FarmWorldArt,
         artePersonagens:!!window.FarmCharacterArt,

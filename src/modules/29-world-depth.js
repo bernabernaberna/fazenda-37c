@@ -165,7 +165,7 @@
   function isBlocked(x,y,from){
    const m=API.scenes.main;if(!m||x<8||y<8||x>m.MW*S-8||y>m.MH*S-8)return true;
    if([undefined,T.WATER,T.RIVER,T.OASIS].includes(m.map[Math.floor(y/S)]?.[Math.floor(x/S)]))return true;
-   for(const o of m.objects){const b=footprint(o);if(b&&contains(b,x,y+7)){
+   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
      // Saves anteriores podem começar dentro de um novo tronco/volume.
      // Permite somente sair em direção à borda, nunca atravessar o obstáculo.
      if(from&&contains(b,from.x,from.y+7)){

@@ -4,7 +4,7 @@
         A pele como sistema natural de controle térmico
                      ~ Manual do Jogador ~
 
-                   Jogo educativo de histologia
+                   Trabalho de Histologia
 
 ================================================================================
 
@@ -24,6 +24,14 @@
   O VALE DOS TRÊS VENTOS começa com uma carta de sua avó Rosa. Você ajuda a
   reabrir a Casa das Sementes e reúne pessoas da fazenda, montanha e oásis.
   A arte atual inclui moradores animados, retratos e materiais de cada bioma.
+  Os seis moradores compartilham 18 lembranças. Suas respostas alteram as
+  próximas conversas e ficam no diário; a história continua depois da reabertura.
+  Nada custa moedas ao escolher uma resposta ou voltar para conversar depois.
+
+  Para descansar, R senta o personagem; E perto da cama ou do catre inicia
+  repouso deitado. Caminhar, R ou E faz levantar. Movimento reduzido mantém
+  o descanso estável. O som acompanha bioma, interior, noite e repouso.
+  A partida e o áudio param quando a aba fica oculta.
 
 
   COMO COMEÇAR  (versão navegador)
@@ -162,7 +170,7 @@
 
   CRÉDITOS
   ------------------------------------------------------------------------------
-  Fazenda 37 °C — versão educativa
+  Desenvolvimento: 
   Tema: A pele como sistema natural de controle térmico — Histologia
   Sons e música: síntese por código do projeto, sem gravações externas.
   O modelo é didático; limites térmicos e itens são regras do jogo.

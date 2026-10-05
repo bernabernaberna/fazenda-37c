@@ -4024,7 +4024,7 @@ body.hud-game #legend{display:none !important;}
       routine:{day:'Tenta descobrir o que mudou na horta.',night:'Anota ideias para testar no dia seguinte.'}}
   ];
   const byId=Object.fromEntries(characters.map(c=>[c.id,c]));
-  const letter={title:'A carta de Rosa',text:'Meu bem,\n\nA Casa das Sementes está fechada há tempo demais. Ainda tenho as caixas, mas um vale não vive só de caixas. Lia guarda perguntas, Tomás guarda ferramentas, Inês conhece a montanha, Caio cuida do oásis e Nico não para de imaginar o que podemos fazer.\n\nVenha plantar alguma coisa comigo. Não precisa resolver tudo no primeiro dia. Quero ouvir de novo três ventos na mesma mesa: o da fazenda, o da montanha e o do oásis.\n\nCom carinho,\nRosa'};
+  const letter={title:'A carta de Rosa',text:'Meu bem,\n\nEncontrei uma semente no bolso do avental que você usava aqui. Ela ainda estava embrulhada naquele papel com três riscos. Você dizia que eram os três ventos do vale.\n\nA Casa das Sementes fechou depois que uma ventania soltou a placa e apagou nossas marcas da trilha. Consertamos o caminho, mas a mesa continuou vazia. Cada um ficou esperando uma ocasião melhor. Eu também.\n\nLia guarda perguntas, Tomás guarda ferramentas, Inês conhece a montanha, Caio cuida do oásis e Nico desenhou uma placa maior do que ele. Nenhum deles tem sozinho a história inteira.\n\nVenha plantar alguma coisa comigo. Não precisa resolver tudo no primeiro dia. Desta vez, não vamos esperar que a casa esteja perfeita para convidar as pessoas.\n\nGuardei uma cadeira.\nRosa'};
   const obj=(id,label,event,goal=1,match={})=>({id,text:label,event,goal,match});
   const chapters=[
     {id:'chegada',title:'1 · Uma carta, três ventos',npcId:'rosa',coins:10,
@@ -4103,6 +4103,112 @@ body.hud-game #legend{display:none !important;}
         ['lost','Minha tentativa não funcionou.','A minha também não, ontem. Podemos olhar o que faltou e fazer uma tentativa nova. Eu anoto o que fizemos, não uma história em que acertamos tudo.', 'Você e Nico combinaram olhar o que faltou antes de tentar novamente.'],
         ['partner','Quero ser seu parceiro nessa ideia.','Fechado! Você cuida de uma parte, eu guardo nossas perguntas. Quando terminar uma etapa, volte para contar. É muito mais interessante do que imaginar sozinho.', 'Nico passou a chamar você de parceiro de experiências.']]}
   };
+  // As lembranças são opcionais: ouvir não exige entregar itens, não cobra moedas
+  // e não fecha nenhum capítulo. Escolhas mudam a conversa, sem resposta "certa".
+  const lore={
+    rosa:[
+      {id:'rosa:caixa',title:'A caixa sem etiqueta',chapter:0,bond:0,
+        text:'Esta caixa ficou sem etiqueta de propósito. Antes da ventania, deixávamos aqui sementes de quem ainda não tinha escolhido um lugar para plantar. Você guardou uma e desenhou três riscos no papel.\n\nQuando a casa fechou, eu etiquetei tudo para não perder nada. Só esta escapou. Às vezes acho que foi ela que me lembrou de escrever sua carta.',
+        choices:[{label:'Vamos deixar espaço para quem ainda chegar.',reply:'Então a caixa continua sem nome. Não por esquecimento: por convite. Vou deixá-la na frente das outras.',memory:'Você e Rosa reservaram uma caixa para quem ainda chegar.',echo:'Deixei aquela caixa sem nome na frente. Já reparou como um espaço vazio pode parecer um convite?'},
+          {label:'Quero começar pela nossa semente.',reply:'Esta eu conheço pelo embrulho. Podemos começar com ela e continuar com as que vierem depois. Uma lembrança também pode criar raiz nova.',memory:'Você quis começar com a semente guardada por Rosa.',echo:'Separei o embrulho dos três riscos. A nossa primeira lembrança ainda cabe na palma da mão.'}]},
+      {id:'rosa:chave',title:'Quem guardou a chave',chapter:2,bond:8,
+        text:'Eu disse a todo mundo que guardaria a chave até terminarmos os reparos. Os reparos terminaram. Depois quis organizar as caixas. Depois esperei uma colheita melhor.\n\nA chave pesava quase nada, mas eu fui fazendo dela uma desculpa enorme. Não foi a ventania que manteve esta casa fechada por tanto tempo. Foi a vergonha de chamar os outros e descobrir que já não queriam voltar.',
+        choices:[{label:'Podemos convidar sem prometer perfeição.',reply:'Posso dizer: há uma mesa, falta um pouco de tudo, venha assim mesmo. É um convite bem mais honesto do que o que eu ensaiava.',memory:'Rosa decidiu convidar as pessoas antes de ter tudo pronto.',echo:'Ensaiando o convite de novo: há uma mesa, falta um pouco de tudo. Ainda gosto dessa versão.'},
+          {label:'Eu ficaria aqui enquanto você chama o pessoal.',reply:'Quero essa companhia. Não para você falar por mim; só para eu lembrar que a primeira cadeira já está ocupada.',memory:'Você ofereceu companhia enquanto Rosa recupera a coragem de convidar.',echo:'Quando vejo sua cadeira, fica mais fácil pensar no próximo convite.'}]},
+      {id:'rosa:mesa',title:'O lugar que não estava no desenho',chapter:6,bond:16,
+        text:'O desenho antigo da casa tinha cinco cadeiras. Quando você era pequeno, arrastava um caixote para a mesa e dizia que faltava uma. Tomás fez a sexta.\n\nAgora Nico quer contar as cadeiras antes de cada encontro. Eu pedi que contasse também quem está chegando pelo caminho. O lugar de alguém às vezes aparece antes no desejo do que no desenho.',
+        choices:[{label:'A próxima cadeira fica para uma nova história.',reply:'Vou pedir a Tomás uma cadeira simples. A pessoa que sentar nela é que vai torná-la diferente das outras.',memory:'Você e Rosa deixaram um lugar para uma nova história.',echo:'Ainda temos lugar para uma nova história. As cadeiras não encerram a contagem.'},
+          {label:'Quero ouvir o que mudou para cada um.',reply:'É assim que uma casa continua aberta: ouvindo mais de uma versão da mesma mesa. Procure os outros depois do encontro.',memory:'Você decidiu ouvir as versões dos moradores sobre a reabertura.',echo:'Depois me conte o que os outros enxergam nesta mesa. Minha versão já conhecemos.'}]}
+    ],
+    lia:[
+      {id:'lia:caderno',title:'A página que ficou em branco',chapter:0,bond:0,
+        text:'No meu primeiro caderno do vale, pulei uma página. Eu queria desenhar o que acontecia dentro da pele, mas só tinha observado o lado de fora. Achei que uma folha vazia parecia falta de trabalho.\n\nRosa escreveu na margem: "Aqui cabe a próxima pergunta." Guardei. Hoje separo o que observei, o que estou tentando explicar e o que ainda preciso conferir.',
+        choices:[{label:'Vamos guardar também as perguntas sem resposta.',reply:'Vou dar a elas uma página própria. Uma dúvida bem escrita pode orientar a observação de amanhã.',memory:'Você e Lia reservaram uma página para perguntas abertas.',echo:'Nossa página de perguntas abertas já tem uma dobra no canto. Continua sendo a mais consultada.'},
+          {label:'Quero comparar uma observação com outra.',reply:'Boa ideia. Primeiro anotamos em que contexto cada uma aconteceu. Se os contextos mudaram, essa diferença faz parte da comparação.',memory:'Você quis comparar observações com Lia sem esquecer o contexto.',echo:'Separei duas anotações para comparar. Desta vez comecei pelo contexto, como combinamos.'}]},
+      {id:'lia:janela',title:'A janela de três desenhos',chapter:3,bond:8,
+        text:'Eu ia ficar no vale só uma estação. Desenhei a montanha pela janela, depois a horta, depois a areia. Cada desenho parecia de um lugar diferente.\n\nCaio reconheceu a janela nos três. Disse que eu tinha encontrado um bom ponto para escutar o vale inteiro. Foi a primeira vez que pensei em ficar. Não por já saber tudo daqui, mas porque minhas perguntas finalmente tinham com quem conversar.',
+        choices:[{label:'Os três desenhos podem ir para a Casa das Sementes.',reply:'Posso levar cópias. Vou deixar um espaço ao lado para quem enxergar algo que eu não vi.',memory:'Lia levará seus três desenhos para a Casa das Sementes.',echo:'Os três desenhos estão separados. Nico já pediu um quarto: a vista debaixo da mesa.'},
+          {label:'O que você ainda quer descobrir por aqui?',reply:'Como as pessoas contam o mesmo caminho de maneiras tão diferentes. Sua próxima volta pode render uma conversa melhor que qualquer desenho meu.',memory:'Lia quer ouvir diferentes versões do mesmo caminho.',echo:'Ainda estou juntando versões do caminho. A sua também faz parte do caderno.'}]},
+      {id:'lia:rasura',title:'A rasura que ficou',chapter:6,bond:16,
+        text:'Nico pediu para copiar meu caderno para a reabertura. Eu comecei a limpar as rasuras. Ele perguntou: "Se apagar a pergunta antiga, como vou saber por que você mudou de ideia?"\n\nDeixei algumas. Na Casa das Sementes, os desenhos terão legenda e contexto; os rabiscos vão mostrar o percurso. Estudar também é poder explicar uma revisão.',
+        choices:[{label:'Vamos mostrar o que nos fez mudar de ideia.',reply:'Vou escrever isso na legenda. O desenho final conta o que penso agora; a rasura conta como cheguei até aqui.',memory:'Você e Lia decidiram mostrar como uma explicação foi revista.',echo:'A legenda das rasuras ficou pronta. É uma parte pequena da folha e grande da conversa.'},
+          {label:'Posso acrescentar minhas próprias perguntas?',reply:'Pode. Use outra cor para sabermos de quem veio cada pergunta. Este caderno não precisa ter uma só voz.',memory:'Lia abriu espaço no caderno para suas perguntas.',echo:'Guardei outra cor para suas perguntas. O caderno já não parece tão solitário.'}]}
+    ],
+    tomas:[
+      {id:'tomas:marca',title:'O risco na bancada',chapter:0,bond:0,
+        text:'Vê esse risco? Não é rachadura. É a medida da antiga placa. Depois da ventania, fiz uma nova exatamente igual. Guardei antes de pendurar.\n\nRosa ainda esperava as caixas, eu ainda esperava o encaixe perfeito. A placa ficou em cima da bancada tanto tempo que o sol marcou a madeira em volta. Uma peça pronta também pode ficar esperando demais.',
+        choices:[{label:'A marca pode ficar à vista.',reply:'Pode. Não enfraquece a tábua. E me poupa de fingir que a oficina sempre teve tudo no prazo.',memory:'Tomás decidiu deixar a marca da placa visível na bancada.',echo:'O risco continua na bancada. Ficou até mais fácil medir a próxima placa.'},
+          {label:'Vamos pendurar algo simples para começar.',reply:'Duas letras já dizem "entre" se a porta estiver aberta. Vou conferir os ganchos. O acabamento fazemos com o lugar funcionando.',memory:'Você e Tomás preferiram uma placa simples para começar.',echo:'Ganchos conferidos. A placa simples aguentou mais conversas do que eu tinha previsto.'}]},
+      {id:'tomas:cadeira',title:'A cadeira que balançava',chapter:2,bond:8,
+        text:'Minha primeira cadeira balançava. Rosa pôs um papel dobrado debaixo do pé e continuou a conversa. Eu queria que todo mundo levantasse para eu consertar.\n\nEla disse que podia esperar até o fim da história de Inês. Consertei depois. Foi a primeira vez que entendi a diferença entre uma coisa precisar de reparo e tudo precisar parar por causa dela.',
+        choices:[{label:'O encontro pode começar com o que temos.',reply:'Pode. Eu confiro se está firme. Depois deixo uma lista curta para os próximos reparos. Curta mesmo.',memory:'Tomás fará os reparos em etapas, com o encontro já funcionando.',echo:'Minha lista de reparos tem três linhas. Se aparecer a quarta, decido o que pode esperar.'},
+          {label:'Quero ajudar a conferir as cadeiras.',reply:'Empurre de leve, olhe os encaixes e me chame se alguma balançar. Gosto mais de duas pessoas conferindo do que de uma pessoa prometendo.',memory:'Você ofereceu ajuda para conferir as cadeiras com Tomás.',echo:'Conferi as cadeiras outra vez. Ainda tenho espaço para mais um par de olhos.'}]},
+      {id:'tomas:encaixe',title:'Uma peça de cada lugar',chapter:6,bond:16,
+        text:'A mesa nova tem três tipos de madeira. Uma peça veio das caixas de Rosa, outra do antigo abrigo de Inês, outra chegou na carga de Caio. Nenhuma tinha o tamanho certo sozinha.\n\nSe eu escondesse todas as emendas, ela pareceria ter vindo de um só lugar. Deixei duas aparecendo. Nico achou que era um mapa. Não vou discutir com ele.',
+        choices:[{label:'As emendas merecem uma história.',reply:'Então vou anotar de onde vieram. Só não vou escrever "obra de Tomás" por cima de seis pessoas carregando tábua.',memory:'Tomás registrará as origens das peças da mesa.',echo:'Anotei a origem das tábuas. A letra de Nico é maior, mas os nomes couberam.'},
+          {label:'Que peça podemos construir depois?',reply:'Uma prateleira baixa para as sementes. Quem é menor precisa alcançar também. Primeiro eu meço; depois vocês me dizem se ficou útil.',memory:'Tomás imaginou uma prateleira que todos possam alcançar.',echo:'Estou medindo aquela prateleira baixa. Se Nico alcança, já estamos no caminho certo.'}]}
+    ],
+    ines:[
+      {id:'ines:fita',title:'A fita da primeira curva',chapter:0,bond:0,
+        text:'Eu marcava esta curva com uma fita vermelha. A ventania levou a fita e cobriu duas pegadas. A trilha continuou aqui; a certeza de quem vinha é que sumiu.\n\nDepois eu comecei a andar sozinha para conferir tudo. Ficou tão natural que parei de perguntar quem queria vir junto. Um caminho pode estar inteiro e ainda assim deixar de ligar as pessoas.',
+        choices:[{label:'Vamos marcar os pontos de apoio juntos.',reply:'Primeiro a curva, depois o abrigo. Uma marca precisa ser compreendida por quem vai usá-la, não só por quem a desenhou.',memory:'Você e Inês combinaram conferir os pontos de apoio juntos.',echo:'Ainda começo pela curva e pelo abrigo. Agora lembro de perguntar se a marca faz sentido para quem chega.'},
+          {label:'Quero conhecer o caminho no meu ritmo.',reply:'Eu espero no próximo apoio. Se mudar de ideia, voltamos. A trilha não exige que duas pessoas deem passos iguais.',memory:'Inês respeitou seu ritmo para conhecer a montanha.',echo:'O próximo apoio continua lá. Seu ritmo não precisa combinar com o meu relógio.'}]},
+      {id:'ines:sino',title:'O sino que não era um aviso',chapter:4,bond:8,
+        text:'Tomás colocou um sino na Casa das Sementes. Eu pensei que seria para chamar ajuda da trilha. Rosa riu: era para avisar que havia conversa na mesa.\n\nNa última reunião antes da ventania, eu fui a última a chegar. Escutei o sino da curva e acelerei. Quando entrei, ainda estavam guardando uma cadeira. Ninguém tinha começado a contar sem mim.',
+        choices:[{label:'Desta vez também guardamos sua cadeira.',reply:'Vou levar uma história que ainda não contei inteira. Saber que há uma cadeira muda bastante o caminho de volta.',memory:'Você prometeu guardar uma cadeira para Inês.',echo:'Trouxe a história da curva. A parte mais bonita continua sendo a cadeira que ficou esperando.'},
+          {label:'O sino pode chamar sem apressar ninguém.',reply:'Gosto disso. Um som dizendo "há lugar" em vez de "corra". Vou contar a Tomás que entendi a diferença.',memory:'Inês imaginou o sino como convite, sem pressa.',echo:'Quando ouço o sino, penso no convite. Ficou mais fácil voltar sem transformar tudo em corrida.'}]},
+      {id:'ines:mapa',title:'O mapa que ganhou margens',chapter:6,bond:16,
+        text:'Meu mapa antigo mostrava as linhas entre os lugares. Seu caminho, o de Caio e o de Nico encheram as margens: uma pausa aqui, uma conversa ali, uma volta que valeu a pena.\n\nAinda preciso das linhas. Mas deixei de cortar as anotações para o mapa parecer limpo. O vale não ficou menor porque passei a caber menos certezas numa folha.',
+        choices:[{label:'Quero acrescentar os meus lugares de pausa.',reply:'Marque com uma pequena roda. Depois comparamos os lugares e o que mudou em cada viagem. Não precisa escolher um apoio para sempre.',memory:'Inês deixou espaço no mapa para seus lugares de pausa.',echo:'Reservei rodas pequenas nas margens. Seu próximo lugar de pausa pode entrar no mapa.'},
+          {label:'Podemos mostrar o mapa para os outros.',reply:'Deixo uma cópia na casa. Peço que anotem a data das mudanças. Um mapa também precisa poder ser revisto.',memory:'Inês fará uma cópia do mapa para a comunidade.',echo:'A cópia comunitária já tem uma anotação de Caio. Ele desenha palmeiras melhor que eu.'}]}
+    ],
+    caio:[
+      {id:'caio:recipiente',title:'O recipiente de três marcas',chapter:0,bond:0,
+        text:'Este recipiente tem três marcas no fundo. A menor é minha. As outras são de Rosa e Inês. Fizemos para reconhecer as reservas quando as caixas se encontravam na mesma mesa.\n\nDepois que a casa fechou, ainda levávamos coisas de um lugar a outro. Só parávamos menos para conversar. As cargas continuaram circulando; as histórias vieram ficando pelo caminho.',
+        choices:[{label:'Quero levar uma história junto das caixas.',reply:'Então me conte o que viu na próxima travessia. Deixo um espaço entre os recipientes: histórias não gostam de ser apertadas.',memory:'Você e Caio combinaram trocar histórias além de cargas.',echo:'Deixei um espaço entre as caixas para a história da sua próxima travessia.'},
+          {label:'Podemos deixar as marcas mais visíveis.',reply:'Posso contornar as três com tinta. Assim ninguém acha que esta reserva apareceu sozinha. Um recipiente também tem seus caminhos.',memory:'Caio destacará as três marcas no recipiente comunitário.',echo:'As três marcas ficaram visíveis. Agora até Nico pergunta de onde veio cada recipiente.'}]},
+      {id:'caio:espera',title:'A entrega que virou visita',chapter:5,bond:8,
+        text:'Uma vez a roda da minha carga soltou perto da fazenda. Fui pedir ferramenta a Tomás e fiquei para ouvir Lia. Quando consertamos, já era hora de voltar.\n\nEu disse que tinha perdido a tarde. No caminho, percebi que lembrava de três histórias e mal lembrava da roda. Desde então tento deixar um pouco de tempo sem encomenda. Ainda estou aprendendo.',
+        choices:[{label:'Sua próxima visita pode ser só uma visita.',reply:'Posso chegar com uma caixa menor. Ou sem caixa. Rosa vai estranhar primeiro e depois arranjar o que me oferecer.',memory:'Caio decidiu fazer uma visita sem depender de uma entrega.',echo:'Hoje separei tempo sem encomenda. Ainda estranho, mas já não parece tempo perdido.'},
+          {label:'Vamos levar as conversas para a trilha também.',reply:'A conversa muda quando a paisagem anda junto. Podemos combinar uma pausa e ouvir o que cada um chama de perto.',memory:'Você e Caio querem conversar também durante as travessias.',echo:'Tenho uma história para a próxima pausa da trilha. Prometo não transformar tudo em entrega.'}]},
+      {id:'caio:troca',title:'O que voltou na caixa vazia',chapter:6,bond:16,
+        text:'Na reabertura, levei recipientes e voltei com uma caixa quase vazia. Quase: Nico tinha deixado um desenho da mesa no fundo. Rosa pôs uma etiqueta: "para continuar".\n\nA caixa continua leve. Levo para lembrar que nem tudo o que trazemos de uma troca dá para contar na venda. Algumas coisas só aparecem quando a gente abre de novo.',
+        choices:[{label:'A próxima troca pode trazer outra lembrança.',reply:'Quero ver o que vem. Vou guardar o desenho sem dobrar por cima das pernas da mesa. Nico trabalhou muito nessas pernas.',memory:'Caio reservou a caixa para novas lembranças do vale.',echo:'A caixa das lembranças continua leve. Já não volto pensando que está vazia.'},
+          {label:'Vamos começar um caderno de travessias.',reply:'Uma página por viagem, sem obrigação de grande aventura. Às vezes basta lembrar por que resolvemos parar.',memory:'Você e Caio imaginaram um caderno de travessias.',echo:'Primeira página do caderno de travessias: parei, ouvi, voltei. Parece curta e já conta bastante.'}]}
+    ],
+    nico:[
+      {id:'nico:placa',title:'Sete desenhos para uma placa',chapter:0,bond:0,
+        text:'Eu fiz sete placas. A primeira tinha uma árvore. A segunda, três ventos. Na quinta, desenhei um vento, mas Rosa disse que parecia um macarrão fugindo.\n\nTomás perguntou para quem era a placa. Eu disse "para todo mundo". Ele respondeu: "Então começa com uma palavra que quem chega consiga ler." Foi assim que cheguei a "entre". Ainda cabe uma árvore pequena!',
+        choices:[{label:'Gostei do convite simples.',reply:'Então "entre" fica grande. O macarrão... quer dizer, o vento fica no canto. Assim cada desenho tem seu trabalho.',memory:'Você ajudou Nico a escolher uma placa com um convite simples.',echo:'A palavra "entre" continua maior que o desenho. O vento não gostou, mas ficou no canto.'},
+          {label:'Quero ver também os desenhos que não usamos.',reply:'Todos? Até o macarrão? Fechado! Vou guardar numa pasta chamada "caminhos até a placa". Uma pasta já é meu oitavo projeto.',memory:'Nico guardará também as tentativas que levaram à placa.',echo:'Guardei os sete desenhos. A pasta das tentativas acabou virando a coisa que mais mostro.'}]},
+      {id:'nico:semente',title:'A semente que ele puxou',chapter:2,bond:8,
+        text:'Posso contar uma coisa sem você rir primeiro? Desenterrei uma semente para ver se ela já tinha acordado. Depois outra, para comparar. No fim eu tinha duas sementes e nenhuma comparação boa.\n\nRosa não me deu outra caixa imediatamente. Sentou comigo para recontar os passos. Foi chato nos primeiros cinco segundos. Depois descobri onde minha pergunta tinha virado pressa.',
+        choices:[{label:'Vamos observar sem interromper tudo.',reply:'Combinado! Eu desenho, você observa, a planta cresce. Três atividades que finalmente podem acontecer ao mesmo tempo.',memory:'Você e Nico decidiram observar sem interromper o crescimento.',echo:'Hoje observei sem puxar. O desenho ficou maior, a planta ficou no lugar. Progresso dos dois lados!'},
+          {label:'Podemos anotar também o que não funcionou.',reply:'Vou escrever a tentativa com todos os passos. Sem transformar em uma história em que eu já sabia desde o começo.',memory:'Nico registrará as tentativas que não funcionaram.',echo:'Escrevi a tentativa toda. A parte da pressa não ficou bonita, mas ficou útil.'}]},
+      {id:'nico:amanha',title:'A página de amanhã',chapter:6,bond:16,
+        text:'Quando terminamos a placa, pensei que o meu caderno acabaria também. Só que Tomás falou da prateleira, Inês abriu o mapa e Caio perguntou o que a gente faria na próxima estação.\n\nDeixei uma página vazia. Desta vez não é porque não sei desenhar a coisa pronta. É porque a coisa ainda pode ser mais de uma. Você quer começar pela horta ou pela exploração?',
+        choices:[{label:'Vamos continuar as experiências da horta.',reply:'Nova página: horta! Quero comparar tentativas, fazer perguntas e lembrar de esperar. Essa última vai ter letras bem grandes.',memory:'Você e Nico escolheram continuar as experiências da horta.',echo:'A página da horta está aberta. Escrevi "esperar" grande o bastante para Rosa ler de longe.'},
+          {label:'Quero descobrir novos detalhes pelo vale.',reply:'Exploração! Vou marcar o que já vimos e deixar espaço para os detalhes pequenos. Não precisa encontrar um lugar novo para enxergar uma coisa nova.',memory:'Você e Nico decidiram procurar novos detalhes no vale.',echo:'Reservei páginas para os detalhes pequenos do vale. Se eu fizer outra seta, você me avisa?'}]}
+    ]
+  };
+  const loreById=Object.fromEntries(IDS.flatMap(id=>lore[id].map(s=>[s.id,{...s,npcId:id}])));
+  const knownLore=id=>typeof id==='string'&&Object.prototype.hasOwnProperty.call(loreById,id);
+  const greetings={
+    rosa:['A cadeira perto das caixas está livre. Chegue um pouco mais.','Ouvi seus passos antes de ver o chapéu. Quer uma conversa curta ou uma história comprida?','Estava guardando esta caixa, mas ela pode esperar enquanto você me conta do caminho.'],
+    lia:['O que mudou desde a nossa última conversa? Pode começar por uma coisa pequena.','Acabei de fechar uma anotação e abrir outra pergunta. Você chegou na hora certa.','Eu estava comparando dois desenhos. Sua volta pode acrescentar um terceiro ponto de vista.'],
+    tomas:['Pode chegar. Guardei o serrote; agora consigo escutar.','Bancada firme, ferramenta no lugar. O que temos para combinar?','Esta peça não precisa de minha atenção o tempo inteiro. Fale.'],
+    ines:['Chegou. Antes do próximo caminho, podemos parar aqui um instante.','Estou conferindo a curva. Qual parte da sua viagem ficou na memória?','Há tempo para escutar. A próxima ronda começa depois desta conversa.'],
+    caio:['Uma visita! Vou afastar a caixa para caber também uma conversa.','A trilha trouxe você de novo. Hoje chegou com alguma história nas botas?','Reservas conferidas. Podemos contar outras coisas além de recipientes.'],
+    nico:['Você voltou! Tenho uma pergunta. Hoje escolhi só uma, olha o avanço!','Guardei o desenho para ouvir você primeiro. Mas posso mostrar depois?','Parceiro! Separei uma página. Pode ser para a sua história ou para uma ideia nossa.']
+  };
+  const actionReactions={
+    rosa:{plant:'Vi que você voltou a plantar. Já estou pensando em como guardar as histórias dessas sementes.',harvest:'A colheita chegou! Quero saber qual planta fez você esperar mais.',rest:'Fez uma pausa? Que bom. Também deixei uma caixa para depois; não fugiu.',sell:'Ouvi a tampa da caixa de venda. Um trabalho encerrado deixa espaço para o próximo.'},
+    lia:{skin:'Você abriu a Visão da Pele. Que detalhe quis observar desta vez?',quiz:'Você voltou depois de uma questão. Quero ouvir o que o feedback fez você revisar.',rest:'Uma pausa protegida entrou no seu percurso. Podemos comparar o contexto antes e depois.',use:'Você usou uma reserva. Essa ação também faz parte do contexto que observamos.'},
+    tomas:{harvest:'Vi caixa chegando da horta. Vou deixar a bancada livre para ela.',sell:'A caixa de venda trabalhou. Agora podemos planejar a próxima entrega sem empilhar promessas.',collect:'Trouxe material do caminho? Tenho um canto da bancada para conferir sem pressa.'},
+    ines:{collect:'Você voltou com uma reserva da viagem. O caminho também serve para aprender onde parar.',equip:'Conferiu o casaco. Gosto de ver preparo antes do próximo trecho.',rest:'Uma pausa faz parte da rota. No meu mapa ela ganha uma marca, não uma rasura.',visit:'Você atravessou uma região. O que mudou entre um trecho e outro?'},
+    caio:{collect:'Você conheceu um ponto de reserva. Quero ouvir como foi chegar até ele.',use:'Usou uma reserva e seguiu o caminho. A próxima visita pode trazer uma observação diferente.',water:'A água chegou às plantas. É bom ver os dois lados da travessia se encontrando.',visit:'Tem poeira de outro trecho nas botas. O caminho de hoje pareceu com o de ontem?'},
+    nico:{plant:'Você plantou! Vou desenhar o cantinho sem puxar a semente para conferir.',water:'Vi a rega. Já anotei esse passo antes de inventar o próximo.',harvest:'Tem colheita nova! Agora minha placa aponta para algo que aconteceu de verdade.',quiz:'Respondeu uma questão? Quero saber qual pergunta ficou depois da resposta.'}
+  };
   const jobDefs={
     rosa:[['Caixas com futuro','Colha novos produtos para Rosa separar as caixas da próxima estação.',[obj('harvest','Colha 2 produtos após aceitar','harvest',2)]],
       ['Sementes para outra tentativa','Abra três novos plantios para a próxima experiência de Rosa.',[obj('plant','Plante 3 sementes após aceitar','plant',3)]]],
@@ -4118,11 +4224,13 @@ body.hud-game #legend{display:none !important;}
       ['Antes da placa','Faça duas colheitas para Nico ter algo real para mostrar.',[obj('harvest','Colha 2 produtos maduros','harvest',2)]]]
   };
   let adapter={}, initialized=false, dialogue=null, state;
+  const noticeLines={};
   function ctx(value){
     const s=plain(value)?value:(typeof adapter.readState==='function'?adapter.readState():{});
     return {season:season(s?.season),timeOfDay:Number.isFinite(s?.timeOfDay)?Math.max(0,Math.min(24,s.timeOfDay)):12,
       region:['farm','mountain','desert'].includes(s?.region)?s.region:'farm',scene:text(s?.scene,24)||'main',
-      playerName:text(s?.playerName,40)||'viajante',activities:plain(s?.activities)?s.activities:{}};
+      playerName:text(s?.playerName,40)||'viajante',activities:plain(s?.activities)?s.activities:{},
+      energy:Number.isFinite(s?.energy)?Math.max(0,Math.min(100,s.energy)):100,resting:s?.resting===true};
   }
   function recordFor(def){return {status:'offered',counts:Object.fromEntries(def.objectives.map(o=>[o.id,0])),acceptedAt:null,paid:false};}
   function jobDefinition(npcId,which=state.season,cycleId=state.cycleId){
@@ -4133,7 +4241,8 @@ body.hud-game #legend{display:none !important;}
   function fresh(context){return {version:VERSION,chapterIndex:0,main:chapters.map(recordFor),season:context.season,cycleId:1,
     jobs:{},friendships:Object.fromEntries(IDS.map(id=>[id,0])),memories:[],flags:{},
     sequence:0,events:Object.fromEntries(EVENTS.map(e=>[e,0])),coinsEarned:0,chaptersCompleted:0,jobsCompleted:0,
-    lastRegion:context.region,recentEventIds:[],log:[]};}
+    lastRegion:context.region,recentEventIds:[],log:[],discoveries:[],decisions:{},
+    visits:Object.fromEntries(IDS.map(id=>[id,0])),recentActions:[],spokenActions:Object.fromEntries(IDS.map(id=>[id,0]))};}
   function emit(name,payload){if(typeof adapter[name]==='function')try{adapter[name](payload);}catch(e){console.warn('[história] '+name,e);}}
   function friendship(id,points){state.friendships[id]=Math.min(100,state.friendships[id]+points);}
   function remember(id,npcId,message){
@@ -4146,6 +4255,8 @@ body.hud-game #legend{display:none !important;}
     const c=byId[npcId];dialogue={npcId,speaker:c?c.name:'Rosa',role:c?c.role:'A carta que trouxe você ao vale',
       title:title||'Conversa com '+(c?c.name:'Rosa'),text:message,kind,
       choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:kind==='response'};
+    // Respostas com escolhas conservam avanço por API; a UI exibe só as respostas
+    // explícitas para não duplicar "continuar" ao lado de "continuar a conversa".
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
@@ -4154,6 +4265,21 @@ body.hud-game #legend{display:none !important;}
   function objectives(def,data){return def.objectives.map(o=>({id:o.id,text:o.text,n:num(data?.counts?.[o.id],o.goal),goal:o.goal}));}
   function complete(def,data){return def.objectives.every(o=>num(data.counts[o.id],o.goal)>=o.goal);}
   function objectiveLine(list){return list.map(o=>o.text+' ('+o.n+'/'+o.goal+')').join(' · ');}
+  function unlocked(scene){return scene.chapter===6?state.chapterIndex===6:state.chapterIndex>=scene.chapter||state.friendships[scene.npcId]>=scene.bond;}
+  function discoveryViews(){return state.discoveries.map(id=>{
+    const scene=loreById[id],choice=scene.choices[state.decisions[id]];
+    return {id,npcId:scene.npcId,title:scene.title,text:scene.text,response:choice?.memory||'',answered:!!choice};
+  });}
+  function nextLore(npcId){return lore[npcId].find(scene=>!state.discoveries.includes(scene.id)&&unlocked({...scene,npcId}));}
+  function decisionEcho(npcId){
+    for(const scene of [...lore[npcId]].reverse())if(Number.isInteger(state.decisions[scene.id]))return scene.choices[state.decisions[scene.id]].echo;
+    return '';
+  }
+  function noticeActivity(npcId){
+    const last=state.recentActions.slice().reverse().find(a=>a.sequence>state.spokenActions[npcId]&&actionReactions[npcId][a.event]);
+    noticeLines[npcId]=last?actionReactions[npcId][last.event]:'';
+    if(last){state.spokenActions[npcId]=last.sequence;return true;}return false;
+  }
   // Consequências derivadas dos capítulos pagos: carregar não constrói nem paga de novo.
   function worldState(){
     const n=state.chapterIndex,open=n===chapters.length;
@@ -4179,7 +4305,10 @@ body.hud-game #legend{display:none !important;}
     });
     return {version:VERSION,chapter:chapterView,quests,friendships:clone(state.friendships),memories:clone(state.memories),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letter),
-      coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState()};
+      coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
+      discoveries:discoveryViews(),discoveryTotal:Object.keys(loreById).length,
+      relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
+        discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length}))};
   }
   function grant(def,data,kind){
     if(data.paid || data.status!=='ready') return false;
@@ -4227,15 +4356,19 @@ body.hud-game #legend{display:none !important;}
     if(state.sequence>=LIMIT){
       state.sequence=0;
       for(const data of [...state.main,...Object.values(state.jobs)])if(data.acceptedAt!==null)data.acceptedAt=0;
+      state.recentActions=[];for(const id of IDS)state.spokenActions[id]=0;
     }
     state.sequence++;state.events[event]=Math.min(LIMIT,state.events[event]+amount);
+    const reactive=IDS.some(id=>actionReactions[id][event]);
+    if(reactive){state.recentActions.push({event,sequence:state.sequence,item:text(payload.item,32),correct:payload.correct===true});state.recentActions=state.recentActions.slice(-6);}
     let dirty=false;const c=chapter();if(c)dirty=progress(c,state.main[state.chapterIndex],event,payload,amount);
     for(const npcId of IDS){const job=state.jobs[npcId];if(job)dirty=progress(jobDefinition(npcId),job,event,payload,amount)||dirty;}
-    if(dirty)changed();return dirty;
+    if(dirty||reactive)changed();return dirty;
   }
   function menu(npcId,preamble){
     const c=byId[npcId],s=ctx(),ch=chapter(),q=state.jobs[npcId],choices=[];
-    let message=preamble||((s.timeOfDay>=19 || s.timeOfDay<6)?chats[npcId].night:chats[npcId][s.season]);
+    const night=s.timeOfDay>=19||s.timeOfDay<6,visit=state.visits[npcId]||1;
+    let message=preamble||(night?chats[npcId].night:visit%3===1?chats[npcId][s.season]:greetings[npcId][(visit-1)%greetings[npcId].length]);
     if(!preamble && state.chapterIndex===6){
       const after={rosa:'Você está ouvindo? Esse barulho de caixa abrindo e gente chegando era o que faltava nesta casa. Sua cadeira fica aqui perto da minha.',
         lia:'Separei uma ponta da mesa para desenhos e amostras. Nico já ocupou metade com perguntas. Acho que combinamos bem.',
@@ -4243,19 +4376,15 @@ body.hud-game #legend{display:none !important;}
         ines:'Deixei uma cesta de lã na Casa das Sementes. É bom chegar da trilha e reconhecer as vozes antes de ver a porta.',
         caio:'Na primeira visita eu trouxe uma caixa. Agora sempre volto levando outra. A troca finalmente tem caminho de ida e de volta.',
         nico:'A placa está pronta! Errei uma letra e Tomás me emprestou uma lixa. Ficou uma marca pequena. Rosa pediu para deixar: agora a placa também tem história.'};
-      message=after[npcId];
+      message=visit%3===1?after[npcId]:greetings[npcId][(visit-1)%greetings[npcId].length];
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
     const activity=text(s.activities[npcId],180);
-    if(!preamble && activity)message+='\n\n'+activity;
-    if(!preamble && state.friendships[npcId]>=12){
-      const familiar={rosa:'Já não preciso explicar onde guardo as caixas: você está ajudando a dar novas histórias a elas.',
-        lia:'Nossas conversas já têm perguntas que vale retomar. Gosto de como você volta para observar outra vez.',
-        tomas:'Com você eu já posso partir de um combinado anterior. Isso economiza mais trabalho que qualquer ferramenta.',
-        ines:'Já conhecemos um pedaço do caminho juntos. Ainda conferimos o próximo passo, mesmo entre conhecidos.',
-        caio:'Quem volta para conversar deixa de ser só alguém de passagem. Há um lugar para você nesta troca.',
-        nico:'Parceiro de experiências! Tenho outra pergunta, mas desta vez comecei olhando o que já fizemos.'};
-      message+='\n\n'+familiar[npcId];
+    if(!preamble){
+      const echo=decisionEcho(npcId),notice=noticeLines[npcId];
+      const extra=notice||((visit%3===0&&echo)?echo:activity);
+      if(extra)message+='\n\n'+extra;
+      if(s.energy<25&&npcId==='rosa')message+='\n\nMinha cadeira está aqui. Se precisar de uma pausa, não tem caixa que valha sua pressa.';
     }
     if(ch && ch.npcId===npcId){
       const main=state.main[state.chapterIndex];
@@ -4272,6 +4401,10 @@ body.hud-game #legend{display:none !important;}
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
     else message+='\n\nSeu pedido desta estação já foi entregue. Na próxima estação combinamos outro.';
+    const pending=lore[npcId].find(scene=>state.discoveries.includes(scene.id)&&state.decisions[scene.id]===undefined);
+    const next=pending||nextLore(npcId);
+    if(next)choices.push({id:'lore:'+next.id,label:(pending?'Retomar: ':'Ouvir lembrança: ')+next.title});
+    if(state.discoveries.some(id=>loreById[id].npcId===npcId))choices.push({id:'lore:revisit',label:'Revisitar suas histórias'});
     for(const [id,label]of chats[npcId].topics)choices.push({id:'chat:'+id,label});
     choices.push({id:'memory',label:'Você lembra do que já fizemos?'},{id:'close',label:'Até depois'});
     return show(npcId,message,'menu',choices);
@@ -4281,6 +4414,7 @@ body.hud-game #legend{display:none !important;}
     if(!byId[npcId])return null;
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
+    state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
     record('talk',{npcId});
     return menu(npcId,first?chats[npcId].first:undefined);
   }
@@ -4288,6 +4422,25 @@ body.hud-game #legend{display:none !important;}
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
     if(choiceId==='back')return menu(npcId);
+    if(choiceId==='lore:revisit'){
+      const found=state.discoveries.filter(id=>loreById[id].npcId===npcId);
+      return show(npcId,'Cada lembrança ganhou um lugar no nosso caminho. Qual você quer ouvir de novo?','lore-list',
+        [...found.map(id=>({id:'lore:'+id,label:loreById[id].title})),{id:'back',label:'Voltar à conversa'}],'Histórias de '+byId[npcId].name);
+    }
+    if(choiceId.startsWith('lore:')){
+      const scene=loreById[choiceId.slice(5)];if(!scene||scene.npcId!==npcId||!unlocked(scene))return currentDialogue();
+      if(!state.discoveries.includes(scene.id)){state.discoveries.push(scene.id);friendship(npcId,2);log('discovery',scene.id);changed();}
+      const previous=state.decisions[scene.id],answered=Number.isInteger(previous);
+      return show(npcId,scene.text+(answered?'\n\n'+scene.choices[previous].echo:''),'lore',answered?
+        [{id:'back',label:'Voltar à conversa'},{id:'close',label:'Guardar a lembrança'}]:
+        [...scene.choices.map((c,i)=>({id:'reply:'+scene.id+':'+i,label:c.label})),{id:'close',label:'Quero pensar nisso; volto depois'}],scene.title);
+    }
+    if(choiceId.startsWith('reply:')){
+      const match=/^reply:(.+):([01])$/.exec(choiceId),scene=match&&loreById[match[1]],which=match?Number(match[2]):-1;
+      if(!scene||scene.npcId!==npcId||!state.discoveries.includes(scene.id)||state.decisions[scene.id]!==undefined)return currentDialogue();
+      const choice=scene.choices[which];state.decisions[scene.id]=which;friendship(npcId,1);remember('lore:'+scene.id,npcId,choice.memory);log('decision',scene.id);changed();
+      return show(npcId,choice.reply,'response',[{id:'back',label:'Continuar a conversa'},{id:'close',label:'Até depois'}],scene.title);
+    }
     if(npcId==='rosa' && state.chapterIndex===6 && ['community:gather','community:release'].includes(choiceId)){
       const gathering=choiceId==='community:gather';state.flags.communityGathering=gathering;
       if(gathering)remember('community:first-meeting','rosa','Você chamou os seis moradores para um encontro na Casa das Sementes.');
@@ -4342,7 +4495,13 @@ body.hud-game #legend{display:none !important;}
       const topic=chats[npcId].topics.find(t=>t[0]===choiceId.slice(5));if(!topic)return currentDialogue();
       const key='topic:'+npcId+':'+topic[0],again=state.flags[key];
       if(!again){state.flags[key]=true;friendship(npcId,2);remember(key,npcId,topic[3]);changed();}
-      return show(npcId,(again?'Lembro de termos falado disso. ':'')+topic[2],'response',[{id:'back',label:'Continuar a conversa'},{id:'close',label:'Até depois'}]);
+      const followUp={rosa:'Lembro da nossa conversa. Desde então, a caixa parece guardar também o que você trouxe para a história.',
+        lia:'Lembro da pergunta. Retomá-la depois de observar outra vez pode mudar nossa explicação.',
+        tomas:'Lembro do combinado. O que fizemos depois dele vale mais que repetir minha primeira promessa.',
+        ines:'Lembro do caminho que discutimos. Hoje eu começaria conferindo o próximo apoio de novo.',
+        caio:'Lembro dessa troca. Na próxima travessia, podemos escutar o que ficou faltando desta vez.',
+        nico:'Lembro! Anotei nossa ideia. Se tentarmos de novo, quero comparar os passos, não só a última caixa.'};
+      return show(npcId,again?followUp[npcId]+'\n\n'+(decisionEcho(npcId)||topic[2]):topic[2],'response',[{id:'back',label:'Continuar a conversa'},{id:'close',label:'Até depois'}]);
     }
     return currentDialogue();
   }
@@ -4375,11 +4534,16 @@ body.hud-game #legend{display:none !important;}
     for(let i=state.chapterIndex+1;i<6;i++)state.main[i]=recordFor(chapters[i]);
     for(const npcId of IDS){
       state.friendships[npcId]=num(saved.friendships?.[npcId],100);
+      state.visits[npcId]=num(saved.visits?.[npcId]);state.spokenActions[npcId]=Math.min(state.sequence,num(saved.spokenActions?.[npcId]));noticeLines[npcId]='';
       if(plain(saved.jobs?.[npcId]))state.jobs[npcId]=sanitizeRecord(saved.jobs[npcId],jobDefinition(npcId,state.season,state.cycleId),state.sequence);
     }
     const validFlags=new Set(['casaAberta','communityGathering',...IDS.map(id=>'met:'+id),...IDS.map(id=>'greet:'+id),
       ...IDS.flatMap(id=>chats[id].topics.map(t=>'topic:'+id+':'+t[0]))]);
     if(plain(saved.flags))for(const key of validFlags)if(saved.flags[key]===true)state.flags[key]=true;
+    state.discoveries=[...new Set((Array.isArray(saved.discoveries)?saved.discoveries:[]).filter(knownLore))].slice(0,18);
+    if(plain(saved.decisions))for(const id of state.discoveries)if(saved.decisions[id]===0||saved.decisions[id]===1)state.decisions[id]=saved.decisions[id];
+    for(const a of (Array.isArray(saved.recentActions)?saved.recentActions:[]).slice(-6))if(plain(a)&&EVENTS.includes(a.event)&&Number.isFinite(a.sequence)&&a.sequence>0&&a.sequence<=state.sequence)
+      state.recentActions.push({event:a.event,sequence:num(a.sequence),item:text(a.item,32),correct:a.correct===true});
     state.flags.casaAberta=state.chapterIndex===6;if(!state.flags.casaAberta)delete state.flags.communityGathering;
     const seen=new Set();
     for(const m of (Array.isArray(saved.memories)?saved.memories:[]).slice(-72)){
@@ -4401,7 +4565,7 @@ body.hud-game #legend{display:none !important;}
     init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh(ctx());initialized=true;}return snapshot();},
     interact,currentDialogue,choose,advance,close,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
     serialize:()=>clone(state),restore,
-    reset(value){state=fresh(ctx(value));close();changed();return snapshot();}
+    reset(value){state=fresh(ctx(value));for(const id of IDS)noticeLines[id]='';close();changed();return snapshot();}
   };
 })();
 
@@ -4412,7 +4576,7 @@ body.hud-game #legend{display:none !important;}
 (function(){
   'use strict';
   let adapter={}, panel=null, dialog=null, book=null, previousFocus=null;
-  let bookOpen=false, lastChapter='', lastNpc='', ready=false;
+  let bookOpen=false, lastChapter='', lastNpc='', ready=false,lastHud='';
   const cast=()=>window.FarmStoryWorld?.characters || [];
   const story=()=>window.FarmStoryWorld;
   const state=()=>adapter.read?.() || {};
@@ -4424,7 +4588,7 @@ body.hud-game #legend{display:none !important;}
     window.FarmCharacterArt?.drawPortrait(c,id,{gender:state().gender,name:id==='player'?state().name:cast().find(x=>x.id===id)?.name});return c;
   }
   function rememberFocus(){if(!previousFocus&&!dialog?.classList.contains('show')&&!bookOpen)previousFocus=document.activeElement;adapter.beforeOpen?.();}
-  function returnFocus(){const f=previousFocus;previousFocus=null;if(f?.isConnected)f.focus({preventScroll:true});else adapter.focusGame?.();}
+  function returnFocus(){const f=previousFocus;previousFocus=null;if(f?.isConnected&&f!==document.body&&f!==document.documentElement&&f.getClientRects().length)f.focus({preventScroll:true});else adapter.focusGame?.();}
   function install(){
     if(ready)return;ready=true;
     const style=el('style');
@@ -4455,6 +4619,14 @@ body.hud-game #legend{display:none !important;}
       .vale-dialog-header h2{font:700 26px/1.12 Georgia,serif;margin:3px 0;color:#203e32}
       .vale-kicker{font:10px/1.5 monospace;letter-spacing:1.5px;text-transform:uppercase;color:#7a744b}
       .vale-dialog-text{font:18px/1.65 Georgia,'Times New Roman',serif;white-space:pre-wrap;margin:0 0 20px;max-width:64ch}
+      .vale-dialog-content{min-width:0;display:flex;flex-direction:column;min-height:0}
+      .vale-dialog-body{max-height:38dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 14px 2px 0;margin-bottom:14px;min-height:80px}
+      .vale-dialog-body:focus-visible{outline:2px solid #375d44;outline-offset:2px}
+      .vale-dialog-body .vale-dialog-text{margin-bottom:8px}
+      .vale-dialog-card .vale-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:32dvh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:3px 7px 5px 3px}
+      .vale-dialog-card .vale-button{overflow-wrap:anywhere;min-width:0;flex-shrink:0}
+      .vale-dialog-person{position:sticky;top:6px}
+      .vale-dialog-help{flex:0 0 auto}
       .vale-choices{display:flex;flex-direction:column;gap:8px;align-items:stretch}
       .vale-button{font:15px/1.4 Georgia,serif;min-height:43px;background:#e7ddc2;color:#203e32;border:1px solid #a99f7a;border-radius:4px;padding:10px 15px;text-align:left;cursor:pointer;transition:background .15s}
       .vale-button:hover{background:#d6d6b3;border-color:#5f7958}.vale-button:focus-visible{outline:3px solid #375d44;outline-offset:2px}
@@ -4470,10 +4642,19 @@ body.hud-game #legend{display:none !important;}
       .vale-residents{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.vale-resident{display:flex;gap:10px;background:#e6dfcb;border:1px solid #c7c4a6;padding:10px;border-radius:4px;align-items:start}.vale-resident .vale-portrait{width:56px;height:56px;flex:0 0 56px}.vale-resident strong{font:700 16px Georgia,serif}.vale-resident small{display:block;font:11px/1.5 Georgia,serif;color:#627052;margin-top:3px}
       .vale-world-state{background:#dce1c8;border:1px solid #afbc96;border-radius:4px;padding:14px;margin:14px 0}.vale-world-state strong{font:700 17px Georgia,serif}.vale-world-state p{margin:5px 0 0;font-size:14px}.vale-offer-terms{font:12px/1.5 Georgia,serif;margin:0 0 16px;color:#677451;border-left:3px solid #b7bd94;padding:8px 12px;background:#e8e3cb}.vale-letter{white-space:pre-wrap;font:16px/1.75 Georgia,serif;padding:20px;background:#ede1c2;border:1px solid #c4ad81;margin-top:14px}
       .vale-memory{font:13px/1.6 Georgia,serif;margin:8px 0;padding-left:12px;border-left:2px solid #bca171}
+      .vale-discoveries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+      .vale-discovery{background:#e9dfc6;border:1px solid #b4ab86;border-radius:4px;padding:14px;min-width:0}
+      .vale-discovery summary{cursor:pointer;color:#27432f;font:700 16px/1.45 Georgia,serif;min-height:34px}
+      .vale-discovery .vale-kicker{display:block;margin:4px 0 8px;letter-spacing:.6px}
+      .vale-discovery p{white-space:pre-wrap;margin:8px 0;font-size:14px;line-height:1.65}
+      .vale-discovery .vale-decision{padding-top:10px;border-top:1px solid #bdb493;color:#294e35}
       body.access-contrast .vale-dialog-card,body.access-contrast .vale-book{background:#fff;color:#101b15;border-color:#172f1e}body.access-contrast .vale-dialog-text,body.access-contrast .vale-book p{color:#101b15}
       body.access-reduce-motion .vale-button{transition:none}
       @media(max-width:700px){.vale-overlay{padding:12px}.vale-dialog-card{padding:17px;gap:13px;grid-template-columns:80px 1fr;max-height:calc(100dvh - 24px)}.vale-dialog-person .vale-portrait{width:74px;height:74px}.vale-dialog-person .vale-role{font-size:10px}.vale-dialog-header h2{font-size:22px}.vale-dialog-text{font-size:16px;line-height:1.6}.vale-book-overlay{padding:12px}.vale-book{padding:17px;max-height:calc(100dvh - 24px)}.vale-book-grid{grid-template-columns:1fr}.vale-map{max-height:230px}.vale-residents{grid-template-columns:1fr 1fr}.vale-book h2{font-size:25px}}
       @media(max-width:460px){#valeHud{padding:8px}#valeHud strong{font-size:12px}#valeHud .vale-hud-objective{font-size:10px}#valeHud .vale-kicker{font-size:8px;letter-spacing:.4px}#valeHud .vale-hud-footer{font-size:8px}.vale-dialog-card{display:block;padding:16px}.vale-dialog-person{float:left;width:58px;padding:0;margin:0 12px 8px 0}.vale-dialog-person .vale-portrait{width:56px;height:56px}.vale-dialog-person .vale-role{display:none}.vale-dialog-header h2{font-size:20px}.vale-dialog-header{min-height:58px;gap:7px}.vale-kicker{font-size:9px;letter-spacing:.5px}.vale-dialog-text{clear:both;font-size:16px}.vale-choices{clear:both}.vale-residents{grid-template-columns:1fr}.vale-close{font-size:11px;padding:6px 8px}.vale-book h2{font-size:23px}}
+      @media(max-width:700px){.vale-dialog-body{max-height:30dvh}.vale-dialog-card .vale-choices{max-height:31dvh;grid-template-columns:1fr}.vale-discoveries{grid-template-columns:1fr}}
+      @media(max-height:520px){.vale-overlay{padding:8px}.vale-dialog-card{padding:13px;max-height:calc(100dvh - 16px);grid-template-columns:80px 1fr;gap:12px}.vale-dialog-person .vale-portrait{width:70px;height:70px}.vale-dialog-header{margin-bottom:6px}.vale-dialog-header h2{font-size:20px}.vale-dialog-body{max-height:23dvh;min-height:45px;margin-bottom:6px}.vale-dialog-text{font-size:15px;line-height:1.45}.vale-dialog-card .vale-choices{max-height:29dvh}.vale-dialog-help{margin-top:5px}}
+      @media(max-width:460px){.vale-dialog-card{display:grid;grid-template-columns:58px minmax(0,1fr);gap:9px 12px}.vale-dialog-person{float:none;position:static;margin:0;width:58px;grid-column:1;grid-row:1}.vale-dialog-content{display:contents}.vale-dialog-header{grid-column:2;grid-row:1;margin-bottom:0;min-width:0}.vale-dialog-body,.vale-dialog-card .vale-choices,.vale-dialog-help{grid-column:1/-1}.vale-dialog-body{padding-right:8px}.vale-dialog-help{margin-top:0}}
       @media(max-width:520px){#characterSelect .csCard,#startMenu .menuCard{padding:16px;border-width:3px}#characterSelect .cs-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#characterSelect .cs-option{padding:10px 4px;min-width:0}#characterSelect .cs-portrait{width:64px;height:86px}#characterSelect .cs-nameRow{flex-wrap:wrap}#characterSelect input{box-sizing:border-box;max-width:100%;min-width:0}#startMenu .menuGrid{grid-template-columns:1fr}#startMenu .vale-menu-story{font-size:15px;line-height:1.5}}
     `;
     document.head.append(style);
@@ -4492,8 +4673,10 @@ body.hud-game #legend{display:none !important;}
     if(!ready)return;const s=story()?.snapshot();if(!s)return;
     const c=s.chapter||{},giver=cast().find(n=>n.id===c.targetNpc)?.name||'Rosa',next=c.objectives?.find(o=>o.n<o.goal);
     const objective=c.status==='available'?'Converse com '+giver+' para combinar esta etapa.':c.status==='ready'?'Volte a '+giver+' para concluir a etapa.':next?next.text+' · '+next.n+'/'+next.goal:c.objective;
-    panel.replaceChildren();
-    panel.append(el('span','vale-kicker','O Vale dos Três Ventos'),el('strong','',c.title||'Uma carta de Rosa'),el('span','vale-hud-objective',objective||'Encontre Rosa perto da casa.'),el('span','vale-hud-footer',(s.completed?'Vida no vale':'Capítulo '+((c.index||0)+1)+' / 6')+' · abrir jornada'));
+    const signature=JSON.stringify([c.title,objective,s.completed,c.index]);
+    if(signature!==lastHud){lastHud=signature;panel.replaceChildren();
+      panel.append(el('span','vale-kicker','O Vale dos Três Ventos'),el('strong','',c.title||'Uma carta de Rosa'),el('span','vale-hud-objective',objective||'Encontre Rosa perto da casa.'),el('span','vale-hud-footer',(s.completed?'Vida no vale':'Capítulo '+((c.index||0)+1)+' / 6')+' · abrir jornada'));
+    }
     if(bookOpen)renderBook();
   }
   function showDialogue(d){
@@ -4506,11 +4689,14 @@ body.hud-game #legend{display:none !important;}
     person.append(portrait(d.npcId==='letter'?'rosa':d.npcId,128),el('span','vale-role',d.role||''));
     const head=el('div','vale-dialog-header'),label=el('div');label.append(el('span','vale-kicker',d.title||'Uma conversa no vale'));
     const speaker=el('h2','',d.speaker||'Carta de Rosa');speaker.id='valeSpeaker';label.append(speaker);
-    head.append(label,button('Fechar · Esc',closeDialogue,'vale-close'));content.append(head,el('p','vale-dialog-text',d.text||''));
-    if(d.kind==='offer')content.append(el('p','vale-offer-terms','Pedido da estação · 8 moedas na entrega. Conta apenas o que você fizer depois de aceitar. Expira quando a estação mudar.'));
+    const body=el('div','vale-dialog-body');body.tabIndex=0;body.setAttribute('aria-label','Fala de '+(d.speaker||'Rosa')+'; use as setas para ler');
+    body.append(el('p','vale-dialog-text',d.text||''));
+    head.append(label,button('Fechar · Esc',closeDialogue,'vale-close'));content.append(head,body);
+    if(d.kind==='offer')body.append(el('p','vale-offer-terms','Pedido da estação · 8 moedas na entrega. Conta apenas o que você fizer depois de aceitar. Expira quando a estação mudar.'));
+    if(d.kind==='lore')body.append(el('p','vale-offer-terms','Uma lembrança do vale. Sua resposta muda a conversa; você pode pensar e voltar depois.'));
     const choices=el('div','vale-choices');
     (d.choices||[]).forEach((choice,i)=>{const b=button(choice.label,()=>story().choose(choice.id),i===0?'vale-button vale-button-primary':'vale-button');b.dataset.valeChoice=choice.id;choices.append(b);});
-    if(d.canAdvance)choices.append(button('Continuar →',()=>story().advance(),'vale-button vale-button-primary'));
+    if(d.canAdvance&&!(d.choices||[]).some(c=>c.id==='back'))choices.append(button('Continuar →',()=>story().advance(),'vale-button vale-button-primary'));
     if(!choices.children.length)choices.append(button('Até mais',closeDialogue));
     content.append(choices,el('div','vale-dialog-help','Conversa pausada · Tab escolhe · Enter confirma · Esc volta ao mundo'));
     card.append(person,content);dialog.append(card);dialog.classList.add('show');
@@ -4564,23 +4750,36 @@ body.hud-game #legend{display:none !important;}
     grid.append(main,aside);card.append(grid,el('h3','','Quem vive no vale'));
     const people=el('div','vale-residents');
     for(const def of cast()){
-      const p=el('div','vale-resident'),label=el('div');label.append(el('strong','',def.name),el('small','',def.role),el('small','',location(def,info)),el('small','','Vínculo: '+(s.friendships?.[def.id]||0)));
+      const relation=s.relationships?.find(r=>r.npcId===def.id);
+      const p=el('div','vale-resident'),label=el('div');label.append(el('strong','',def.name),el('small','',def.role),el('small','',location(def,info)),el('small','',(relation?.label||'Vínculo')+' · '+(s.friendships?.[def.id]||0)),el('small','',(relation?.discoveries||0)+' / '+(relation?.total||3)+' lembranças descobertas'));
       const actor=(info.npcs||[]).find(n=>n.npcId===def.id);if(actor?.routineDescription)label.append(el('small','',actor.routineDescription));
       p.append(portrait(def.id,96),label);people.append(p);
     }
     card.append(people);
+    card.append(el('h3','','Vozes do vale · '+(s.discoveries?.length||0)+' / '+(s.discoveryTotal||18)),el('p','','Cada morador conhece uma parte do passado. Converse, volte após as etapas e escute as lembranças. As histórias de depois da reabertura continuam na vida do vale.'));
+    if(s.discoveries?.length){
+      const collection=el('div','vale-discoveries');
+      for(const memory of s.discoveries){const item=el('details','vale-discovery');item.append(el('summary','',memory.title),el('span','vale-kicker',cast().find(n=>n.id===memory.npcId)?.name||''),el('p','',memory.text),el('p','vale-decision',memory.response||'Você pode voltar a este morador para responder à lembrança.'));collection.append(item);}
+      card.append(collection);
+    }
     if(s.memories?.length){card.append(el('h3','','Memórias da jornada'));s.memories.slice(-8).forEach(m=>card.append(el('p','vale-memory',m.text)));}
     if(s.letter?.text){card.append(el('h3','',s.letter.title||'A carta de Rosa'),el('div','vale-letter',s.letter.text));}
     book.append(card);
   }
   function openBook(){
-    if(!ready||!adapter.canOpen?.())return;rememberFocus();story()?.close();bookOpen=true;renderBook();book.classList.add('show');book.querySelector('button')?.focus({preventScroll:true});
+    if(!ready||!adapter.canOpen?.())return;rememberFocus();story()?.close();bookOpen=true;renderBook();book.classList.add('show');book.querySelector('button')?.focus({preventScroll:true});window.synthSfx?.pageTurn?.();
   }
   function closeBook(focus=true){if(!bookOpen)return;bookOpen=false;book.classList.remove('show');if(focus)returnFocus();}
   function keyboard(e){
     const active=dialog?.classList.contains('show')?dialog:bookOpen?book:null;if(!active)return;
+    const reader=document.activeElement;
+    if(reader?.classList.contains('vale-dialog-body')&&['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(e.key)){
+      e.preventDefault();e.stopImmediatePropagation();
+      const page=Math.max(40,reader.clientHeight*.85),step=e.key==='ArrowUp'?-40:e.key==='ArrowDown'?40:e.key==='PageUp'?-page:page;
+      reader.scrollTop=e.key==='Home'?0:e.key==='End'?reader.scrollHeight:reader.scrollTop+(e.shiftKey&&e.key===' '?-page:step);return;
+    }
     if(e.key==='Tab'){
-      const list=Array.from(active.querySelectorAll('button,[tabindex="0"]')).filter(n=>!n.disabled),first=list[0],last=list.at(-1);
+      const list=Array.from(active.querySelectorAll('button,summary,[tabindex="0"]')).filter(n=>!n.disabled),first=list[0],last=list.at(-1);
       if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
       else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
       e.stopImmediatePropagation();return;
@@ -4588,7 +4787,7 @@ body.hud-game #legend{display:none !important;}
     if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(bookOpen)closeBook();else closeDialogue();return;}
     if(e.key==='Enter'||e.key===' '){
       e.preventDefault();e.stopImmediatePropagation();
-      const a=document.activeElement;if(a?.tagName==='BUTTON'&&active.contains(a))a.click();return;
+      const a=document.activeElement;if((a?.tagName==='BUTTON'||a?.tagName==='SUMMARY')&&active.contains(a))a.click();return;
     }
     if(dialog.classList.contains('show')&&/^[1-9]$/.test(e.key)){
       e.preventDefault();e.stopImmediatePropagation();dialog.querySelectorAll('.vale-choices button')[Number(e.key)-1]?.click();return;
@@ -4604,7 +4803,7 @@ body.hud-game #legend{display:none !important;}
 /* Ponte pequena entre mundo, narrativa e UI. A fonte principal chama os hooks. */
 (function(){
   'use strict';
-  let active=false, restoring=false, pendingSave=false;
+  let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
   const actors=[];
   const homes={};
   let navigation=null,navVersion='',community={x:608,y:1260};
@@ -4639,7 +4838,8 @@ body.hud-game #legend{display:none !important;}
   const read=()=>({season:currentSeason,timeOfDay,region:currentRegion(),scene:currentScene,
     playerName:player.name,name:player.name,gender:player.gender,x:worldPosition().x,y:worldPosition().y,
     worldWidth:scenes.main.MW*TS,worldHeight:scenes.main.MH*TS,npcs:actors,
-    inventory:player.inv,coatEquipped:player.coatEquipped,activities:activityLines,community:{...community}});
+    inventory:player.inv,coatEquipped:player.coatEquipped,energy:player.en,resting:player.resting===true,
+    activities:activityLines,community:{...community}});
   function safePoint(x,y){
     const main=scenes.main;const tx=Math.floor(x/TS),ty=Math.floor(y/TS),t=main.map[ty]?.[tx];
     if(t===undefined||[T.WATER,T.RIVER,T.OASIS,T.FENCE].includes(t))return false;
@@ -4709,7 +4909,14 @@ body.hud-game #legend{display:none !important;}
           pendingSave=true;queueMicrotask(()=>{pendingSave=false;if(gameStarted&&!restoring)saveGame(true);});
         }
       },
-      onDialogue(d){if(d)beforeOpen();FarmStoryUI.showDialogue(d);}
+      onDialogue(d){
+        if(d)beforeOpen();FarmStoryUI.showDialogue(d);
+        if(!restoring&&gameStarted){
+          if(d)window.synthSfx?.dialogue?.(d.npcId,dialogueSoundNpc===d.npcId?'choice':'greet');
+          else if(dialogueSoundNpc)window.synthSfx?.dialogue?.(dialogueSoundNpc,'close');
+        }
+        dialogueSoundNpc=d?.npcId||'';
+      }
     });
     for(const def of FarmStoryWorld.characters)place(def);
     rebuildNavigation();
@@ -4766,7 +4973,13 @@ body.hud-game #legend{display:none !important;}
       // Lugares ao redor da praça; espaço entre corpos e frente da porta livres.
       const seats=[[-48,16],[-16,32],[16,32],[48,16],[48,48],[-48,48]],seat=seats[index];
       return {key:'gather:'+community.x+':'+community.y,x:community.x+seat[0],y:community.y+seat[1],
-        activity:'talk',label:'Encontro na Casa das Sementes',line:'Vim para o encontro. É bom ver a mesa cercada de gente outra vez.'};
+        activity:'talk',label:'Encontro na Casa das Sementes',line:{
+          rosa:'Guardei a caixa sem etiqueta perto da porta. Um encontro também precisa de lugar para quem ainda chegar.',
+          lia:'Trouxe os três desenhos e uma página em branco. Hoje quero mais vozes nas margens do caderno.',
+          tomas:'Todas as cadeiras conferidas. Agora vou sentar em uma delas antes de inventar outro reparo.',
+          ines:'Da curva ouvi o movimento da casa. A última parte do caminho ficou mais leve que a primeira.',
+          caio:'Minha caixa está encostada na parede. Hoje vim para a conversa que não cabe dentro dela.',
+          nico:'A placa ficou um pouco torta. Eu ia endireitar, mas todo mundo entrou sem problema. Posso sentar também?'}[o.npcId]};
     }
     return {key:'routine:'+band,x:home.x+normal.dx,y:home.y+normal.dy,...normal};
   }
@@ -5015,6 +5228,58 @@ body.hud-game #legend{display:none !important;}
   setDestination:selectDestination,clearDestination(){selected=null;refresh();},snapshot,draw(){refresh();},
   invalidate(){base=null;refresh();}
  };
+})();
+
+/* ================================
+   src/modules/18-object-queries.js
+   ================================ */
+/* Listas por tipo: mantém ordem, referências vivas e o mesmo critério das
+   consultas originais. Índice apenas de objetos; o cache de tiles não muda. */
+(()=>{
+ const indices=new WeakMap(),metrics={queries:0,rebuilds:0,scanned:0,candidates:0};
+ function of(list,types){
+  if(!Array.isArray(list)||!Array.isArray(types))return [];
+  metrics.queries++;
+  let index=indices.get(list);
+  if(!index||index.length!==list.length){
+   index={length:list.length,byType:new Map(),order:new Map(),queries:new Map()};
+   list.forEach((o,i)=>{index.order.set(o,i);const bucket=index.byType.get(o.type)||[];bucket.push(o);index.byType.set(o.type,bucket);});
+   indices.set(list,index);metrics.rebuilds++;metrics.scanned+=list.length;
+  }
+  const key=[...new Set(types)].sort().join('|');let result=index.queries.get(key);
+  if(!result){result=[];for(const type of new Set(types))result.push(...(index.byType.get(type)||[]));result.sort((a,b)=>index.order.get(a)-index.order.get(b));
+   if(index.queries.size>=64)index.queries.delete(index.queries.keys().next().value);
+   index.queries.set(key,result);
+  }
+  metrics.candidates+=result.length;return result;
+ }
+ window.FarmObjectQueries={of,invalidate(list){if(list)indices.delete(list);},info:()=>({...metrics}),resetMetrics(){for(const key in metrics)metrics[key]=0;}};
+})();
+
+/* =============================
+   src/modules/19-rest-visual.js
+   ============================= */
+/* Estado visual transitório; nunca faz parte de player nem de saves. */
+(()=>{
+ let context=null,blend=0,elapsed=0;
+ const ease=t=>t*t*(3-2*t);
+ function reset(){context=null;blend=0;elapsed=0;}
+ function start(scene,bed=null){context={scene,bed};blend=0;elapsed=0;}
+ function update(dt,actor,scene,reducedMotion=false){
+  if(context&&context.scene!==scene)reset();
+  if(actor.resting&&!context)start(scene);
+  elapsed+=actor.resting?Math.max(0,dt):0;
+  blend=reducedMotion?(actor.resting?1:0):Math.max(0,Math.min(1,blend+(actor.resting?dt/.24:-dt/.18)));
+  if(!actor.resting&&blend===0)context=null;
+ }
+ function pose(actor,scene){
+  const bed=context?.scene===scene?context.bed:null,amount=ease(blend);
+  return{restMode:bed?'bed':'sit',restElapsed:elapsed,restBlend:blend,
+   x:bed?actor.x+((bed.x+(bed.w||48)/2)-actor.x)*amount:actor.x,
+   y:bed?actor.y+((bed.y+(bed.h||32)-15)-actor.y)*amount:actor.y,
+   depth:bed&&blend>0?Math.max(actor.y+10,bed.y+(bed.h||32)+.5):actor.y+10};
+ }
+ window.FarmRestVisual={start,reset,update,pose,info:()=>({blend,elapsed,scene:context?.scene||null,bed:context?.bed?.type||null})};
 })();
 
 /* =============================
@@ -6593,7 +6858,15 @@ body.hud-game #legend{display:none !important;}
   function position(actor,opts){return {x:Number.isFinite(opts.x)?opts.x:Math.round(Number(actor.x)||0),
     y:Number.isFinite(opts.y)?opts.y:Math.round(Number(actor.y)||0)};}
   function state(actor,opts,hero){
-    const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest');
+    const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
+    const restMode=rest&&opts.restMode==='bed'?'bed':rest?'sit':'';
+    const restElapsed=Math.max(0,Number.isFinite(opts.restElapsed)?opts.restElapsed:Number(hero?actor.restTimer:actor.activityPhase)||0);
+    const restBlend=Number.isFinite(opts.restBlend)?Math.max(0,Math.min(1,opts.restBlend)):Math.min(1,restElapsed/.24);
+    const restStage=rest?(opts.reducedMotion?2:Math.round(restBlend*2)):0;
+    // Respiração de 4,8s mexe apenas no tórax/tecido. Cabeça, mãos e pés ficam
+    // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
+    const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
+    const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
     const job=!hero&&!actor.moving&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
@@ -6603,7 +6876,7 @@ body.hud-game #legend{display:none !important;}
     const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
     return {dir:dirOf(actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
-      moving,gait,runMix,rest,
+      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
       actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
       blink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
@@ -6652,8 +6925,119 @@ body.hud-game #legend{display:none !important;}
     }
     g.restore();
   }
+  // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
+  // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
+  function paintHead(g,d,s){
+    const side=s.dir===1||s.dir===2,back=s.dir===3;
+    // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
+    rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
+    const hx=side?-4:-5,hw=side?9:10;
+    rect(g,d.hair,side?-5:-6,-27,side?10:12,10);
+    rect(g,d.skin,hx,-24,hw,7);rect(g,d.skinHi,hx,-23,2,5);rect(g,d.skinSh,hx+hw-2,-22,2,5);
+    rect(g,d.skin,side?5:-6,-22,side?1:2,3);if(!side) rect(g,d.skinSh,5,-22,1,3);
+    if(back){rect(g,d.hair,-6,-26,12,9);rect(g,d.hairHi,-5,-25,2,7);rect(g,d.hairSh,4,-25,2,8);}
+    else{
+      rect(g,d.hair,hx,-25,hw,2);rect(g,d.hairHi,hx,-25,3,1);
+      rect(g,d.hair,hx,-23,2,2);rect(g,d.hairSh,hx+hw-1,-24,1,3);
+      if(side){rect(g,P.ink,s.restDoze?2:3,-22,s.restDoze?2:1,s.restDoze||s.blink?1:2);rect(g,d.skinHi,5,-20,1,1);rect(g,d.skinSh,3,-18,2,1);}
+      else{
+        if(!s.restDoze){rect(g,P.cream,-3,-22,2,1);rect(g,P.cream,2,-22,2,1);}
+        rect(g,P.ink,s.restDoze?-3:-2,-22,s.restDoze?2:1,s.restDoze||s.blink?1:2);rect(g,P.ink,2,-22,s.restDoze?2:1,s.restDoze||s.blink?1:2);
+        rect(g,d.skinSh,0,-20,1,1);rect(g,d.skinSh,-1,-18,3,1);
+        if(d.expression==='curious'){rect(g,'#a86748',-4,-20,1,1);rect(g,'#a86748',3,-20,1,1);}
+        if(d.expression==='kind'){rect(g,P.edge,-4,-23,4,1);rect(g,P.edge,1,-23,4,1);rect(g,P.amber,-4,-21,1,1);}
+      }
+    }
+    if(d.hairStyle==='curls'){
+      for(const [x,y] of [[-7,-25],[-5,-28],[-1,-29],[3,-28],[5,-26],[-7,-21],[5,-21]]){
+        rect(g,d.hair,x,y,3,3);rect(g,d.hairHi,x,y,1,1);
+      }
+    }else if(d.hairStyle==='bun'){
+      rect(g,d.hair,side?-7:-3,-29,side?4:6,4);rect(g,d.hairHi,side?-7:-3,-29,3,1);
+      rect(g,P.amber,side?-5:3,-26,2,1);
+    }else if(d.hairStyle==='beanie'){
+      rect(g,d.shirtSh,-6,-28,12,4);rect(g,d.shirt,-5,-29,10,3);rect(g,d.shirtHi,-5,-28,3,1);
+      rect(g,d.shirtHi,-6,-25,12,2);rect(g,P.amber,side?3:3,-25,2,1);
+    }else if(d.hairStyle==='headwrap'){
+      rect(g,'#a07839',-6,-28,12,5);rect(g,d.trim,-5,-29,10,4);rect(g,P.amber,-5,-29,3,1);
+      rect(g,P.cream,-6,-25,12,1);rect(g,d.trim,side?-6:5,-23,2,7);
+      if(!back){rect(g,d.hair,side?2:-3,-19,side?3:7,2);rect(g,d.skin,side?3:-1,-19,side?1:3,1);}
+    }else if(d.hairStyle==='braid'||d.hairStyle==='ponytail'){
+      if(d.hairStyle==='braid'){
+        for(let i=0;i<4;i++){rect(g,d.hair,side?-6:5,-23+i*2,3,2);rect(g,d.hairHi,side?-6:5,-23+i*2,1,1);}
+        rect(g,d.trim,side?-6:5,-15,2,1);
+      }else{rect(g,d.hair,side?-7:5,-24,3,8);rect(g,d.hairHi,side?-7:5,-24,1,6);rect(g,d.trim,side?-7:5,-24,2,1);}
+    }else if(d.hairStyle==='messy'){
+      rect(g,d.hair,-5,-28,3,2);rect(g,d.hair,0,-29,3,3);rect(g,d.hairHi,0,-28,1,1);
+      rect(g,d.hair,4,-27,2,3);
+    }
+    if(s.hat){
+      rect(g,'#9b793d',-7,-29,14,3);rect(g,P.amber,-6,-30,12,3);rect(g,P.cream,-6,-30,5,1);
+      rect(g,P.edge,-7,-27,14,1);rect(g,'#bd9450',-9,-26,18,2);rect(g,P.amber,-9,-26,16,1);
+      rect(g,P.cream,-8,-26,5,1);rect(g,'#9b793d',6,-25,3,1);
+    }
+    if(s.scarf){
+      rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
+      rect(g,P.terra,side?2:3,-15,2,5);rect(g,'#794b43',side?3:4,-14,1,4);
+    }
+    if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
+  }
+  function paintRest(g,d,s){
+    // O primeiro estágio conserva a silhueta anterior ao agachar. A mesma
+    // sequência ao contrário serve para levantar, sem reiniciar a passada.
+    if(s.restStage===0){paintBody(g,d,{...s,rest:false,restDoze:false,gait:0,runMix:0,action:'',blink:false});return;}
+    g.save();g.translate(AX,AY);
+    const bed=s.restMode==='bed'&&s.restStage===2;
+    if(!bed&&s.dir===1)g.scale(-1,1);
+    const side=!bed&&(s.dir===1||s.dir===2),back=!bed&&s.dir===3;
+    const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
+    const hand=s.gloves?'#b79562':d.skin,boot=s.boots?'#40534a':P.soil;
+    if(bed){
+      // Âncora fornecida pela integração: pés = margem inferior do colchão-5.
+      // A cabeça repousa no travesseiro, e a manta cobre as pernas sem sombra
+      // projetada no piso. O chapéu equipado fica ao lado, sobre o colchão.
+      rect(g,shirtSh,-6,-11,12,9);rect(g,shirt,-5,-11,10,7);rect(g,shirtHi,-5,-11-s.restBreath,4,5);
+      rect(g,hand,-6,-8,3,3);rect(g,hand,3,-8,3,3);
+      const quilt=s.blanket?P.sage:'#819494',quiltHi=s.blanket?P.leaf:'#a2b4aa';
+      rect(g,P.edge,-8,-7,16,7);rect(g,quilt,-7,-7,14,6);rect(g,quiltHi,-7,-7-s.restBreath,14,2);
+      for(let x=-5;x<=5;x+=5){rect(g,s.blanket?P.amber:'#bbccc0',x,-4,1,3);}
+      rect(g,P.edge,-7,-1,14,1);
+      g.save();g.translate(0,6);paintHead(g,d,{...s,dir:0,hat:false});g.restore();
+      if(s.hat){rect(g,'#9b793d',9,-19,9,5);rect(g,P.amber,10,-20,7,4);rect(g,P.cream,10,-20,3,1);rect(g,P.edge,9,-16,9,1);}
+    }else{
+      const drop=s.restStage===1?3:5;
+      // Apoio dobrado e compacto. Os pés permanecem no y=0 da mesma âncora de
+      // colisão/profundidade; não deslizam com a respiração nem com o cochilo.
+      if(side){
+        limb(g,d.pants,-3,-9,4,-6,4);limb(g,d.pantsHi,0,-8,5,-5,3);
+        limb(g,d.pantsHi,5,-5,4,-2,3);rect(g,boot,4,-2,5,2);rect(g,P.ink,4,-1,5,1);
+        limb(g,d.pants,-3,-7,-4,-3,3);rect(g,boot,-5,-2,5,2);rect(g,P.ink,-5,-1,5,1);
+      }else{
+        rect(g,d.pants,-5,-9,10,6);limb(g,d.pants,-4,-6,-7,-3,4);limb(g,d.pantsHi,2,-6,5,-3,4);
+        limb(g,d.pantsHi,-5,-3,2,-2,3);limb(g,d.pants,4,-3,-2,-2,3);
+        rect(g,boot,-7,-2,4,2);rect(g,boot,4,-2,4,2);rect(g,P.ink,-7,-1,4,1);rect(g,P.ink,4,-1,4,1);
+      }
+      if(s.boots){rect(g,P.amber,side?5:-6,-2,2,1);if(!side)rect(g,P.amber,5,-2,2,1);}
+      const top=-16+drop;
+      rect(g,shirt,side?-4:-6,top-s.restBreath,side?8:12,9);rect(g,shirtHi,side?-4:-6,top-s.restBreath,2,7);rect(g,shirtSh,side?2:4,top,2,9);
+      if(!back){
+        if(d.style==='apron'||d.style==='vest'||d.style==='overalls'){rect(g,d.style==='overalls'?d.pants:P.cream,-2,top+2,4,5);rect(g,d.trim,1,top+3,1,1);}
+        else{rect(g,P.cream,side?-1:-2,top,side?2:4,2);rect(g,shirtSh,0,top+3,1,3);}
+        if(d.style==='wrap'){rect(g,d.trim,-4,top+1,8,2);rect(g,'#a07839',3,top+3,2,4);}
+        if(d.style==='field'&&!s.coat){rect(g,P.soil,side?-4:-6,top+5,3,3);rect(g,P.amber,side?-4:-6,top+5,3,1);}
+        if(d.style==='patch'){rect(g,d.trim,3,top+4,2,2);}
+      }
+      // Antebraços desenhados sobre as coxas: mãos soltas apoiadas no colo.
+      if(side){limb(g,shirtHi,-1,top+2,1,top+6,3);limb(g,shirtHi,1,top+6,5,-5,2);rect(g,hand,5,-5,3,2);}
+      else{limb(g,shirtSh,-7,top+2,-5,-6,3);limb(g,shirtHi,5,top+2,3,-6,3);rect(g,hand,-4,-5,3,2);rect(g,hand,1,-5,3,2);}
+      if(s.blanket){rect(g,P.sage,side?-5:-7,-9,side?13:14,6);rect(g,P.leaf,side?-5:-7,-9-s.restBreath,side?13:14,2);for(let i=0;i<4;i++)rect(g,P.amber,-5+i*3,-6,1,2);}
+      g.save();g.translate(side&&s.restDoze?1:0,drop);paintHead(g,d,s);g.restore();
+    }
+    g.restore();
+  }
   // Pincel no espaço dos pés. Todas as arestas são passos inteiros da grade.
   function paintBody(g,d,s){
+    if(s.rest){paintRest(g,d,s);return;}
     g.save();g.translate(AX,AY);if(s.dir===1) g.scale(-1,1);
     const side=s.dir===1||s.dir===2,back=s.dir===3;
     const strength=s.gait/8,run=s.runMix/8;
@@ -6755,58 +7139,7 @@ body.hud-game #legend{display:none !important;}
       rect(g,P.sage,side?-5:-7,-16,side?9:14,10);rect(g,P.leaf,side?-5:-7,-16,side?9:14,1);
       for(let i=0;i<4;i++) rect(g,P.amber,(side?-4:-6)+i*3,-9,1,2);
     }
-    // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
-    rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
-    const hx=side?-4:-5,hw=side?9:10;
-    rect(g,d.hair,side?-5:-6,-27,side?10:12,10);
-    rect(g,d.skin,hx,-24,hw,7);rect(g,d.skinHi,hx,-23,2,5);rect(g,d.skinSh,hx+hw-2,-22,2,5);
-    rect(g,d.skin,side?5:-6,-22,side?1:2,3);if(!side) rect(g,d.skinSh,5,-22,1,3);
-    if(back){rect(g,d.hair,-6,-26,12,9);rect(g,d.hairHi,-5,-25,2,7);rect(g,d.hairSh,4,-25,2,8);}
-    else{
-      rect(g,d.hair,hx,-25,hw,2);rect(g,d.hairHi,hx,-25,3,1);
-      rect(g,d.hair,hx,-23,2,2);rect(g,d.hairSh,hx+hw-1,-24,1,3);
-      if(side){rect(g,P.ink,3,-22,1,s.blink?1:2);rect(g,d.skinHi,5,-20,1,1);rect(g,d.skinSh,3,-18,2,1);}
-      else{
-        rect(g,P.cream,-3,-22,2,1);rect(g,P.cream,2,-22,2,1);
-        rect(g,P.ink,-2,-22,1,s.blink?1:2);rect(g,P.ink,2,-22,1,s.blink?1:2);
-        rect(g,d.skinSh,0,-20,1,1);rect(g,d.skinSh,-1,-18,3,1);
-        if(d.expression==='curious'){rect(g,'#a86748',-4,-20,1,1);rect(g,'#a86748',3,-20,1,1);}
-        if(d.expression==='kind'){rect(g,P.edge,-4,-23,4,1);rect(g,P.edge,1,-23,4,1);rect(g,P.amber,-4,-21,1,1);}
-      }
-    }
-    if(d.hairStyle==='curls'){
-      for(const [x,y] of [[-7,-25],[-5,-28],[-1,-29],[3,-28],[5,-26],[-7,-21],[5,-21]]){
-        rect(g,d.hair,x,y,3,3);rect(g,d.hairHi,x,y,1,1);
-      }
-    }else if(d.hairStyle==='bun'){
-      rect(g,d.hair,side?-7:-3,-29,side?4:6,4);rect(g,d.hairHi,side?-7:-3,-29,3,1);
-      rect(g,P.amber,side?-5:3,-26,2,1);
-    }else if(d.hairStyle==='beanie'){
-      rect(g,d.shirtSh,-6,-28,12,4);rect(g,d.shirt,-5,-29,10,3);rect(g,d.shirtHi,-5,-28,3,1);
-      rect(g,d.shirtHi,-6,-25,12,2);rect(g,P.amber,side?3:3,-25,2,1);
-    }else if(d.hairStyle==='headwrap'){
-      rect(g,'#a07839',-6,-28,12,5);rect(g,d.trim,-5,-29,10,4);rect(g,P.amber,-5,-29,3,1);
-      rect(g,P.cream,-6,-25,12,1);rect(g,d.trim,side?-6:5,-23,2,7);
-      if(!back){rect(g,d.hair,side?2:-3,-19,side?3:7,2);rect(g,d.skin,side?3:-1,-19,side?1:3,1);}
-    }else if(d.hairStyle==='braid'||d.hairStyle==='ponytail'){
-      if(d.hairStyle==='braid'){
-        for(let i=0;i<4;i++){rect(g,d.hair,side?-6:5,-23+i*2,3,2);rect(g,d.hairHi,side?-6:5,-23+i*2,1,1);}
-        rect(g,d.trim,side?-6:5,-15,2,1);
-      }else{rect(g,d.hair,side?-7:5,-24,3,8);rect(g,d.hairHi,side?-7:5,-24,1,6);rect(g,d.trim,side?-7:5,-24,2,1);}
-    }else if(d.hairStyle==='messy'){
-      rect(g,d.hair,-5,-28,3,2);rect(g,d.hair,0,-29,3,3);rect(g,d.hairHi,0,-28,1,1);
-      rect(g,d.hair,4,-27,2,3);
-    }
-    if(s.hat){
-      rect(g,'#9b793d',-7,-29,14,3);rect(g,P.amber,-6,-30,12,3);rect(g,P.cream,-6,-30,5,1);
-      rect(g,P.edge,-7,-27,14,1);rect(g,'#bd9450',-9,-26,18,2);rect(g,P.amber,-9,-26,16,1);
-      rect(g,P.cream,-8,-26,5,1);rect(g,'#9b793d',6,-25,3,1);
-    }
-    if(s.scarf){
-      rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
-      rect(g,P.terra,side?2:3,-15,2,5);rect(g,'#794b43',side?3:4,-14,1,4);
-    }
-    if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
+    paintHead(g,d,s);
     paintAction(g,d,s,hand,false);
     g.restore();
   }
@@ -6825,10 +7158,10 @@ body.hud-game #legend{display:none !important;}
   }
   function draw(g,actor,id,opts,hero){
     if(!g||!actor) return false;const p=position(actor,opts),s=state(actor,opts,hero);
-    g.save();g.imageSmoothingEnabled=false;shadow(g,p.x,p.y+FEET_Y,s.rest);
+    g.save();g.imageSmoothingEnabled=false;if(s.restMode!=='bed')shadow(g,p.x,p.y+FEET_Y,s.rest);
     if(actor.dead) g.globalAlpha*=0.65;
     g.drawImage(sprite(id,actor.gender==='f'?'f':'m',s),p.x-AX,p.y+FEET_Y-AY);
-    if(hero&&!opts.reducedMotion&&!actor.dead){
+    if(hero&&!opts.reducedMotion&&!actor.dead&&s.restMode!=='bed'){
       const phase=Math.floor(clock(opts)/180)%4;
       if(opts.winter&&actor.temp<36.2&&s.dir!==3){
         const side=s.dir===1?-1:1;rect(g,'rgba(210,227,222,0.60)',p.x+side*(7+phase),p.y-12-phase,2,1);
@@ -7106,7 +7439,7 @@ body.hud-game #legend{display:none !important;}
   function isBlocked(x,y,from){
    const m=API.scenes.main;if(!m||x<8||y<8||x>m.MW*S-8||y>m.MH*S-8)return true;
    if([undefined,T.WATER,T.RIVER,T.OASIS].includes(m.map[Math.floor(y/S)]?.[Math.floor(x/S)]))return true;
-   for(const o of m.objects){const b=footprint(o);if(b&&contains(b,x,y+7)){
+   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
      // Saves anteriores podem começar dentro de um novo tronco/volume.
      // Permite somente sair em direção à borda, nunca atravessar o obstáculo.
      if(from&&contains(b,from.x,from.y+7)){
@@ -8136,6 +8469,14 @@ body.hud-game #legend{display:none !important;}
   let _ctx = null;
   let _master = null;
   const _voices=new Set(),_timers=new Set();
+  const _noiseCache=new Map(),_lastCue=new Map();
+  const _clock=()=>typeof performance!=='undefined'?performance.now():Date.now();
+  function _allow(name,interval=120){
+    if(_suspended||(typeof soundEnabled!=='undefined'&&!soundEnabled)||(typeof AudioManager!=='undefined'&&AudioManager.master<=0))return false;
+    const now=_clock(),last=_lastCue.get(name);
+    if(last!==undefined&&now-last<interval)return false;
+    _lastCue.set(name,now);return true;
+  }
   let _suspended=false;
   function _later(fn,ms){
     if(_suspended||(typeof soundEnabled!=='undefined'&&!soundEnabled)||(typeof AudioManager!=='undefined'&&AudioManager.master<=0))return;
@@ -8146,7 +8487,7 @@ body.hud-game #legend{display:none !important;}
     for(const voice of [..._voices]){try{voice.source.stop();}catch{}voice.cleanup();}
   }
   function _track(source,nodes){
-    if(_voices.size>=24){const old=_voices.values().next().value;try{old.source.stop();}catch{}old.cleanup();}
+    if(_voices.size>=12){const old=_voices.values().next().value;try{old.source.stop();}catch{}old.cleanup();}
     const voice={source,cleanup(){for(const node of nodes)try{node.disconnect();}catch{}_voices.delete(voice);}};
     _voices.add(voice);source.onended=voice.cleanup;
   }
@@ -8186,7 +8527,7 @@ body.hud-game #legend{display:none !important;}
   }
 
   // Play a single tone with envelope
-  function _tone({ freq, type='sine', dur=0.15, vol=0.3, attack=0.005, release=0.08, detune=0, filter=null }){
+  function _tone({ freq, type='sine', dur=0.15, vol=0.3, attack=0.005, release=0.08, detune=0, filter=null, pitchTo=null }){
     if(!_ensure()) return;
     const v = _vol();
     if(v <= 0) return;
@@ -8195,6 +8536,7 @@ body.hud-game #legend{display:none !important;}
     const gain = _ctx.createGain();
     osc.type = type;
     osc.frequency.value = freq;
+    if(pitchTo>0){osc.frequency.setValueAtTime(freq,t0);osc.frequency.exponentialRampToValueAtTime(pitchTo,t0+dur*.8);}
     if(detune) osc.detune.value = detune;
     let last = osc;
     const nodes=[osc,gain];
@@ -8222,9 +8564,13 @@ body.hud-game #legend{display:none !important;}
     if(v <= 0) return;
     const t0 = _ctx.currentTime;
     const sampleRate = _ctx.sampleRate;
-    const buf = _ctx.createBuffer(1, Math.ceil(sampleRate * dur), sampleRate);
-    const data = buf.getChannelData(0);
-    for(let i=0; i<data.length; i++) data[i] = (Math.random()*2 - 1);
+    const key=sampleRate+':'+dur;
+    if(!_noiseCache.has(key)){
+      const buf=_ctx.createBuffer(1,Math.ceil(sampleRate*dur),sampleRate),data=buf.getChannelData(0);
+      for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+      _noiseCache.set(key,buf);
+    }
+    const buf=_noiseCache.get(key);
     const src = _ctx.createBufferSource();
     src.buffer = buf;
     const lp = _ctx.createBiquadFilter();
@@ -8283,7 +8629,7 @@ body.hud-game #legend{display:none !important;}
       _noiseBurst({ dur: 0.32, vol: 0.18, filterFreq: 300, sweep: 800, filterType: 'lowpass' });
     },
     click(){
-      _tone({ freq: 1800, type: 'square', dur: 0.04, vol: 0.10, attack: 0.001, release: 0.025 });
+      _tone({ freq: 820, type: 'triangle', dur: 0.065, vol: 0.085, attack: 0.007, release: 0.05 });
     },
     door(){
       // Wood thump — low triangle + click
@@ -8313,9 +8659,10 @@ body.hud-game #legend{display:none !important;}
       }, 40);
     },
     sleep(){
-      // Soft "going to bed" two-note descent
-      _tone({ freq: 440, type: 'sine', dur: 0.30, vol: 0.22, release: 0.24 });
-      _later(()=>_tone({ freq: 330, type: 'sine', dur: 0.40, vol: 0.18, release: 0.30 }), 150);
+      // Tecido e duas notas graves, uma vez ao repousar. Sem ronco em loop.
+      _noiseBurst({dur:.24,vol:.055,filterFreq:430});
+      _tone({freq:330,dur:.48,vol:.105,attack:.04,release:.36});
+      _later(()=>_tone({freq:247,dur:.62,vol:.085,attack:.055,release:.5}),190);
     },
     pop(){
       _tone({ freq: 600, type: 'sine', dur: 0.06, vol: 0.20, attack: 0.002, release: 0.04 });
@@ -8323,13 +8670,47 @@ body.hud-game #legend{display:none !important;}
     spray(){
       _noiseBurst({ dur: 0.45, vol: 0.15, filterFreq: 3000, filterType: 'highpass', sweep: -1500 });
     },
+    dialogue(npcId,kind='greet'){
+      if(!_allow('dialogue',kind==='choice'?160:280))return false;
+      const identity={rosa:[294,440,'sine'],lia:[392,523,'sine'],tomas:[196,294,'triangle'],ines:[330,494,'sine'],caio:[262,349,'triangle'],nico:[440,587,'sine']};
+      const [low,high,type]=identity[npcId]||identity.rosa;
+      const pitch=kind==='close'?low:kind==='choice'?high:low;
+      _tone({freq:pitch,type,dur:kind==='greet'?.24:.13,vol:kind==='greet'?.12:.08,attack:.013,release:.1});
+      if(kind==='greet')_later(()=>_tone({freq:high,type,dur:.22,vol:.085,attack:.018,release:.17}),105);
+      return true;
+    },
+    pageTurn(){
+      if(!_allow('page',300))return false;
+      _noiseBurst({dur:.19,vol:.07,filterFreq:1000,sweep:-450});return true;
+    },
+    animal(kind='cow'){
+      // Só responde ao cuidado real. Todos compartilham cooldown: o cocho
+      // não dispara um coro, e andar junto ao cercado continua tranquilo.
+      if(!_allow('animal',2600))return false;
+      _noiseBurst({dur:.22,vol:.055,filterFreq:680});
+      if(kind==='sheep')_tone({freq:430,pitchTo:360,type:'triangle',dur:.29,vol:.09,attack:.035,release:.2,filter:{freq:1250}});
+      else if(kind==='chicken'||kind==='chick'){
+        _tone({freq:720,pitchTo:940,dur:.08,vol:.07,attack:.005,release:.055});
+        _later(()=>_tone({freq:980,pitchTo:740,dur:.11,vol:.065,attack:.009,release:.075}),130);
+      }else{
+        _tone({freq:105,pitchTo:76,type:'triangle',dur:.5,vol:.1,attack:.055,release:.34,filter:{freq:650}});
+        _tone({freq:212,pitchTo:152,dur:.44,vol:.04,attack:.06,release:.3});
+      }
+      return true;
+    },
   };
+
+  // Um contato E repetido não acumula fanfarras/estalos. As notas da mesma
+  // frase continuam livres; a barreira atua na ação, antes de agendar notas.
+  for(const [name,interval]of Object.entries({chimeOk:240,chimeBad:260,achievement:850,levelup:1100,sparkle:420,whoosh:350,click:75,door:350,bubble:800,splash:450,sleep:1400,pop:100,spray:600})){
+    const play=synthSfx[name];synthSfx[name]=function(){if(!_allow(name,interval))return false;play();return true;};
+  }
 
   synthSfx.syncVolume=_vol;
   synthSfx.stopAll=_stopAll;
   synthSfx.suspend=()=>{_suspended=true;_stopAll();return _ctx&&_ctx.state!=='closed'?_ctx.suspend():Promise.resolve();};
-  synthSfx.resume=()=>{_suspended=false;return _ctx&&_ctx.state==='suspended'?_ctx.resume():Promise.resolve();};
-  synthSfx.state=()=>({context:_ctx?.state||'not-created',voices:_voices.size,timers:_timers.size,master:_master?.gain.value??null});
+  synthSfx.resume=()=>{_suspended=false;const audible=(typeof soundEnabled==='undefined'||soundEnabled)&&(typeof AudioManager==='undefined'||AudioManager.master>0);return _ctx&&_ctx.state==='suspended'&&audible?_ctx.resume():Promise.resolve();};
+  synthSfx.state=()=>({context:_ctx?.state||'not-created',voices:_voices.size,timers:_timers.size,master:_master?.gain.value??null,noiseBuffers:_noiseCache.size,maxVoices:12});
   window.synthSfx = synthSfx;
 })();
 
@@ -8346,8 +8727,8 @@ body.hud-game #legend{display:none !important;}
 (function(){
   const TAU=Math.PI*2, SAMPLE_RATE=24000, MAX_EFFECTS=16;
   const BANK={
-    farm_ambience:{duration:12,loop:true,seed:37001,label:'Campo: brisa e pequenos chamados sintetizados'},
-    birds_loop:{duration:8,loop:true,seed:37002,label:'Pássaros estilizados por senóides moduladas'},
+    farm_ambience:{duration:12,loop:true,seed:37001,label:'Campo: brisa leve sem duplicar os pássaros'},
+    birds_loop:{duration:18,loop:true,seed:37002,label:'Pássaros distantes em frases espaçadas'},
     cicadas_loop:{duration:6,loop:true,seed:37003,label:'Cigarras estilizadas por pulsos agudos'},
     cold_wind:{duration:8,loop:true,seed:37004,label:'Vento frio por ruído filtrado e ondulações'},
     fireplace:{duration:6,loop:true,seed:37005,label:'Lareira por rumble e estalos de ruído'},
@@ -8365,9 +8746,12 @@ body.hud-game #legend{display:none !important;}
     coat_equip:{duration:0.52,loop:false,seed:37017,label:'Casaco: movimento de tecido'},
     death_sound:{duration:1.15,loop:false,seed:37018,label:'Fim da tentativa: sinal musical descendente'},
     wool_collect:{duration:0.56,loop:false,seed:37019,label:'Coleta de lã: textura macia e toque'},
-    fire_action:{duration:0.48,loop:false,seed:37020,label:'Acender fogo: fricção, estalo e sopro'}
+    fire_action:{duration:0.48,loop:false,seed:37020,label:'Acender fogo: fricção, estalo e sopro'},
+    room_tone:{duration:10,loop:true,seed:37021,label:'Casa: ar abafado e madeira discreta'},
+    desert_breeze:{duration:12,loop:true,seed:37022,label:'Deserto: brisa seca com grãos finos'},
+    barn_room:{duration:14,loop:true,seed:37023,label:'Celeiro: madeira e palha em intervalos longos'}
   };
-  let ctx=null, output=null, enabled=true, preparing=null, master=0.75;
+  let ctx=null, output=null, enabled=true, preparing=null, master=0.75,suspended=false;
   const buffers=new Map(), prepared=new Map(), voices=new Map();
   const stepBuffers=new Map();
   const footsteps={x:null,y:null,scene:null,distance:0,count:0,surface:null,phase:null,mode:'distance'};
@@ -8402,12 +8786,14 @@ body.hud-game #legend{display:none !important;}
     if(stop)for(const [audio,voice]of [...voices])if(voice.footstep)audio.pause();
   }
   function playFootstep(surface,running){
-    if(!enabled||master<=0)return false;
+    if(!enabled||master<=0||suspended)return false;
     if(!['grass','dirt','sand','snow','stone','wood'].includes(surface))surface='grass';
     const c=ensure();if(c.state==='suspended')c.resume().catch(()=>{});
     const variant=footsteps.count%4,key=surface+':'+variant;
     if(!stepBuffers.has(key)){const pcm=generateFootstep(surface,variant),b=c.createBuffer(1,pcm.length,SAMPLE_RATE);b.copyToChannel(pcm,0);stepBuffers.set(key,b);}
     const source=c.createBufferSource(),gain=c.createGain();source.buffer=stepBuffers.get(key);
+    const steps=[...voices].filter(([,voice])=>voice.footstep);
+    if(steps.length>=4)steps[0][0].pause();
     const relative=running?.31:.24;gain.gain.value=relative*master;source.connect(gain);gain.connect(output);
     const audio={loop:false,pause(){try{source.stop();}catch{}cleanup();}};
     function cleanup(){source.disconnect();gain.disconnect();voices.delete(audio);}
@@ -8465,17 +8851,13 @@ body.hud-game #legend{display:none !important;}
       switch(name){
         case 'farm_ambience':
           v=low*(0.19+0.07*wave(0.25,t))+soft*0.035;
-          for(let k=0;k<5;k++){
-            const e=events[k];
-            v+=chirp(t,e.t,0.16,e.f,1600,0.085);
-            v+=chirp(t,e.t+0.21,0.13,e.f*1.13,-1300,0.065);
-          }
           break;
         case 'birds_loop':
-          for(let k=0;k<8;k++){
+          // Seis chamados em dezoito segundos, com pausas entre pares.
+          for(let k=0;k<6;k++){
             const e=events[k];
-            v+=chirp(t,e.t,0.18,e.f,2800,0.23);
-            v+=chirp(t,e.t+0.22,0.12,e.f*1.15,-2100,0.16);
+            v+=chirp(t,1.2+k*2.7,0.22,e.f,1600,0.18);
+            v+=chirp(t,1.48+k*2.7,0.15,e.f*1.09,-1100,0.12);
           }
           break;
         case 'cicadas_loop':{
@@ -8486,6 +8868,20 @@ body.hud-game #legend{display:none !important;}
         case 'cold_wind':
           v=(low*1.35+soft*0.13)*(0.58+0.26*wave(0.25,t)+0.13*wave(0.625,t));
           v+=wave(92,t)*wave(0.125,t)*0.011;
+          break;
+        case 'desert_breeze':
+          v=(low*.72+soft*.21)*(0.6+0.22*wave(1/12,t)+0.1*wave(.25,t));
+          v+=high*envelope(t,5.2,.5,.13)*.023;
+          break;
+        case 'room_tone':
+          v=low*.1*(.85+.15*wave(.2,t));
+          v+=wave(118,t)*envelope(t,3.2,.19,.02)*.04;
+          v+=soft*envelope(t,7.4,.42,.055)*.06;
+          break;
+        case 'barn_room':
+          v=low*.12;
+          v+=soft*(envelope(t,2.1,.7,.09)+envelope(t,10.5,.5,.12))*.13;
+          v+=wave(105,t)*envelope(t,7.6,.22,.015)*.055;
           break;
         case 'fireplace':
           v=low*0.75+soft*0.09;
@@ -8610,7 +9006,9 @@ body.hud-game #legend{display:none !important;}
       get paused(){ return !source; },
       get volume(){ return volume; },
       set volume(value){
-        volume=Math.max(0,Math.min(1,Number(value)||0));
+        const next=Math.max(0,Math.min(1,Number(value)||0));
+        if(Math.abs(next-volume)<.00005)return;
+        volume=next;
         relativeVolume=master>0?volume/master:0;
         if(gain && ctx){ gain.gain.cancelScheduledValues(ctx.currentTime); gain.gain.setTargetAtTime(volume,ctx.currentTime,0.008); }
       },
@@ -8620,10 +9018,10 @@ body.hud-game #legend{display:none !important;}
         if(starting) return starting;
         const token=stopped;
         starting=(async()=>{
-          if(!enabled) return;
+          if(!enabled||suspended||master<=0||volume<=0) return;
           const c=ensure();
           if(c.state==='suspended') await c.resume();
-          if(!enabled || token!==stopped) return;
+          if(!enabled || suspended || master<=0 || volume<=0 || token!==stopped) return;
           // Evita crescimento ilimitado de vozes ao repetir ações rapidamente.
           if(!audio.loop){
             const effects=[...voices.keys()].filter(v=>!v.loop);
@@ -8664,12 +9062,12 @@ body.hud-game #legend{display:none !important;}
       master=Math.max(0,Math.min(1,Number(value)||0));
       for(const voice of voices.values()) if(!voice.loop) voice.scale(master);
     },
-    suspend(){ return ctx&&ctx.state!=='closed'?ctx.suspend():Promise.resolve(); },
-    resume(){ return ctx&&ctx.state==='suspended'&&enabled?ctx.resume():Promise.resolve(); },
+    suspend(){ suspended=true;resetFootsteps();return ctx&&ctx.state!=='closed'?ctx.suspend():Promise.resolve(); },
+    resume(){ suspended=false;return ctx&&ctx.state==='suspended'&&enabled&&master>0?ctx.resume():Promise.resolve(); },
     state(){ return {enabled,master,outputGain:output?.gain.value??null,currentTime:ctx?.currentTime??null,context:ctx?.state||'not-created',buffers:buffers.size,prepared:prepared.size,
       bytes:[...buffers.values(),...stepBuffers.values()].reduce((sum,b)=>sum+b.length*4,0)+[...prepared.values()].reduce((sum,b)=>sum+b.byteLength,0),voices:voices.size,
       footsteps:{count:footsteps.count,surface:footsteps.surface,buffers:stepBuffers.size,mode:footsteps.mode,phase:footsteps.phase},
-      loops:[...voices.values()].filter(v=>v.loop).length,effects:[...voices.values()].filter(v=>!v.loop).length}; },
+      loops:[...voices.values()].filter(v=>v.loop).length,effects:[...voices.values()].filter(v=>!v.loop).length,suspended}; },
     stopAll(){ for(const audio of [...voices.keys()]) audio.pause(); resetFootsteps(false); }
   };
 })();
@@ -9128,7 +9526,8 @@ body.hud-game #legend{display:none !important;}
     if(!v)clearChirps();else if(started&&!suspended&&cricketTarget>.01&&!timer)scheduleCrickets();return v;
   }
   function ensure(){
-    if(started)return true;if(!enabled()||volume()<=0)return false;
+    if(started){if(ctx?.state==='suspended'&&!suspended&&enabled()&&volume()>0)ctx.resume().catch(()=>{});return !suspended;}
+    if(!enabled()||volume()<=0||suspended)return false;
     try{
       ctx=new(window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=volume();master.connect(ctx.destination);
       const noise=ctx.createBufferSource();noise.buffer=noiseBuffer();noise.loop=true;
@@ -9148,7 +9547,7 @@ body.hud-game #legend{display:none !important;}
       for(let i=0;i<pulses;i++){const start=t+i*.031;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(.055,start+.004);gain.gain.linearRampToValueAtTime(0,start+.019);}
       const voice={osc,gain};chirps.add(voice);osc.connect(gain);gain.connect(crickets.gain);osc.onended=()=>{osc.disconnect();gain.disconnect();chirps.delete(voice);};osc.start(t);osc.stop(t+pulses*.031+.025);
     }
-    timer=setTimeout(()=>{timer=null;scheduleCrickets();},850+Math.random()*900);
+    timer=setTimeout(()=>{timer=null;scheduleCrickets();},2100+Math.random()*2300);
   }
   function mixScene(options={}){
     const weights={farm:0,mountain:0,desert:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
@@ -9156,21 +9555,36 @@ body.hud-game #legend{display:none !important;}
     const total=Object.values(weights).reduce((a,b)=>a+b,0)||1;for(const key of Object.keys(weights))weights[key]/=total;
     const region=Object.keys(weights).reduce((a,b)=>weights[a]>=weights[b]?a:b),tod=((Number(options.timeOfDay)||0)%24+24)%24;
     const night=tod<6||tod>=19,cold=!!options.cold,indoor=!!options.indoor;
-    const result={loops:{farm_ambience:0,birds_loop:0,cicadas_loop:0,cold_wind:0,fireplace:0},river:0,crickets:0,music:{region,night,indoor}};
+    const resting=!!options.resting;
+    const result={loops:{farm_ambience:0,birds_loop:0,cicadas_loop:0,cold_wind:0,fireplace:0,room_tone:0,desert_breeze:0,barn_room:0},river:0,crickets:0,music:{region,night,indoor,resting}};
     if(options.paused)return result;const fire=clamp(options.fireVolume),water=clamp(options.riverProximity),heat=clamp(options.heatStress);
-    if(indoor){result.loops.fireplace=fire;return result;}if(options.scene==='greenhouse'){result.river=.08;return result;}
+    if(indoor){
+      result.loops.fireplace=fire*(resting?.65:1);
+      result.loops[options.scene==='barn'?'barn_room':'room_tone']=resting?.13:.22;
+      return result;
+    }
+    if(options.scene==='greenhouse'){
+      result.river=.055;result.loops.room_tone=.11;result.loops.birds_loop=night||cold?0:.009;
+      result.music.indoor=true;return result;
+    }
     const field=weights.farm,mountain=weights.mountain,desert=weights.desert;
-    result.loops.farm_ambience=field*(cold?0:(night?0:.13));
+    result.loops.farm_ambience=field*(cold?.035:(night?.055:.13));
     result.loops.birds_loop=field*(cold||night?0:tod<9?.05:tod<16?.025:.017);
     result.loops.cicadas_loop=field*(cold||night?0:(tod>=11&&tod<16?.045+heat*.035:.018));
-    result.loops.cold_wind=mountain*(.34+(night?.06:0))+desert*(.12+(night?.035:0))+field*(cold?.22:.015);
-    result.loops.fireplace=fire;result.river=water*(field*(cold?.16:.65)+mountain*.18+desert*.30);result.crickets=field*(night&&!cold?.48:0);return result;
+    result.loops.cold_wind=mountain*(.28+(night?.06:0))+field*(cold?.17:.01);
+    result.loops.desert_breeze=desert*(night?.19:.25);
+    result.loops.fireplace=fire;result.river=water*(field*(cold?.16:.55)+mountain*.18+desert*.28);result.crickets=field*(night&&!cold?.34:0);
+    if(resting){
+      for(const key of Object.keys(result.loops))result.loops[key]*=['birds_loop','cicadas_loop'].includes(key)?.35:.65;
+      result.river*=.7;result.crickets*=.45;
+    }
+    return result;
   }
   window.AmbientSynth={mixScene,syncVolume,
     setRiver(value){riverTarget=clamp(value);if(riverTarget>0&&!ensure())return;if(river){syncVolume();ramp(river,riverTarget*.5,.4);}},
     setCrickets(value){cricketTarget=clamp(value);if(cricketTarget>0&&!ensure())return;if(crickets){syncVolume();ramp(crickets,cricketTarget,.45);if(cricketTarget>.01)scheduleCrickets();else clearChirps();}},
     suspend(){suspended=true;clearChirps();return ctx&&ctx.state!=='closed'?ctx.suspend().catch(()=>{}):Promise.resolve();},
-    resume(){suspended=false;const promise=ctx&&ctx.state==='suspended'&&enabled()?ctx.resume().catch(()=>{}):Promise.resolve();return promise.then(()=>{syncVolume();scheduleCrickets();});},
+    resume(){suspended=false;const promise=ctx&&ctx.state==='suspended'&&enabled()&&volume()>0?ctx.resume().catch(()=>{}):Promise.resolve();return promise.then(()=>{syncVolume();scheduleCrickets();});},
     stopAll(){riverTarget=cricketTarget=0;clearChirps();if(river)ramp(river,0,.08);if(crickets)ramp(crickets,0,.08);},
     dispose(){this.stopAll();for(const node of continuous.splice(0)){try{node.stop?.();node.disconnect();}catch{}}try{crickets?.gain.disconnect();master?.disconnect();ctx?.close();}catch{}ctx=master=river=crickets=null;started=false;},
     isReady(){return started;},state(){return{context:ctx?.state||'not-created',currentTime:ctx?.currentTime??null,master:master?.gain.value??null,river:riverTarget,crickets:cricketTarget,chirps:chirps.size,timer:!!timer,suspended};}
@@ -9180,53 +9594,82 @@ body.hud-game #legend{display:none !important;}
   // contexto e o reverb, mas troca notas aleatórias por frases do próprio vale.
   (window.__farmBiomes=window.__farmBiomes||[]).push(()=>{
     const music=window.AmbientMusic;if(!music)return;
+    // Três frases originais por região. Há silêncio entre frases; não se toca
+    // um arpejo aleatório constante sobre cada ação do jogador.
     const profiles={
-      farm:{scale:[261.63,293.66,329.63,392,440,523.25],beat:.54,motif:[0,2,3,null,2,1,0,null,3,4,3,2,null,1,0,null]},
-      mountain:{scale:[293.66,349.23,392,440,523.25,587.33],beat:.72,motif:[0,null,2,null,1,null,3,null,2,null,1,null,0,null,null,null]},
-      desert:{scale:[220,261.63,293.66,329.63,392,440],beat:.60,motif:[0,2,null,3,2,null,1,0,null,2,4,3,null,2,0,null]}
+      farm:{scale:[261.63,293.66,329.63,392,440,523.25],beat:.62,motifs:[[0,null,2,3,null,1,0,null,3,4,null,2,null,1,0,null],[2,1,null,0,3,null,4,3,null,2,1,null,0,null,null,null],[0,3,null,2,null,4,3,null,1,null,2,0,null,null,null,null]]},
+      mountain:{scale:[293.66,349.23,392,440,523.25,587.33],beat:.86,motifs:[[0,null,2,null,1,null,3,null,2,null,1,null,0,null,null,null],[1,null,null,0,2,null,4,null,3,null,1,null,0,null,null,null],[0,null,3,null,null,2,null,1,2,null,null,0,null,null,null,null]]},
+      desert:{scale:[220,261.63,293.66,329.63,392,440],beat:.74,motifs:[[0,2,null,3,null,2,1,null,0,null,4,3,null,2,0,null],[2,null,1,0,null,3,null,4,2,null,1,null,0,null,null,null],[0,null,2,null,4,3,null,2,1,null,3,null,0,null,null,null]]}
     };
-    const notes=new Set();let token=0,step=0,profile={region:'farm',night:false,indoor:false,duck:1},requestedVolume=.75;
+    const notes=new Set(),toneBuffers=new Map();
+    let token=0,step=0,profile={region:'farm',night:false,indoor:false,resting:false,duck:1},requestedVolume=.75;
     function clearNotes(){for(const voice of [...notes]){try{voice.osc.stop();}catch{}voice.cleanup();}}
     music.setScene=function(next={}){
-      const updated={region:profiles[next.region]?next.region:'farm',night:!!next.night,indoor:!!next.indoor,duck:next.duck===undefined?1:clamp(next.duck)};
-      const changed=updated.region!==profile.region||updated.night!==profile.night||updated.indoor!==profile.indoor;
-      const gainChanged=updated.duck!==profile.duck||updated.night!==profile.night||updated.indoor!==profile.indoor;
+      const updated={region:profiles[next.region]?next.region:'farm',night:!!next.night,indoor:!!next.indoor,resting:!!next.resting,duck:next.duck===undefined?1:clamp(next.duck)};
+      const changed=updated.region!==profile.region;
+      const gainChanged=updated.duck!==profile.duck||updated.night!==profile.night||updated.indoor!==profile.indoor||updated.resting!==profile.resting;
       profile=updated;if(changed)step=0;if(gainChanged)this.setVolume(requestedVolume);
     };
     music.setVolume=function(value){
       requestedVolume=clamp(value);if(!this.master||!this.ctx)return;
-      const target=enabled()&&this.active?this.baseVolume*requestedVolume*profile.duck*(profile.night?.72:1)*(profile.indoor?.8:1):0;
+      const target=enabled()&&this.active?this.baseVolume*requestedVolume*profile.duck*(profile.night?.72:1)*(profile.indoor?.8:1)*(profile.resting?.55:1):0;
       if(target===this._targetGain)return;this._targetGain=target;
       this.master.gain.cancelScheduledValues(this.ctx.currentTime);
-      if(!target)this.master.gain.setValueAtTime(0,this.ctx.currentTime);else this.master.gain.setTargetAtTime(target,this.ctx.currentTime,.18);
+      if(!target){this.master.gain.setValueAtTime(0,this.ctx.currentTime);clearTimeout(this._loopTimer);this._loopTimer=null;clearNotes();}
+      else{
+        this.master.gain.setTargetAtTime(target,this.ctx.currentTime,.25);
+        if(this.active&&this.ctx.state==='running'&&!this._loopTimer){this.scheduledUntil=this.ctx.currentTime+.03;this._scheduleLoop();}
+      }
     };
     music.start=function(){
-      if(this.active||!enabled())return;this.init();if(!this.ctx)return;const request=++token;
-      const begin=()=>{if(request!==token||!enabled())return;this.active=true;this.setVolume(volume());this.scheduledUntil=this.ctx.currentTime+.02;this._scheduleLoop();};
+      if(this.active||!enabled()||volume()<=0)return;this.init();if(!this.ctx)return;const request=++token;
+      const begin=()=>{if(request!==token||!enabled()||volume()<=0)return;this.active=true;this.scheduledUntil=this.ctx.currentTime+.02;this.setVolume(volume());if(!this._loopTimer)this._scheduleLoop();};
       if(this.ctx.state==='suspended')return this.ctx.resume().then(begin).catch(()=>{});begin();
     };
     music.stop=function(){token++;this.active=false;clearTimeout(this._loopTimer);this._loopTimer=null;clearNotes();this.setVolume(requestedVolume);};
     music._scheduleLoop=function(){
-      clearTimeout(this._loopTimer);this._loopTimer=null;if(!this.active||!this.ctx||this.ctx.state!=='running')return;
+      clearTimeout(this._loopTimer);this._loopTimer=null;if(!this.active||!enabled()||requestedVolume<=0||!this.ctx||this.ctx.state!=='running')return;
       const now=this.ctx.currentTime;if(this.scheduledUntil<now)this.scheduledUntil=now+.02;
       while(this.scheduledUntil<now+.85){
-        const p=profiles[profile.region],index=step%p.motif.length,note=p.motif[index],beat=p.beat*(profile.night?1.25:1);
+        const p=profiles[profile.region],index=step%16,phrase=Math.floor(step/16),variant=Math.floor(phrase/2)%p.motifs.length;
+        const note=p.motifs[variant][index],beat=p.beat*(profile.night?1.3:1)*(profile.resting?1.45:1);
         // Uma frase de respiro a cada duas, dando espaço aos sons do mundo.
-        const rest=Math.floor(step/p.motif.length)%3===2;
-        if(note!==null&&!rest){const pitch=p.scale[note]*(profile.night?.5:1);this._playNote(pitch,this.scheduledUntil,beat*.88,index%4===0?.9:.65);}
+        const rest=phrase%2===1;
+        if(note!==null&&!rest&&(!profile.resting||index%4===0)){
+          const pitch=p.scale[note]*(profile.night||profile.resting?.5:1);
+          this._playNote(pitch,this.scheduledUntil,Math.min(1.4,beat*1.05),index%4===0?.85:.6);
+          if(!profile.resting&&index===0)this._playNote(p.scale[0]/2,this.scheduledUntil,Math.min(1.8,beat*1.6),.28);
+        }
         step++;this.scheduledUntil+=beat;
       }
       this._loopTimer=setTimeout(()=>this._scheduleLoop(),260);
     };
     music._playNote=function(freq,time,duration,strength=1){
-      if(!this.ctx||!this.active)return;const osc=this.ctx.createOscillator(),gain=this.ctx.createGain();osc.type='triangle';osc.frequency.value=freq;
-      gain.gain.setValueAtTime(0,time);gain.gain.linearRampToValueAtTime(.14*strength,time+.035);gain.gain.exponentialRampToValueAtTime(.0001,time+duration);gain.gain.linearRampToValueAtTime(0,time+duration+.035);
+      if(!this.ctx||!this.active||!enabled()||requestedVolume<=0)return;
+      if(notes.size>=8){const oldest=notes.values().next().value;try{oldest.osc.stop();}catch{}oldest.cleanup();}
+      const osc=this.ctx.createBufferSource(),gain=this.ctx.createGain(),key=freq.toFixed(2)+':'+duration.toFixed(2);
+      if(!toneBuffers.has(key)){
+        const data=this.generateTone(freq,duration),buffer=this.ctx.createBuffer(1,data.length,24000);buffer.copyToChannel(data,0);
+        if(toneBuffers.size>=96)toneBuffers.delete(toneBuffers.keys().next().value);
+        toneBuffers.set(key,buffer);
+      }
+      osc.buffer=toneBuffers.get(key);gain.gain.value=.14*strength;
       osc.connect(gain);gain.connect(this.master);if(this.fxIn)gain.connect(this.fxIn);
-      const voice={osc,cleanup(){osc.disconnect();gain.disconnect();notes.delete(voice);}};notes.add(voice);osc.onended=voice.cleanup;osc.start(time);osc.stop(time+duration+.06);
+      const voice={osc,cleanup(){osc.disconnect();gain.disconnect();notes.delete(voice);}};notes.add(voice);osc.onended=voice.cleanup;osc.start(time);
+    };
+    music.generateTone=function(freq,duration){
+      const rate=24000,seconds=duration+.1,data=new Float32Array(Math.ceil(seconds*rate));
+      for(let i=0;i<data.length;i++){
+        const t=i/rate,attack=Math.min(1,t/.025),tail=Math.max(0,1-t/seconds),decay=Math.exp(-t*3/seconds);
+        const fundamental=Math.sin(Math.PI*2*freq*t),second=Math.sin(Math.PI*4*freq*t)*Math.exp(-t*8/seconds)*.17;
+        const third=Math.sin(Math.PI*6*freq*t)*Math.exp(-t*11/seconds)*.07;
+        data[i]=(fundamental+second+third)*attack*tail*decay*.72;
+      }
+      data[data.length-1]=0;return data;
     };
     music.suspend=function(){clearTimeout(this._loopTimer);this._loopTimer=null;clearNotes();return this.ctx&&this.ctx.state!=='closed'?this.ctx.suspend():Promise.resolve();};
-    music.resume=function(){if(!this.ctx||!enabled())return Promise.resolve();return this.ctx.resume().then(()=>{if(this.active){this.scheduledUntil=this.ctx.currentTime+.02;this._scheduleLoop();}}).catch(()=>{});};
-    music.state=function(){return{...profile,active:this.active,voices:notes.size,timer:!!this._loopTimer,step,target:this._targetGain??0,context:this.ctx?.state||'not-created'};};
+    music.resume=function(){if(!this.ctx||!enabled()||requestedVolume<=0)return Promise.resolve();return this.ctx.resume().then(()=>{if(this.active){this.scheduledUntil=this.ctx.currentTime+.02;this._scheduleLoop();}}).catch(()=>{});};
+    music.state=function(){return{...profile,active:this.active,voices:notes.size,timer:!!this._loopTimer,step,phrase:Math.floor(step/16),variant:Math.floor(step/32)%3,toneBuffers:toneBuffers.size,maxVoices:8,target:this._targetGain??0,context:this.ctx?.state||'not-created'};};
   });
 })();
 </script>
@@ -9292,12 +9735,16 @@ document.addEventListener('fullscreenchange', ()=>setTimeout(resize, 60));
 document.addEventListener('webkitfullscreenchange', ()=>setTimeout(resize, 60));
 
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && soundEnabled && AmbientMusic.ctx && AmbientMusic.ctx.state === 'suspended'){
-    AmbientMusic.ctx.resume().then(()=>{
-      if(AmbientMusic.active){ AmbientMusic.scheduledUntil = AmbientMusic.ctx.currentTime; AmbientMusic._scheduleLoop(); }
-    }).catch(()=>{});
+  if(document.hidden){
+    for(const key of Object.keys(keys)) delete keys[key];
+    window.FarmOriginalAudio?.suspend();window.synthSfx?.suspend();
+    window.AmbientSynth?.suspend();AmbientMusic.suspend?.();
+  }else{
+    last=performance.now();
+    window.FarmOriginalAudio?.resume();window.synthSfx?.resume();window.AmbientSynth?.resume();AmbientMusic.resume?.();
   }
 });
+window.addEventListener('blur',()=>{for(const key of Object.keys(keys))delete keys[key];});
 
 /* ---------- Input ---------- */
 const keys = {};
@@ -9610,9 +10057,9 @@ const AmbientMusic = {
 window.AmbientMusic = AmbientMusic;
 
 const AudioManager = {
-  master: 0.75,
+  master: Math.max(0,Math.min(1,Number(_savedAudio?.volume??.75)||0)),
   sounds: {},
-  loops: ['farm_ambience','birds_loop','cicadas_loop','cold_wind','fireplace','heavy_breathing','teeth_chatter','heartbeat_warning','grass_steps','dirt_steps'],
+  loops: Object.entries(FarmOriginalAudio.describe()).filter(([,def])=>def.loop).map(([name])=>name),
   files: Object.fromEntries(FarmOriginalAudio.keys.map(name=>[name,'procedural'])),
   init(){
     if(audioStarted) return;
@@ -9632,15 +10079,16 @@ const AudioManager = {
     FarmOriginalAudio.setEnabled(soundEnabled);
     FarmOriginalAudio.setMaster(this.master);
     AmbientMusic.setVolume(soundEnabled?this.master:0);
+    if(gameStarted&&soundEnabled&&this.master>0&&!document.hidden&&!AmbientMusic.active)AmbientMusic.start();
     window.synthSfx?.syncVolume();
     window.AmbientSynth?.syncVolume();
     for(const [name,a] of Object.entries(this.sounds)){
       const target = Number(a.dataset.target || 0);
-      if(a.loop) a.volume = soundEnabled ? target * this.master : 0;
+      if(a.loop){a.volume = soundEnabled ? target * this.master : 0;if(!soundEnabled||this.master===0)a.pause();}
     }
   },
   playSfx(name, vol=0.8){
-    if(!soundEnabled || !audioStarted) return;
+    if(!soundEnabled || !audioStarted || this.master<=0 || document.hidden) return;
     const base = this.sounds[name];
     if(!base || base.dataset.missing==='1') return;
     try{
@@ -9653,20 +10101,21 @@ const AudioManager = {
   ensureLoop(name){
     const a = this.sounds[name];
     if(!a || a.dataset.missing==='1') return null;
-    if(a.paused && soundEnabled){ a.play().catch(()=>{}); }
+    if(a.paused && soundEnabled && this.master>0 && a.volume>0 && !document.hidden){ a.play().catch(()=>{}); }
     return a;
   },
   setLoop(name, targetVol, fade=0.08){
     if(!audioStarted) return;
-    const a = this.ensureLoop(name); if(!a) return;
-    const target = soundEnabled ? Math.max(0, Math.min(1, targetVol)) : 0;
+    const a = this.sounds[name];if(!a||a.dataset.missing==='1')return;
+    const target = soundEnabled&&!document.hidden ? Math.max(0,Math.min(1,targetVol)) : 0;
     a.dataset.target = String(target);
-    const desired = target * this.master;
-    a.volume += (desired - a.volume) * fade;
-    if(a.volume < 0.002 && target===0){ a.volume = 0; }
+    const desired = target*this.master;
+    a.volume += (desired-a.volume)*fade;
+    if(desired===0&&(a.volume<.002||this.master===0||!soundEnabled||document.hidden)){a.volume=0;a.pause();return;}
+    if(desired>0)this.ensureLoop(name);
   },
   muteAll(){
-    for(const a of Object.values(this.sounds)) a.volume = 0;
+    for(const a of Object.values(this.sounds)){a.volume=0;a.pause();}
     FarmOriginalAudio.stopAll();FarmOriginalAudio.setEnabled(false);
     window.synthSfx?.syncVolume();window.AmbientSynth?.syncVolume();
   }
@@ -9758,10 +10207,12 @@ function distanceVolume(playerX, playerY, targetX, targetY, maxDist, baseVol){
   const t = 1 - (d / maxDist);   // 1 muito perto, 0 longe
   return baseVol * t * t;         // curva quadrática (cai mais devagar perto)
 }
+function queryObjects(types,list=objects){
+  return window.FarmObjectQueries?FarmObjectQueries.of(list,types):list.filter(o=>types.includes(o.type));
+}
 function nearestObjectDistance(type){
   let nearest = Infinity;
-  for(const o of objects){
-    if(o.type !== type) continue;
+  for(const o of queryObjects([type])){
     const d = Math.hypot(player.x - o.x, player.y - o.y);
     if(d < nearest) nearest = d;
   }
@@ -9769,8 +10220,8 @@ function nearestObjectDistance(type){
 }
 function findNearestLitFire(){
   let nearest = null, dist = Infinity;
-  for(const o of objects){
-    if(!['fireplace','mtn_fire','i_fireplace','b_stove'].includes(o.type) || (!o.lit&&!['i_fireplace','b_stove'].includes(o.type))) continue;
+  for(const o of queryObjects(['fireplace','mtn_fire','i_fireplace','b_stove'])){
+    if(!o.lit&&!['i_fireplace','b_stove'].includes(o.type))continue;
     const d = Math.hypot(player.x - o.x, player.y - o.y);
     if(d < dist){ dist = d; nearest = o; }
   }
@@ -9778,7 +10229,7 @@ function findNearestLitFire(){
 }
 function updateAudioState(){
   if(!gameStarted || !audioStarted) return;
-  const paused=isPaused||cutsceneActive||readingPanelOpen()||histologyMissionOpen||player.dead;
+  const paused=document.hidden||isPaused||cutsceneActive||readingPanelOpen()||histologyMissionOpen||player.dead;
   const heatStress=Math.max(0,Math.min(1,(player.temp-38.2)/2.2));
   const coldStress=Math.max(0,Math.min(1,(36.3-player.temp)/1.3));
   const fatigueStress=Math.max(0,Math.min(1,(35-player.en)/35));
@@ -9791,12 +10242,12 @@ function updateAudioState(){
   }
   const audioWorldPosition=currentScene==='main'?player:(scenes.main._lastPlayer||player);
   const mix=window.AmbientSynth.mixScene({weights:regionWeights(audioWorldPosition.y/TS),cold:isFrio(),timeOfDay,
-    indoor:isIndoor(),scene:currentScene,riverProximity:Math.max(0,1-waterDistance/70),fireVolume,heatStress,coldStress,paused});
+    indoor:isIndoor(),scene:currentScene,resting:player.resting,riverProximity:Math.max(0,1-waterDistance/70),fireVolume,heatStress,coldStress,paused});
   for(const [name,volume]of Object.entries(mix.loops))AudioManager.setLoop(name,volume,paused?.35:.08);
   window.AmbientSynth.setRiver(mix.river);window.AmbientSynth.setCrickets(mix.crickets);
   AmbientMusic.setScene?.({...mix.music,duck:paused?.35:1});
   // Contatos na mesma fase dos pés; areia, neve, pedra e assoalho têm timbres próprios.
-  const onBridge=objects.some(o=>o.type==='bridge'&&player.x>=o.x&&player.x<=o.x+(o.w||48)&&Math.abs(player.y-o.y)<9);
+  const onBridge=queryObjects(['bridge']).some(o=>player.x>=o.x&&player.x<=o.x+(o.w||48)&&Math.abs(player.y-o.y)<9);
   const surface=isIndoor()||onBridge||tile===T.WOOD?'wood':[T.PATH,T.FIELD].includes(tile)?'dirt':[T.STONE,T.COBBLE,T.ICE].includes(tile)?'stone':[T.SAND,T.DUNE,T.CRACKED].includes(tile)?'sand':[T.SNOW,T.SNOWROCK].includes(tile)||(isFrio()&&currentRegion()==='farm'&&[T.GRASS,T.GRASS2,T.FLOWER].includes(tile))?'snow':'grass';
   AudioManager.setLoop('grass_steps',0,.6);AudioManager.setLoop('dirt_steps',0,.6);
   window.FarmOriginalAudio.updateFootsteps({x:player.x,y:player.y,phase:player.anim,moving:player.moving,running:player.running,surface,scene:currentScene,blocked:paused||!soundEnabled||player.resting});
@@ -10371,7 +10822,7 @@ function setSceneTo(name, spawnX, spawnY){
   } else if(s.spawn){
     player.x = s.spawn.x; player.y = s.spawn.y;
   }
-  player.moving = false;
+  player.moving=false;player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
   // Teleporta a câmera para a nova cena (sem deslizar suavemente entre mapas)
   if(typeof snapCamera === 'function') snapCamera();
   if(s.onEnterMsg) showToast(s.onEnterMsg, 'info', 3400);
@@ -11742,6 +12193,7 @@ function loadGameFromData(data){
     setSceneTo('main');
   }
   Object.assign(player, data.player||{});
+  player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
   if(player.inv && !player.inv.seeds) player.inv.seeds = {tomato:player.inv.seed||0,corn:0,carrot:0,forage:0};
   // Backward-compat: older saves don't have name/gender
   if(typeof player.name !== 'string' || !player.name) player.name = 'Fazendeiro';
@@ -12297,7 +12749,7 @@ function toggleInventory(force){
   }
 }
 
-function updateBars(){
+function updateBars(paintSkin=true){
   const tNorm = Math.max(0, Math.min(1, (player.temp-35)/(41-35)));
   document.getElementById('bTemp').style.width = (tNorm*100)+'%';
   document.getElementById('bTemp').style.background =
@@ -12339,7 +12791,7 @@ function updateBars(){
   setStat('sGland', player.temp>37.4 && player.hyd>20, player.hyd<30?'bad':'on');
 
   // Skin View live update
-  if(skinOpen) drawSkinView();
+  if(paintSkin&&skinOpen) drawSkinView();
 
   const icon = isFrio() ? '❄️' : dayIcon();
   document.getElementById('seasonIcon').textContent = icon;
@@ -12842,13 +13294,13 @@ window.toggleHudTips = toggleHudTips;
 function inShade(){
   // Mesma elipse desenhada por drawTree — inclusive o deslocamento pelo sol.
   const sv = (typeof sunShadowVec === 'function') ? sunShadowVec() : null;
-  for(const o of objects) if(o.type==='tree'){
+  for(const o of queryObjects(['tree'])){
     const e = treeShadowEllipse(o, sv);
     const dx = (player.x - e.cx)/e.rx, dy = (player.y - e.cy)/e.ry;
     if(dx*dx + dy*dy < 1) return true;
   }
   // House/barn shadow (south side)
-  for(const o of objects) if(o.type==='house'||o.type==='barn'){
+  for(const o of queryObjects(['house','barn'])){
     if(player.x>o.x && player.x<o.x+o.w && player.y>o.y+o.h && player.y<o.y+o.h+12) return true;
   }
   return false;
@@ -12856,8 +13308,7 @@ function inShade(){
 function inRect(p,r){ return p.x>r.x && p.x<r.x+r.w && p.y>r.y && p.y<r.y+r.h; }
 function nearObj(types, range=22){
   let best=null, bd=range;
-  for(const o of objects){
-    if(!types.includes(o.type)) continue;
+  for(const o of queryObjects(types)){
     const cx = o.x + (o.w?o.w/2:0), cy = o.y + (o.h?o.h/2:0);
     const d = Math.hypot(player.x-cx, player.y-cy);
     if(d<bd){ bd=d; best=o; }
@@ -12967,6 +13418,7 @@ function tryInteract(){
       player.restTimer = 0;
       if(player.resting){
         stats.restSessionCounted = false;
+        window.FarmRestVisual?.start(currentScene,bed);
         flashFx(player.x, player.y-12, 'descansando…', '#dce9ff');
         try { window.synthSfx && synthSfx.sleep(); } catch(e){}
       }
@@ -13148,7 +13600,7 @@ function tryInteract(){
     if(isFrio()) tickTask('protect');
     flashFx(an.x,an.y-8,woolRegrew?'lã cresceu':(isFrio()?'protegido':'alimentado'),'#cfe57a');
     if(woolRegrew) showAlert('A lã da ovelha voltou a crescer depois de alimentar');
-    sfx.plant();
+    window.synthSfx?.animal(an.kind);
     renderInv();
     return;
   }
@@ -13318,6 +13770,7 @@ function toggleRest(){
   player.resting = !player.resting;
   player.restTimer = 0;
   stats.restSessionCounted = false;
+  if(player.resting){window.FarmRestVisual?.start(currentScene);try{window.synthSfx?.sleep();}catch(e){}}
 }
 
 /* ---------- Scene transition triggers (walk-onto) ---------- */
@@ -13716,28 +14169,28 @@ function switchSeason(){
 function nearShelter(){
   if(isIndoor()) return true;
   if(nearObj(['house','barn'], 50)) return true;
-  for(const o of objects) if((o.type==='fireplace' || o.type==='i_fireplace' || o.type==='b_stove') && o.lit && Math.hypot(player.x-o.x, player.y-o.y)<55) return true;
+  for(const o of queryObjects(['fireplace','i_fireplace','b_stove']))if(o.lit&&Math.hypot(player.x-o.x, player.y-o.y)<55) return true;
   return false;
 }
 
 /* updateThermalUI / resetThermalUI live in src/modules/10-thermal-ui.js */
 function nearFire(){
-  for(const o of objects) if(o.type==='fireplace' && o.lit && Math.hypot(player.x-o.x, player.y-o.y)<45) return true;
+  for(const o of queryObjects(['fireplace']))if(o.lit&&Math.hypot(player.x-o.x, player.y-o.y)<45) return true;
   return false;
 }
 
 function fireWarmthFactor(){
   let best = 0;
-  for(const o of objects){
-    if((o.type!=='fireplace' && o.type!=='i_fireplace' && o.type!=='b_stove') || !o.lit) continue;
+  for(const o of queryObjects(['fireplace','i_fireplace','b_stove'])){
+    if(!o.lit)continue;
     const d = Math.hypot(player.x-o.x, player.y-o.y);
     if(d < 90) best = Math.max(best, 1 - d/90);
   }
   return Math.max(0, Math.min(1, best));
 }
 function updateFireplaces(dt){
-  for(const o of objects){
-    if(o.type!=='fireplace' || !o.lit) continue;
+  for(const o of queryObjects(['fireplace'])){
+    if(!o.lit)continue;
     o.fuel = Math.max(0, (o.fuel||90) - dt);
     if(o.fuel<=0){
       o.lit = false;
@@ -13767,6 +14220,7 @@ function killPlayer(type){
   }
   player.dead = true;
   player.resting = false;
+  window.FarmRestVisual?.reset();
   player.moving = false;
   player.running = false;
   shakeCamera(8, 30);
@@ -13800,6 +14254,7 @@ function killPlayer(type){
   document.getElementById('death').classList.add('show');
 }
 window.respawnPlayer = function(){
+  window.FarmRestVisual?.reset();
   document.getElementById('death').classList.remove('show');
   player.dead = false;
   player.temp = 37.0;
@@ -13941,8 +14396,7 @@ function spawnCrow(){
   });
 }
 function isScarecrowNearby(x, y){
-  for(const o of objects){
-    if(o.type !== 'scarecrow') continue;
+  for(const o of queryObjects(['scarecrow'])){
     if(Math.hypot(o.x - x, o.y - y) < 80) return true;
   }
   return false;
@@ -14224,6 +14678,7 @@ function update(dt){
   if(player.temp<38.7) stats.hotFlag=false;
   if(player.temp>36.4) stats.coldFlag=false;
   player.moving = false;
+  if(player.resting&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].some(key=>keys[key]))player.resting=false;
   if(!player.resting){
     let dx=0,dy=0;
     if(keys['w']||keys['arrowup']) dy-=1;
@@ -14312,6 +14767,8 @@ function update(dt){
       feedback.add('descanso no interior',repouso);
     }
   }
+
+  window.FarmRestVisual?.update(dt,player,currentScene,!!A11Y.reduceMotion);
 
   // Mantém a fase ao soltar a tecla; os pés assentam e retomam sem trocar
   // de pose numa única imagem. As misturas independem da taxa de quadros.
@@ -14539,6 +14996,7 @@ function resetSeasonTasks(list){
 function resetSandboxRun(){
   window.FarmWorldMap?.reset();
   window.FarmAnimalLife?.reset();
+  window.FarmRestVisual?.reset();
   const identity={name:player.name,gender:player.gender};
   if(currentScene!=='main') setSceneTo('main');
   Object.assign(player,JSON.parse(JSON.stringify(initialSandboxRun.player)),identity);
@@ -18639,11 +19097,12 @@ function drawPlayer(){
   // Posição na TELA arredondada a partir da diferença player-câmera (não de
   // player e câmera separados). Isso elimina o tremor ao andar na diagonal:
   // o personagem fica cravado em pixel inteiro em relação ao cenário.
-  let x = _camRenderX + Math.round(player.x - _camFloatX);
-  let y = _camRenderY + Math.round(player.y - _camFloatY);
+  const restPose=window.FarmRestVisual?.pose(player,currentScene)||{x:player.x,y:player.y};
+  let x = _camRenderX + Math.round(restPose.x - _camFloatX);
+  let y = _camRenderY + Math.round(restPose.y - _camFloatY);
   if(window.FarmCharacterArt){
     if(!A11Y.reduceMotion && isFrio() && player.temp<36.2) x+=Math.floor(Math.sin(performance.now()/35));
-    window.FarmCharacterArt.drawPlayer(ctx,player,{x,y,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
+    window.FarmCharacterArt.drawPlayer(ctx,player,{...restPose,x,y,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
     return;
   }
   const dir = player.dir ?? 0; // 0 baixo, 1 esquerda, 2 direita, 3 cima
@@ -19607,6 +20066,7 @@ function applyBloom(){
   }catch(e){ /* nunca derruba o frame por causa do pós-processamento */ }
 }
 
+const _renderDrawables=[],_renderPlayer={type:'player',x:0,y:0};
 function render(){
   // Base do supersampling: todo o desenho continua em coordenadas lógicas (VW×VH),
   // mas é escrito no backing store ampliado (VW*RS × VH*RS). setTransform é absoluto,
@@ -19704,6 +20164,7 @@ function render(){
   for(const k in crops){
     const c=crops[k]; if(!c) continue;
     const [tx,ty]=k.split(',').map(Number);
+    if(tx*TS+TS*2<camX||tx*TS-TS*2>camX+visW||ty*TS+TS*2<camY||ty*TS-TS*2>camY+visH)continue;
     drawCrop(tx,ty,c);
   }
   if(!isIndoor()) drawFootprints();
@@ -19715,8 +20176,11 @@ function render(){
   }
 
   // sort by y, including player
-  const drawables = objects.filter(o=>o.type!=='pen' && o.x+(o.w||0)+128>=camX && o.x-128<=camX+visW && o.y+(o.h||0)+128>=camY && o.y-128<=camY+visH);
-  drawables.push({type:'player', x:player.x, y:player.y});
+  const drawables=_renderDrawables;drawables.length=0;
+  for(const o of objects)if(o.type!=='pen'&&o.x+(o.w||0)+128>=camX&&o.x-128<=camX+visW&&o.y+(o.h||0)+128>=camY&&o.y-128<=camY+visH)drawables.push(o);
+  const restPose=window.FarmRestVisual?.pose(player,currentScene);
+  _renderPlayer.x=restPose?.x??player.x;_renderPlayer.y=restPose?restPose.depth-10:player.y;
+  drawables.push(_renderPlayer);
   if(window.FarmWorldDepth)for(const o of objects)if(o.type==='pen')drawables.push(...FarmWorldDepth.penParts(o));
   if(window.FarmInteriorArt)for(const o of objects)if(o.type==='gh_frame')drawables.push(...FarmInteriorArt.parts(o));
   drawables.sort((a,b)=>{
@@ -20475,8 +20939,11 @@ function lerpColor(a,b,t){
   return [Math.round(a[0]+(b[0]-a[0])*t), Math.round(a[1]+(b[1]-a[1])*t), Math.round(a[2]+(b[2]-a[2])*t)];
 }
 
+let _hudElapsed=0;
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
+  // Sem simulação/renderização em abas ocultas; retoma sem acumular tempo.
+  if(document.hidden){requestAnimationFrame(loop);return;}
   // Cutscene avança independente do pause
   if(cutsceneActive) cutsceneT += dt;
   // Pause: skip update logic but keep rendering animated
@@ -20493,7 +20960,9 @@ function loop(now){
       window.FarmLearningJourney.observe(player.temp);
       checkWin();
     }
-    updateBars();
+    _hudElapsed+=dt;
+    if(_hudElapsed>=.1){updateBars(false);_hudElapsed%=.1;}
+    if(skinOpen)drawSkinView();
     // Background activity timers run across scenes (so soup keeps cooking
     // even while the player is on the main map)
     if(typeof updatePot === 'function') updatePot();

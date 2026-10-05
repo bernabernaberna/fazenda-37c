@@ -27,6 +27,14 @@
   let _ctx = null;
   let _master = null;
   const _voices=new Set(),_timers=new Set();
+  const _noiseCache=new Map(),_lastCue=new Map();
+  const _clock=()=>typeof performance!=='undefined'?performance.now():Date.now();
+  function _allow(name,interval=120){
+    if(_suspended||(typeof soundEnabled!=='undefined'&&!soundEnabled)||(typeof AudioManager!=='undefined'&&AudioManager.master<=0))return false;
+    const now=_clock(),last=_lastCue.get(name);
+    if(last!==undefined&&now-last<interval)return false;
+    _lastCue.set(name,now);return true;
+  }
   let _suspended=false;
   function _later(fn,ms){
     if(_suspended||(typeof soundEnabled!=='undefined'&&!soundEnabled)||(typeof AudioManager!=='undefined'&&AudioManager.master<=0))return;
@@ -37,7 +45,7 @@
     for(const voice of [..._voices]){try{voice.source.stop();}catch{}voice.cleanup();}
   }
   function _track(source,nodes){
-    if(_voices.size>=24){const old=_voices.values().next().value;try{old.source.stop();}catch{}old.cleanup();}
+    if(_voices.size>=12){const old=_voices.values().next().value;try{old.source.stop();}catch{}old.cleanup();}
     const voice={source,cleanup(){for(const node of nodes)try{node.disconnect();}catch{}_voices.delete(voice);}};
     _voices.add(voice);source.onended=voice.cleanup;
   }
@@ -77,7 +85,7 @@
   }
 
   // Play a single tone with envelope
-  function _tone({ freq, type='sine', dur=0.15, vol=0.3, attack=0.005, release=0.08, detune=0, filter=null }){
+  function _tone({ freq, type='sine', dur=0.15, vol=0.3, attack=0.005, release=0.08, detune=0, filter=null, pitchTo=null }){
     if(!_ensure()) return;
     const v = _vol();
     if(v <= 0) return;
@@ -86,6 +94,7 @@
     const gain = _ctx.createGain();
     osc.type = type;
     osc.frequency.value = freq;
+    if(pitchTo>0){osc.frequency.setValueAtTime(freq,t0);osc.frequency.exponentialRampToValueAtTime(pitchTo,t0+dur*.8);}
     if(detune) osc.detune.value = detune;
     let last = osc;
     const nodes=[osc,gain];
@@ -113,9 +122,13 @@
     if(v <= 0) return;
     const t0 = _ctx.currentTime;
     const sampleRate = _ctx.sampleRate;
-    const buf = _ctx.createBuffer(1, Math.ceil(sampleRate * dur), sampleRate);
-    const data = buf.getChannelData(0);
-    for(let i=0; i<data.length; i++) data[i] = (Math.random()*2 - 1);
+    const key=sampleRate+':'+dur;
+    if(!_noiseCache.has(key)){
+      const buf=_ctx.createBuffer(1,Math.ceil(sampleRate*dur),sampleRate),data=buf.getChannelData(0);
+      for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+      _noiseCache.set(key,buf);
+    }
+    const buf=_noiseCache.get(key);
     const src = _ctx.createBufferSource();
     src.buffer = buf;
     const lp = _ctx.createBiquadFilter();
@@ -174,7 +187,7 @@
       _noiseBurst({ dur: 0.32, vol: 0.18, filterFreq: 300, sweep: 800, filterType: 'lowpass' });
     },
     click(){
-      _tone({ freq: 1800, type: 'square', dur: 0.04, vol: 0.10, attack: 0.001, release: 0.025 });
+      _tone({ freq: 820, type: 'triangle', dur: 0.065, vol: 0.085, attack: 0.007, release: 0.05 });
     },
     door(){
       // Wood thump — low triangle + click
@@ -204,9 +217,10 @@
       }, 40);
     },
     sleep(){
-      // Soft "going to bed" two-note descent
-      _tone({ freq: 440, type: 'sine', dur: 0.30, vol: 0.22, release: 0.24 });
-      _later(()=>_tone({ freq: 330, type: 'sine', dur: 0.40, vol: 0.18, release: 0.30 }), 150);
+      // Tecido e duas notas graves, uma vez ao repousar. Sem ronco em loop.
+      _noiseBurst({dur:.24,vol:.055,filterFreq:430});
+      _tone({freq:330,dur:.48,vol:.105,attack:.04,release:.36});
+      _later(()=>_tone({freq:247,dur:.62,vol:.085,attack:.055,release:.5}),190);
     },
     pop(){
       _tone({ freq: 600, type: 'sine', dur: 0.06, vol: 0.20, attack: 0.002, release: 0.04 });
@@ -214,12 +228,46 @@
     spray(){
       _noiseBurst({ dur: 0.45, vol: 0.15, filterFreq: 3000, filterType: 'highpass', sweep: -1500 });
     },
+    dialogue(npcId,kind='greet'){
+      if(!_allow('dialogue',kind==='choice'?160:280))return false;
+      const identity={rosa:[294,440,'sine'],lia:[392,523,'sine'],tomas:[196,294,'triangle'],ines:[330,494,'sine'],caio:[262,349,'triangle'],nico:[440,587,'sine']};
+      const [low,high,type]=identity[npcId]||identity.rosa;
+      const pitch=kind==='close'?low:kind==='choice'?high:low;
+      _tone({freq:pitch,type,dur:kind==='greet'?.24:.13,vol:kind==='greet'?.12:.08,attack:.013,release:.1});
+      if(kind==='greet')_later(()=>_tone({freq:high,type,dur:.22,vol:.085,attack:.018,release:.17}),105);
+      return true;
+    },
+    pageTurn(){
+      if(!_allow('page',300))return false;
+      _noiseBurst({dur:.19,vol:.07,filterFreq:1000,sweep:-450});return true;
+    },
+    animal(kind='cow'){
+      // Só responde ao cuidado real. Todos compartilham cooldown: o cocho
+      // não dispara um coro, e andar junto ao cercado continua tranquilo.
+      if(!_allow('animal',2600))return false;
+      _noiseBurst({dur:.22,vol:.055,filterFreq:680});
+      if(kind==='sheep')_tone({freq:430,pitchTo:360,type:'triangle',dur:.29,vol:.09,attack:.035,release:.2,filter:{freq:1250}});
+      else if(kind==='chicken'||kind==='chick'){
+        _tone({freq:720,pitchTo:940,dur:.08,vol:.07,attack:.005,release:.055});
+        _later(()=>_tone({freq:980,pitchTo:740,dur:.11,vol:.065,attack:.009,release:.075}),130);
+      }else{
+        _tone({freq:105,pitchTo:76,type:'triangle',dur:.5,vol:.1,attack:.055,release:.34,filter:{freq:650}});
+        _tone({freq:212,pitchTo:152,dur:.44,vol:.04,attack:.06,release:.3});
+      }
+      return true;
+    },
   };
+
+  // Um contato E repetido não acumula fanfarras/estalos. As notas da mesma
+  // frase continuam livres; a barreira atua na ação, antes de agendar notas.
+  for(const [name,interval]of Object.entries({chimeOk:240,chimeBad:260,achievement:850,levelup:1100,sparkle:420,whoosh:350,click:75,door:350,bubble:800,splash:450,sleep:1400,pop:100,spray:600})){
+    const play=synthSfx[name];synthSfx[name]=function(){if(!_allow(name,interval))return false;play();return true;};
+  }
 
   synthSfx.syncVolume=_vol;
   synthSfx.stopAll=_stopAll;
   synthSfx.suspend=()=>{_suspended=true;_stopAll();return _ctx&&_ctx.state!=='closed'?_ctx.suspend():Promise.resolve();};
-  synthSfx.resume=()=>{_suspended=false;return _ctx&&_ctx.state==='suspended'?_ctx.resume():Promise.resolve();};
-  synthSfx.state=()=>({context:_ctx?.state||'not-created',voices:_voices.size,timers:_timers.size,master:_master?.gain.value??null});
+  synthSfx.resume=()=>{_suspended=false;const audible=(typeof soundEnabled==='undefined'||soundEnabled)&&(typeof AudioManager==='undefined'||AudioManager.master>0);return _ctx&&_ctx.state==='suspended'&&audible?_ctx.resume():Promise.resolve();};
+  synthSfx.state=()=>({context:_ctx?.state||'not-created',voices:_voices.size,timers:_timers.size,master:_master?.gain.value??null,noiseBuffers:_noiseCache.size,maxVoices:12});
   window.synthSfx = synthSfx;
 })();

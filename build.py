@@ -60,6 +60,8 @@ MODULE_ORDER = [
     "15-story-ui.js",         # diálogos com retratos e diário da comunidade
     "16-story-integration.js", # ponte com ações, saves, mundo e rotina dos NPCs
     "17-world-map.js",        # minimapa, mapa completo e destino de orientação
+    "18-object-queries.js",   # listas reutilizáveis por tipo para as consultas do mundo
+    "19-rest-visual.js",      # transição de descanso; dados visuais fora dos saves
     "20-achievements.js",     # achievement system (example extraction)
     "21-tile-themes.js",      # Fatia B: repaginação dos tiles (registerTileDrawer)
     "22-biome-mountain.js",   # Fatia C: bioma montanha nevada (cena via FarmBiomes)
@@ -76,7 +78,7 @@ MODULE_ORDER = [
     "50-window-glow.js",      # warm halos from house/barn windows at night
     "60-histology-annotations.js", # realtime science labels over the player
     "70-synth-sfx.js",        # procedural UI/feedback sounds via Web Audio API
-    "71-original-audio.js",   # banco sonoro original: 20 chaves sem gravações
+    "71-original-audio.js",   # banco sonoro original: 23 chaves sem gravações
     "80-teacher-mode.js",     # teacher telemetry: quiz performance to Supabase/local
     "90-ambient-synth.js",    # synthesized river water + night crickets ambience
     # add more modules here as the file is split further

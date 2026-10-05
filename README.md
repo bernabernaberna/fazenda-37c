@@ -5,6 +5,14 @@ a montanha e o deserto, converse com seis moradores e cuide dos animais
 enquanto aprende sobre a pele e a termorregulação. A história acompanha
 a reabertura da Casa das Sementes; a exploração continua depois dela.
 
+Os moradores têm **18 lembranças para descobrir e 36 respostas possíveis**.
+Suas escolhas ficam no diário, reaparecem nas conversas e abrem histórias
+depois da reabertura. Os NPCs também comentam ações recentes do jogador.
+
+A atualização melhora as poses de descanso, os sons de cada ambiente e
+as interações. O mundo e a interface receberam otimizações para reduzir
+trabalho repetido durante a partida.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar
@@ -18,10 +26,15 @@ abri-lo no navegador sem internet. O progresso é salvo no próprio navegador.
 | WASD | Caminhar |
 | Shift + movimento | Correr |
 | E | Interagir e conversar |
+| R | Descansar ou levantar |
 | G ou clique no minimapa | Abrir o mapa do vale |
 | I | Abrir a mochila |
 | Z | Alternar o zoom |
+| M | Ligar ou desligar os sons |
 | ESC | Fechar a tela aberta ou acessar o menu |
+
+Perto de uma cama, use E para deitar ou levantar. Começar a se mover também
+encerra o descanso. Conversas e o diário pausam a simulação enquanto você lê.
 
 ## Compilar
 

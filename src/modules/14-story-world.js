@@ -33,7 +33,7 @@
       routine:{day:'Tenta descobrir o que mudou na horta.',night:'Anota ideias para testar no dia seguinte.'}}
   ];
   const byId=Object.fromEntries(characters.map(c=>[c.id,c]));
-  const letter={title:'A carta de Rosa',text:'Meu bem,\n\nA Casa das Sementes está fechada há tempo demais. Ainda tenho as caixas, mas um vale não vive só de caixas. Lia guarda perguntas, Tomás guarda ferramentas, Inês conhece a montanha, Caio cuida do oásis e Nico não para de imaginar o que podemos fazer.\n\nVenha plantar alguma coisa comigo. Não precisa resolver tudo no primeiro dia. Quero ouvir de novo três ventos na mesma mesa: o da fazenda, o da montanha e o do oásis.\n\nCom carinho,\nRosa'};
+  const letter={title:'A carta de Rosa',text:'Meu bem,\n\nEncontrei uma semente no bolso do avental que você usava aqui. Ela ainda estava embrulhada naquele papel com três riscos. Você dizia que eram os três ventos do vale.\n\nA Casa das Sementes fechou depois que uma ventania soltou a placa e apagou nossas marcas da trilha. Consertamos o caminho, mas a mesa continuou vazia. Cada um ficou esperando uma ocasião melhor. Eu também.\n\nLia guarda perguntas, Tomás guarda ferramentas, Inês conhece a montanha, Caio cuida do oásis e Nico desenhou uma placa maior do que ele. Nenhum deles tem sozinho a história inteira.\n\nVenha plantar alguma coisa comigo. Não precisa resolver tudo no primeiro dia. Desta vez, não vamos esperar que a casa esteja perfeita para convidar as pessoas.\n\nGuardei uma cadeira.\nRosa'};
   const obj=(id,label,event,goal=1,match={})=>({id,text:label,event,goal,match});
   const chapters=[
     {id:'chegada',title:'1 · Uma carta, três ventos',npcId:'rosa',coins:10,
@@ -112,6 +112,112 @@
         ['lost','Minha tentativa não funcionou.','A minha também não, ontem. Podemos olhar o que faltou e fazer uma tentativa nova. Eu anoto o que fizemos, não uma história em que acertamos tudo.', 'Você e Nico combinaram olhar o que faltou antes de tentar novamente.'],
         ['partner','Quero ser seu parceiro nessa ideia.','Fechado! Você cuida de uma parte, eu guardo nossas perguntas. Quando terminar uma etapa, volte para contar. É muito mais interessante do que imaginar sozinho.', 'Nico passou a chamar você de parceiro de experiências.']]}
   };
+  // As lembranças são opcionais: ouvir não exige entregar itens, não cobra moedas
+  // e não fecha nenhum capítulo. Escolhas mudam a conversa, sem resposta "certa".
+  const lore={
+    rosa:[
+      {id:'rosa:caixa',title:'A caixa sem etiqueta',chapter:0,bond:0,
+        text:'Esta caixa ficou sem etiqueta de propósito. Antes da ventania, deixávamos aqui sementes de quem ainda não tinha escolhido um lugar para plantar. Você guardou uma e desenhou três riscos no papel.\n\nQuando a casa fechou, eu etiquetei tudo para não perder nada. Só esta escapou. Às vezes acho que foi ela que me lembrou de escrever sua carta.',
+        choices:[{label:'Vamos deixar espaço para quem ainda chegar.',reply:'Então a caixa continua sem nome. Não por esquecimento: por convite. Vou deixá-la na frente das outras.',memory:'Você e Rosa reservaram uma caixa para quem ainda chegar.',echo:'Deixei aquela caixa sem nome na frente. Já reparou como um espaço vazio pode parecer um convite?'},
+          {label:'Quero começar pela nossa semente.',reply:'Esta eu conheço pelo embrulho. Podemos começar com ela e continuar com as que vierem depois. Uma lembrança também pode criar raiz nova.',memory:'Você quis começar com a semente guardada por Rosa.',echo:'Separei o embrulho dos três riscos. A nossa primeira lembrança ainda cabe na palma da mão.'}]},
+      {id:'rosa:chave',title:'Quem guardou a chave',chapter:2,bond:8,
+        text:'Eu disse a todo mundo que guardaria a chave até terminarmos os reparos. Os reparos terminaram. Depois quis organizar as caixas. Depois esperei uma colheita melhor.\n\nA chave pesava quase nada, mas eu fui fazendo dela uma desculpa enorme. Não foi a ventania que manteve esta casa fechada por tanto tempo. Foi a vergonha de chamar os outros e descobrir que já não queriam voltar.',
+        choices:[{label:'Podemos convidar sem prometer perfeição.',reply:'Posso dizer: há uma mesa, falta um pouco de tudo, venha assim mesmo. É um convite bem mais honesto do que o que eu ensaiava.',memory:'Rosa decidiu convidar as pessoas antes de ter tudo pronto.',echo:'Ensaiando o convite de novo: há uma mesa, falta um pouco de tudo. Ainda gosto dessa versão.'},
+          {label:'Eu ficaria aqui enquanto você chama o pessoal.',reply:'Quero essa companhia. Não para você falar por mim; só para eu lembrar que a primeira cadeira já está ocupada.',memory:'Você ofereceu companhia enquanto Rosa recupera a coragem de convidar.',echo:'Quando vejo sua cadeira, fica mais fácil pensar no próximo convite.'}]},
+      {id:'rosa:mesa',title:'O lugar que não estava no desenho',chapter:6,bond:16,
+        text:'O desenho antigo da casa tinha cinco cadeiras. Quando você era pequeno, arrastava um caixote para a mesa e dizia que faltava uma. Tomás fez a sexta.\n\nAgora Nico quer contar as cadeiras antes de cada encontro. Eu pedi que contasse também quem está chegando pelo caminho. O lugar de alguém às vezes aparece antes no desejo do que no desenho.',
+        choices:[{label:'A próxima cadeira fica para uma nova história.',reply:'Vou pedir a Tomás uma cadeira simples. A pessoa que sentar nela é que vai torná-la diferente das outras.',memory:'Você e Rosa deixaram um lugar para uma nova história.',echo:'Ainda temos lugar para uma nova história. As cadeiras não encerram a contagem.'},
+          {label:'Quero ouvir o que mudou para cada um.',reply:'É assim que uma casa continua aberta: ouvindo mais de uma versão da mesma mesa. Procure os outros depois do encontro.',memory:'Você decidiu ouvir as versões dos moradores sobre a reabertura.',echo:'Depois me conte o que os outros enxergam nesta mesa. Minha versão já conhecemos.'}]}
+    ],
+    lia:[
+      {id:'lia:caderno',title:'A página que ficou em branco',chapter:0,bond:0,
+        text:'No meu primeiro caderno do vale, pulei uma página. Eu queria desenhar o que acontecia dentro da pele, mas só tinha observado o lado de fora. Achei que uma folha vazia parecia falta de trabalho.\n\nRosa escreveu na margem: "Aqui cabe a próxima pergunta." Guardei. Hoje separo o que observei, o que estou tentando explicar e o que ainda preciso conferir.',
+        choices:[{label:'Vamos guardar também as perguntas sem resposta.',reply:'Vou dar a elas uma página própria. Uma dúvida bem escrita pode orientar a observação de amanhã.',memory:'Você e Lia reservaram uma página para perguntas abertas.',echo:'Nossa página de perguntas abertas já tem uma dobra no canto. Continua sendo a mais consultada.'},
+          {label:'Quero comparar uma observação com outra.',reply:'Boa ideia. Primeiro anotamos em que contexto cada uma aconteceu. Se os contextos mudaram, essa diferença faz parte da comparação.',memory:'Você quis comparar observações com Lia sem esquecer o contexto.',echo:'Separei duas anotações para comparar. Desta vez comecei pelo contexto, como combinamos.'}]},
+      {id:'lia:janela',title:'A janela de três desenhos',chapter:3,bond:8,
+        text:'Eu ia ficar no vale só uma estação. Desenhei a montanha pela janela, depois a horta, depois a areia. Cada desenho parecia de um lugar diferente.\n\nCaio reconheceu a janela nos três. Disse que eu tinha encontrado um bom ponto para escutar o vale inteiro. Foi a primeira vez que pensei em ficar. Não por já saber tudo daqui, mas porque minhas perguntas finalmente tinham com quem conversar.',
+        choices:[{label:'Os três desenhos podem ir para a Casa das Sementes.',reply:'Posso levar cópias. Vou deixar um espaço ao lado para quem enxergar algo que eu não vi.',memory:'Lia levará seus três desenhos para a Casa das Sementes.',echo:'Os três desenhos estão separados. Nico já pediu um quarto: a vista debaixo da mesa.'},
+          {label:'O que você ainda quer descobrir por aqui?',reply:'Como as pessoas contam o mesmo caminho de maneiras tão diferentes. Sua próxima volta pode render uma conversa melhor que qualquer desenho meu.',memory:'Lia quer ouvir diferentes versões do mesmo caminho.',echo:'Ainda estou juntando versões do caminho. A sua também faz parte do caderno.'}]},
+      {id:'lia:rasura',title:'A rasura que ficou',chapter:6,bond:16,
+        text:'Nico pediu para copiar meu caderno para a reabertura. Eu comecei a limpar as rasuras. Ele perguntou: "Se apagar a pergunta antiga, como vou saber por que você mudou de ideia?"\n\nDeixei algumas. Na Casa das Sementes, os desenhos terão legenda e contexto; os rabiscos vão mostrar o percurso. Estudar também é poder explicar uma revisão.',
+        choices:[{label:'Vamos mostrar o que nos fez mudar de ideia.',reply:'Vou escrever isso na legenda. O desenho final conta o que penso agora; a rasura conta como cheguei até aqui.',memory:'Você e Lia decidiram mostrar como uma explicação foi revista.',echo:'A legenda das rasuras ficou pronta. É uma parte pequena da folha e grande da conversa.'},
+          {label:'Posso acrescentar minhas próprias perguntas?',reply:'Pode. Use outra cor para sabermos de quem veio cada pergunta. Este caderno não precisa ter uma só voz.',memory:'Lia abriu espaço no caderno para suas perguntas.',echo:'Guardei outra cor para suas perguntas. O caderno já não parece tão solitário.'}]}
+    ],
+    tomas:[
+      {id:'tomas:marca',title:'O risco na bancada',chapter:0,bond:0,
+        text:'Vê esse risco? Não é rachadura. É a medida da antiga placa. Depois da ventania, fiz uma nova exatamente igual. Guardei antes de pendurar.\n\nRosa ainda esperava as caixas, eu ainda esperava o encaixe perfeito. A placa ficou em cima da bancada tanto tempo que o sol marcou a madeira em volta. Uma peça pronta também pode ficar esperando demais.',
+        choices:[{label:'A marca pode ficar à vista.',reply:'Pode. Não enfraquece a tábua. E me poupa de fingir que a oficina sempre teve tudo no prazo.',memory:'Tomás decidiu deixar a marca da placa visível na bancada.',echo:'O risco continua na bancada. Ficou até mais fácil medir a próxima placa.'},
+          {label:'Vamos pendurar algo simples para começar.',reply:'Duas letras já dizem "entre" se a porta estiver aberta. Vou conferir os ganchos. O acabamento fazemos com o lugar funcionando.',memory:'Você e Tomás preferiram uma placa simples para começar.',echo:'Ganchos conferidos. A placa simples aguentou mais conversas do que eu tinha previsto.'}]},
+      {id:'tomas:cadeira',title:'A cadeira que balançava',chapter:2,bond:8,
+        text:'Minha primeira cadeira balançava. Rosa pôs um papel dobrado debaixo do pé e continuou a conversa. Eu queria que todo mundo levantasse para eu consertar.\n\nEla disse que podia esperar até o fim da história de Inês. Consertei depois. Foi a primeira vez que entendi a diferença entre uma coisa precisar de reparo e tudo precisar parar por causa dela.',
+        choices:[{label:'O encontro pode começar com o que temos.',reply:'Pode. Eu confiro se está firme. Depois deixo uma lista curta para os próximos reparos. Curta mesmo.',memory:'Tomás fará os reparos em etapas, com o encontro já funcionando.',echo:'Minha lista de reparos tem três linhas. Se aparecer a quarta, decido o que pode esperar.'},
+          {label:'Quero ajudar a conferir as cadeiras.',reply:'Empurre de leve, olhe os encaixes e me chame se alguma balançar. Gosto mais de duas pessoas conferindo do que de uma pessoa prometendo.',memory:'Você ofereceu ajuda para conferir as cadeiras com Tomás.',echo:'Conferi as cadeiras outra vez. Ainda tenho espaço para mais um par de olhos.'}]},
+      {id:'tomas:encaixe',title:'Uma peça de cada lugar',chapter:6,bond:16,
+        text:'A mesa nova tem três tipos de madeira. Uma peça veio das caixas de Rosa, outra do antigo abrigo de Inês, outra chegou na carga de Caio. Nenhuma tinha o tamanho certo sozinha.\n\nSe eu escondesse todas as emendas, ela pareceria ter vindo de um só lugar. Deixei duas aparecendo. Nico achou que era um mapa. Não vou discutir com ele.',
+        choices:[{label:'As emendas merecem uma história.',reply:'Então vou anotar de onde vieram. Só não vou escrever "obra de Tomás" por cima de seis pessoas carregando tábua.',memory:'Tomás registrará as origens das peças da mesa.',echo:'Anotei a origem das tábuas. A letra de Nico é maior, mas os nomes couberam.'},
+          {label:'Que peça podemos construir depois?',reply:'Uma prateleira baixa para as sementes. Quem é menor precisa alcançar também. Primeiro eu meço; depois vocês me dizem se ficou útil.',memory:'Tomás imaginou uma prateleira que todos possam alcançar.',echo:'Estou medindo aquela prateleira baixa. Se Nico alcança, já estamos no caminho certo.'}]}
+    ],
+    ines:[
+      {id:'ines:fita',title:'A fita da primeira curva',chapter:0,bond:0,
+        text:'Eu marcava esta curva com uma fita vermelha. A ventania levou a fita e cobriu duas pegadas. A trilha continuou aqui; a certeza de quem vinha é que sumiu.\n\nDepois eu comecei a andar sozinha para conferir tudo. Ficou tão natural que parei de perguntar quem queria vir junto. Um caminho pode estar inteiro e ainda assim deixar de ligar as pessoas.',
+        choices:[{label:'Vamos marcar os pontos de apoio juntos.',reply:'Primeiro a curva, depois o abrigo. Uma marca precisa ser compreendida por quem vai usá-la, não só por quem a desenhou.',memory:'Você e Inês combinaram conferir os pontos de apoio juntos.',echo:'Ainda começo pela curva e pelo abrigo. Agora lembro de perguntar se a marca faz sentido para quem chega.'},
+          {label:'Quero conhecer o caminho no meu ritmo.',reply:'Eu espero no próximo apoio. Se mudar de ideia, voltamos. A trilha não exige que duas pessoas deem passos iguais.',memory:'Inês respeitou seu ritmo para conhecer a montanha.',echo:'O próximo apoio continua lá. Seu ritmo não precisa combinar com o meu relógio.'}]},
+      {id:'ines:sino',title:'O sino que não era um aviso',chapter:4,bond:8,
+        text:'Tomás colocou um sino na Casa das Sementes. Eu pensei que seria para chamar ajuda da trilha. Rosa riu: era para avisar que havia conversa na mesa.\n\nNa última reunião antes da ventania, eu fui a última a chegar. Escutei o sino da curva e acelerei. Quando entrei, ainda estavam guardando uma cadeira. Ninguém tinha começado a contar sem mim.',
+        choices:[{label:'Desta vez também guardamos sua cadeira.',reply:'Vou levar uma história que ainda não contei inteira. Saber que há uma cadeira muda bastante o caminho de volta.',memory:'Você prometeu guardar uma cadeira para Inês.',echo:'Trouxe a história da curva. A parte mais bonita continua sendo a cadeira que ficou esperando.'},
+          {label:'O sino pode chamar sem apressar ninguém.',reply:'Gosto disso. Um som dizendo "há lugar" em vez de "corra". Vou contar a Tomás que entendi a diferença.',memory:'Inês imaginou o sino como convite, sem pressa.',echo:'Quando ouço o sino, penso no convite. Ficou mais fácil voltar sem transformar tudo em corrida.'}]},
+      {id:'ines:mapa',title:'O mapa que ganhou margens',chapter:6,bond:16,
+        text:'Meu mapa antigo mostrava as linhas entre os lugares. Seu caminho, o de Caio e o de Nico encheram as margens: uma pausa aqui, uma conversa ali, uma volta que valeu a pena.\n\nAinda preciso das linhas. Mas deixei de cortar as anotações para o mapa parecer limpo. O vale não ficou menor porque passei a caber menos certezas numa folha.',
+        choices:[{label:'Quero acrescentar os meus lugares de pausa.',reply:'Marque com uma pequena roda. Depois comparamos os lugares e o que mudou em cada viagem. Não precisa escolher um apoio para sempre.',memory:'Inês deixou espaço no mapa para seus lugares de pausa.',echo:'Reservei rodas pequenas nas margens. Seu próximo lugar de pausa pode entrar no mapa.'},
+          {label:'Podemos mostrar o mapa para os outros.',reply:'Deixo uma cópia na casa. Peço que anotem a data das mudanças. Um mapa também precisa poder ser revisto.',memory:'Inês fará uma cópia do mapa para a comunidade.',echo:'A cópia comunitária já tem uma anotação de Caio. Ele desenha palmeiras melhor que eu.'}]}
+    ],
+    caio:[
+      {id:'caio:recipiente',title:'O recipiente de três marcas',chapter:0,bond:0,
+        text:'Este recipiente tem três marcas no fundo. A menor é minha. As outras são de Rosa e Inês. Fizemos para reconhecer as reservas quando as caixas se encontravam na mesma mesa.\n\nDepois que a casa fechou, ainda levávamos coisas de um lugar a outro. Só parávamos menos para conversar. As cargas continuaram circulando; as histórias vieram ficando pelo caminho.',
+        choices:[{label:'Quero levar uma história junto das caixas.',reply:'Então me conte o que viu na próxima travessia. Deixo um espaço entre os recipientes: histórias não gostam de ser apertadas.',memory:'Você e Caio combinaram trocar histórias além de cargas.',echo:'Deixei um espaço entre as caixas para a história da sua próxima travessia.'},
+          {label:'Podemos deixar as marcas mais visíveis.',reply:'Posso contornar as três com tinta. Assim ninguém acha que esta reserva apareceu sozinha. Um recipiente também tem seus caminhos.',memory:'Caio destacará as três marcas no recipiente comunitário.',echo:'As três marcas ficaram visíveis. Agora até Nico pergunta de onde veio cada recipiente.'}]},
+      {id:'caio:espera',title:'A entrega que virou visita',chapter:5,bond:8,
+        text:'Uma vez a roda da minha carga soltou perto da fazenda. Fui pedir ferramenta a Tomás e fiquei para ouvir Lia. Quando consertamos, já era hora de voltar.\n\nEu disse que tinha perdido a tarde. No caminho, percebi que lembrava de três histórias e mal lembrava da roda. Desde então tento deixar um pouco de tempo sem encomenda. Ainda estou aprendendo.',
+        choices:[{label:'Sua próxima visita pode ser só uma visita.',reply:'Posso chegar com uma caixa menor. Ou sem caixa. Rosa vai estranhar primeiro e depois arranjar o que me oferecer.',memory:'Caio decidiu fazer uma visita sem depender de uma entrega.',echo:'Hoje separei tempo sem encomenda. Ainda estranho, mas já não parece tempo perdido.'},
+          {label:'Vamos levar as conversas para a trilha também.',reply:'A conversa muda quando a paisagem anda junto. Podemos combinar uma pausa e ouvir o que cada um chama de perto.',memory:'Você e Caio querem conversar também durante as travessias.',echo:'Tenho uma história para a próxima pausa da trilha. Prometo não transformar tudo em entrega.'}]},
+      {id:'caio:troca',title:'O que voltou na caixa vazia',chapter:6,bond:16,
+        text:'Na reabertura, levei recipientes e voltei com uma caixa quase vazia. Quase: Nico tinha deixado um desenho da mesa no fundo. Rosa pôs uma etiqueta: "para continuar".\n\nA caixa continua leve. Levo para lembrar que nem tudo o que trazemos de uma troca dá para contar na venda. Algumas coisas só aparecem quando a gente abre de novo.',
+        choices:[{label:'A próxima troca pode trazer outra lembrança.',reply:'Quero ver o que vem. Vou guardar o desenho sem dobrar por cima das pernas da mesa. Nico trabalhou muito nessas pernas.',memory:'Caio reservou a caixa para novas lembranças do vale.',echo:'A caixa das lembranças continua leve. Já não volto pensando que está vazia.'},
+          {label:'Vamos começar um caderno de travessias.',reply:'Uma página por viagem, sem obrigação de grande aventura. Às vezes basta lembrar por que resolvemos parar.',memory:'Você e Caio imaginaram um caderno de travessias.',echo:'Primeira página do caderno de travessias: parei, ouvi, voltei. Parece curta e já conta bastante.'}]}
+    ],
+    nico:[
+      {id:'nico:placa',title:'Sete desenhos para uma placa',chapter:0,bond:0,
+        text:'Eu fiz sete placas. A primeira tinha uma árvore. A segunda, três ventos. Na quinta, desenhei um vento, mas Rosa disse que parecia um macarrão fugindo.\n\nTomás perguntou para quem era a placa. Eu disse "para todo mundo". Ele respondeu: "Então começa com uma palavra que quem chega consiga ler." Foi assim que cheguei a "entre". Ainda cabe uma árvore pequena!',
+        choices:[{label:'Gostei do convite simples.',reply:'Então "entre" fica grande. O macarrão... quer dizer, o vento fica no canto. Assim cada desenho tem seu trabalho.',memory:'Você ajudou Nico a escolher uma placa com um convite simples.',echo:'A palavra "entre" continua maior que o desenho. O vento não gostou, mas ficou no canto.'},
+          {label:'Quero ver também os desenhos que não usamos.',reply:'Todos? Até o macarrão? Fechado! Vou guardar numa pasta chamada "caminhos até a placa". Uma pasta já é meu oitavo projeto.',memory:'Nico guardará também as tentativas que levaram à placa.',echo:'Guardei os sete desenhos. A pasta das tentativas acabou virando a coisa que mais mostro.'}]},
+      {id:'nico:semente',title:'A semente que ele puxou',chapter:2,bond:8,
+        text:'Posso contar uma coisa sem você rir primeiro? Desenterrei uma semente para ver se ela já tinha acordado. Depois outra, para comparar. No fim eu tinha duas sementes e nenhuma comparação boa.\n\nRosa não me deu outra caixa imediatamente. Sentou comigo para recontar os passos. Foi chato nos primeiros cinco segundos. Depois descobri onde minha pergunta tinha virado pressa.',
+        choices:[{label:'Vamos observar sem interromper tudo.',reply:'Combinado! Eu desenho, você observa, a planta cresce. Três atividades que finalmente podem acontecer ao mesmo tempo.',memory:'Você e Nico decidiram observar sem interromper o crescimento.',echo:'Hoje observei sem puxar. O desenho ficou maior, a planta ficou no lugar. Progresso dos dois lados!'},
+          {label:'Podemos anotar também o que não funcionou.',reply:'Vou escrever a tentativa com todos os passos. Sem transformar em uma história em que eu já sabia desde o começo.',memory:'Nico registrará as tentativas que não funcionaram.',echo:'Escrevi a tentativa toda. A parte da pressa não ficou bonita, mas ficou útil.'}]},
+      {id:'nico:amanha',title:'A página de amanhã',chapter:6,bond:16,
+        text:'Quando terminamos a placa, pensei que o meu caderno acabaria também. Só que Tomás falou da prateleira, Inês abriu o mapa e Caio perguntou o que a gente faria na próxima estação.\n\nDeixei uma página vazia. Desta vez não é porque não sei desenhar a coisa pronta. É porque a coisa ainda pode ser mais de uma. Você quer começar pela horta ou pela exploração?',
+        choices:[{label:'Vamos continuar as experiências da horta.',reply:'Nova página: horta! Quero comparar tentativas, fazer perguntas e lembrar de esperar. Essa última vai ter letras bem grandes.',memory:'Você e Nico escolheram continuar as experiências da horta.',echo:'A página da horta está aberta. Escrevi "esperar" grande o bastante para Rosa ler de longe.'},
+          {label:'Quero descobrir novos detalhes pelo vale.',reply:'Exploração! Vou marcar o que já vimos e deixar espaço para os detalhes pequenos. Não precisa encontrar um lugar novo para enxergar uma coisa nova.',memory:'Você e Nico decidiram procurar novos detalhes no vale.',echo:'Reservei páginas para os detalhes pequenos do vale. Se eu fizer outra seta, você me avisa?'}]}
+    ]
+  };
+  const loreById=Object.fromEntries(IDS.flatMap(id=>lore[id].map(s=>[s.id,{...s,npcId:id}])));
+  const knownLore=id=>typeof id==='string'&&Object.prototype.hasOwnProperty.call(loreById,id);
+  const greetings={
+    rosa:['A cadeira perto das caixas está livre. Chegue um pouco mais.','Ouvi seus passos antes de ver o chapéu. Quer uma conversa curta ou uma história comprida?','Estava guardando esta caixa, mas ela pode esperar enquanto você me conta do caminho.'],
+    lia:['O que mudou desde a nossa última conversa? Pode começar por uma coisa pequena.','Acabei de fechar uma anotação e abrir outra pergunta. Você chegou na hora certa.','Eu estava comparando dois desenhos. Sua volta pode acrescentar um terceiro ponto de vista.'],
+    tomas:['Pode chegar. Guardei o serrote; agora consigo escutar.','Bancada firme, ferramenta no lugar. O que temos para combinar?','Esta peça não precisa de minha atenção o tempo inteiro. Fale.'],
+    ines:['Chegou. Antes do próximo caminho, podemos parar aqui um instante.','Estou conferindo a curva. Qual parte da sua viagem ficou na memória?','Há tempo para escutar. A próxima ronda começa depois desta conversa.'],
+    caio:['Uma visita! Vou afastar a caixa para caber também uma conversa.','A trilha trouxe você de novo. Hoje chegou com alguma história nas botas?','Reservas conferidas. Podemos contar outras coisas além de recipientes.'],
+    nico:['Você voltou! Tenho uma pergunta. Hoje escolhi só uma, olha o avanço!','Guardei o desenho para ouvir você primeiro. Mas posso mostrar depois?','Parceiro! Separei uma página. Pode ser para a sua história ou para uma ideia nossa.']
+  };
+  const actionReactions={
+    rosa:{plant:'Vi que você voltou a plantar. Já estou pensando em como guardar as histórias dessas sementes.',harvest:'A colheita chegou! Quero saber qual planta fez você esperar mais.',rest:'Fez uma pausa? Que bom. Também deixei uma caixa para depois; não fugiu.',sell:'Ouvi a tampa da caixa de venda. Um trabalho encerrado deixa espaço para o próximo.'},
+    lia:{skin:'Você abriu a Visão da Pele. Que detalhe quis observar desta vez?',quiz:'Você voltou depois de uma questão. Quero ouvir o que o feedback fez você revisar.',rest:'Uma pausa protegida entrou no seu percurso. Podemos comparar o contexto antes e depois.',use:'Você usou uma reserva. Essa ação também faz parte do contexto que observamos.'},
+    tomas:{harvest:'Vi caixa chegando da horta. Vou deixar a bancada livre para ela.',sell:'A caixa de venda trabalhou. Agora podemos planejar a próxima entrega sem empilhar promessas.',collect:'Trouxe material do caminho? Tenho um canto da bancada para conferir sem pressa.'},
+    ines:{collect:'Você voltou com uma reserva da viagem. O caminho também serve para aprender onde parar.',equip:'Conferiu o casaco. Gosto de ver preparo antes do próximo trecho.',rest:'Uma pausa faz parte da rota. No meu mapa ela ganha uma marca, não uma rasura.',visit:'Você atravessou uma região. O que mudou entre um trecho e outro?'},
+    caio:{collect:'Você conheceu um ponto de reserva. Quero ouvir como foi chegar até ele.',use:'Usou uma reserva e seguiu o caminho. A próxima visita pode trazer uma observação diferente.',water:'A água chegou às plantas. É bom ver os dois lados da travessia se encontrando.',visit:'Tem poeira de outro trecho nas botas. O caminho de hoje pareceu com o de ontem?'},
+    nico:{plant:'Você plantou! Vou desenhar o cantinho sem puxar a semente para conferir.',water:'Vi a rega. Já anotei esse passo antes de inventar o próximo.',harvest:'Tem colheita nova! Agora minha placa aponta para algo que aconteceu de verdade.',quiz:'Respondeu uma questão? Quero saber qual pergunta ficou depois da resposta.'}
+  };
   const jobDefs={
     rosa:[['Caixas com futuro','Colha novos produtos para Rosa separar as caixas da próxima estação.',[obj('harvest','Colha 2 produtos após aceitar','harvest',2)]],
       ['Sementes para outra tentativa','Abra três novos plantios para a próxima experiência de Rosa.',[obj('plant','Plante 3 sementes após aceitar','plant',3)]]],
@@ -127,11 +233,13 @@
       ['Antes da placa','Faça duas colheitas para Nico ter algo real para mostrar.',[obj('harvest','Colha 2 produtos maduros','harvest',2)]]]
   };
   let adapter={}, initialized=false, dialogue=null, state;
+  const noticeLines={};
   function ctx(value){
     const s=plain(value)?value:(typeof adapter.readState==='function'?adapter.readState():{});
     return {season:season(s?.season),timeOfDay:Number.isFinite(s?.timeOfDay)?Math.max(0,Math.min(24,s.timeOfDay)):12,
       region:['farm','mountain','desert'].includes(s?.region)?s.region:'farm',scene:text(s?.scene,24)||'main',
-      playerName:text(s?.playerName,40)||'viajante',activities:plain(s?.activities)?s.activities:{}};
+      playerName:text(s?.playerName,40)||'viajante',activities:plain(s?.activities)?s.activities:{},
+      energy:Number.isFinite(s?.energy)?Math.max(0,Math.min(100,s.energy)):100,resting:s?.resting===true};
   }
   function recordFor(def){return {status:'offered',counts:Object.fromEntries(def.objectives.map(o=>[o.id,0])),acceptedAt:null,paid:false};}
   function jobDefinition(npcId,which=state.season,cycleId=state.cycleId){
@@ -142,7 +250,8 @@
   function fresh(context){return {version:VERSION,chapterIndex:0,main:chapters.map(recordFor),season:context.season,cycleId:1,
     jobs:{},friendships:Object.fromEntries(IDS.map(id=>[id,0])),memories:[],flags:{},
     sequence:0,events:Object.fromEntries(EVENTS.map(e=>[e,0])),coinsEarned:0,chaptersCompleted:0,jobsCompleted:0,
-    lastRegion:context.region,recentEventIds:[],log:[]};}
+    lastRegion:context.region,recentEventIds:[],log:[],discoveries:[],decisions:{},
+    visits:Object.fromEntries(IDS.map(id=>[id,0])),recentActions:[],spokenActions:Object.fromEntries(IDS.map(id=>[id,0]))};}
   function emit(name,payload){if(typeof adapter[name]==='function')try{adapter[name](payload);}catch(e){console.warn('[história] '+name,e);}}
   function friendship(id,points){state.friendships[id]=Math.min(100,state.friendships[id]+points);}
   function remember(id,npcId,message){
@@ -155,6 +264,8 @@
     const c=byId[npcId];dialogue={npcId,speaker:c?c.name:'Rosa',role:c?c.role:'A carta que trouxe você ao vale',
       title:title||'Conversa com '+(c?c.name:'Rosa'),text:message,kind,
       choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:kind==='response'};
+    // Respostas com escolhas conservam avanço por API; a UI exibe só as respostas
+    // explícitas para não duplicar "continuar" ao lado de "continuar a conversa".
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
@@ -163,6 +274,21 @@
   function objectives(def,data){return def.objectives.map(o=>({id:o.id,text:o.text,n:num(data?.counts?.[o.id],o.goal),goal:o.goal}));}
   function complete(def,data){return def.objectives.every(o=>num(data.counts[o.id],o.goal)>=o.goal);}
   function objectiveLine(list){return list.map(o=>o.text+' ('+o.n+'/'+o.goal+')').join(' · ');}
+  function unlocked(scene){return scene.chapter===6?state.chapterIndex===6:state.chapterIndex>=scene.chapter||state.friendships[scene.npcId]>=scene.bond;}
+  function discoveryViews(){return state.discoveries.map(id=>{
+    const scene=loreById[id],choice=scene.choices[state.decisions[id]];
+    return {id,npcId:scene.npcId,title:scene.title,text:scene.text,response:choice?.memory||'',answered:!!choice};
+  });}
+  function nextLore(npcId){return lore[npcId].find(scene=>!state.discoveries.includes(scene.id)&&unlocked({...scene,npcId}));}
+  function decisionEcho(npcId){
+    for(const scene of [...lore[npcId]].reverse())if(Number.isInteger(state.decisions[scene.id]))return scene.choices[state.decisions[scene.id]].echo;
+    return '';
+  }
+  function noticeActivity(npcId){
+    const last=state.recentActions.slice().reverse().find(a=>a.sequence>state.spokenActions[npcId]&&actionReactions[npcId][a.event]);
+    noticeLines[npcId]=last?actionReactions[npcId][last.event]:'';
+    if(last){state.spokenActions[npcId]=last.sequence;return true;}return false;
+  }
   // Consequências derivadas dos capítulos pagos: carregar não constrói nem paga de novo.
   function worldState(){
     const n=state.chapterIndex,open=n===chapters.length;
@@ -188,7 +314,10 @@
     });
     return {version:VERSION,chapter:chapterView,quests,friendships:clone(state.friendships),memories:clone(state.memories),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letter),
-      coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState()};
+      coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
+      discoveries:discoveryViews(),discoveryTotal:Object.keys(loreById).length,
+      relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
+        discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length}))};
   }
   function grant(def,data,kind){
     if(data.paid || data.status!=='ready') return false;
@@ -236,15 +365,19 @@
     if(state.sequence>=LIMIT){
       state.sequence=0;
       for(const data of [...state.main,...Object.values(state.jobs)])if(data.acceptedAt!==null)data.acceptedAt=0;
+      state.recentActions=[];for(const id of IDS)state.spokenActions[id]=0;
     }
     state.sequence++;state.events[event]=Math.min(LIMIT,state.events[event]+amount);
+    const reactive=IDS.some(id=>actionReactions[id][event]);
+    if(reactive){state.recentActions.push({event,sequence:state.sequence,item:text(payload.item,32),correct:payload.correct===true});state.recentActions=state.recentActions.slice(-6);}
     let dirty=false;const c=chapter();if(c)dirty=progress(c,state.main[state.chapterIndex],event,payload,amount);
     for(const npcId of IDS){const job=state.jobs[npcId];if(job)dirty=progress(jobDefinition(npcId),job,event,payload,amount)||dirty;}
-    if(dirty)changed();return dirty;
+    if(dirty||reactive)changed();return dirty;
   }
   function menu(npcId,preamble){
     const c=byId[npcId],s=ctx(),ch=chapter(),q=state.jobs[npcId],choices=[];
-    let message=preamble||((s.timeOfDay>=19 || s.timeOfDay<6)?chats[npcId].night:chats[npcId][s.season]);
+    const night=s.timeOfDay>=19||s.timeOfDay<6,visit=state.visits[npcId]||1;
+    let message=preamble||(night?chats[npcId].night:visit%3===1?chats[npcId][s.season]:greetings[npcId][(visit-1)%greetings[npcId].length]);
     if(!preamble && state.chapterIndex===6){
       const after={rosa:'Você está ouvindo? Esse barulho de caixa abrindo e gente chegando era o que faltava nesta casa. Sua cadeira fica aqui perto da minha.',
         lia:'Separei uma ponta da mesa para desenhos e amostras. Nico já ocupou metade com perguntas. Acho que combinamos bem.',
@@ -252,19 +385,15 @@
         ines:'Deixei uma cesta de lã na Casa das Sementes. É bom chegar da trilha e reconhecer as vozes antes de ver a porta.',
         caio:'Na primeira visita eu trouxe uma caixa. Agora sempre volto levando outra. A troca finalmente tem caminho de ida e de volta.',
         nico:'A placa está pronta! Errei uma letra e Tomás me emprestou uma lixa. Ficou uma marca pequena. Rosa pediu para deixar: agora a placa também tem história.'};
-      message=after[npcId];
+      message=visit%3===1?after[npcId]:greetings[npcId][(visit-1)%greetings[npcId].length];
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
     const activity=text(s.activities[npcId],180);
-    if(!preamble && activity)message+='\n\n'+activity;
-    if(!preamble && state.friendships[npcId]>=12){
-      const familiar={rosa:'Já não preciso explicar onde guardo as caixas: você está ajudando a dar novas histórias a elas.',
-        lia:'Nossas conversas já têm perguntas que vale retomar. Gosto de como você volta para observar outra vez.',
-        tomas:'Com você eu já posso partir de um combinado anterior. Isso economiza mais trabalho que qualquer ferramenta.',
-        ines:'Já conhecemos um pedaço do caminho juntos. Ainda conferimos o próximo passo, mesmo entre conhecidos.',
-        caio:'Quem volta para conversar deixa de ser só alguém de passagem. Há um lugar para você nesta troca.',
-        nico:'Parceiro de experiências! Tenho outra pergunta, mas desta vez comecei olhando o que já fizemos.'};
-      message+='\n\n'+familiar[npcId];
+    if(!preamble){
+      const echo=decisionEcho(npcId),notice=noticeLines[npcId];
+      const extra=notice||((visit%3===0&&echo)?echo:activity);
+      if(extra)message+='\n\n'+extra;
+      if(s.energy<25&&npcId==='rosa')message+='\n\nMinha cadeira está aqui. Se precisar de uma pausa, não tem caixa que valha sua pressa.';
     }
     if(ch && ch.npcId===npcId){
       const main=state.main[state.chapterIndex];
@@ -281,6 +410,10 @@
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
     else message+='\n\nSeu pedido desta estação já foi entregue. Na próxima estação combinamos outro.';
+    const pending=lore[npcId].find(scene=>state.discoveries.includes(scene.id)&&state.decisions[scene.id]===undefined);
+    const next=pending||nextLore(npcId);
+    if(next)choices.push({id:'lore:'+next.id,label:(pending?'Retomar: ':'Ouvir lembrança: ')+next.title});
+    if(state.discoveries.some(id=>loreById[id].npcId===npcId))choices.push({id:'lore:revisit',label:'Revisitar suas histórias'});
     for(const [id,label]of chats[npcId].topics)choices.push({id:'chat:'+id,label});
     choices.push({id:'memory',label:'Você lembra do que já fizemos?'},{id:'close',label:'Até depois'});
     return show(npcId,message,'menu',choices);
@@ -290,6 +423,7 @@
     if(!byId[npcId])return null;
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
+    state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
     record('talk',{npcId});
     return menu(npcId,first?chats[npcId].first:undefined);
   }
@@ -297,6 +431,25 @@
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
     if(choiceId==='back')return menu(npcId);
+    if(choiceId==='lore:revisit'){
+      const found=state.discoveries.filter(id=>loreById[id].npcId===npcId);
+      return show(npcId,'Cada lembrança ganhou um lugar no nosso caminho. Qual você quer ouvir de novo?','lore-list',
+        [...found.map(id=>({id:'lore:'+id,label:loreById[id].title})),{id:'back',label:'Voltar à conversa'}],'Histórias de '+byId[npcId].name);
+    }
+    if(choiceId.startsWith('lore:')){
+      const scene=loreById[choiceId.slice(5)];if(!scene||scene.npcId!==npcId||!unlocked(scene))return currentDialogue();
+      if(!state.discoveries.includes(scene.id)){state.discoveries.push(scene.id);friendship(npcId,2);log('discovery',scene.id);changed();}
+      const previous=state.decisions[scene.id],answered=Number.isInteger(previous);
+      return show(npcId,scene.text+(answered?'\n\n'+scene.choices[previous].echo:''),'lore',answered?
+        [{id:'back',label:'Voltar à conversa'},{id:'close',label:'Guardar a lembrança'}]:
+        [...scene.choices.map((c,i)=>({id:'reply:'+scene.id+':'+i,label:c.label})),{id:'close',label:'Quero pensar nisso; volto depois'}],scene.title);
+    }
+    if(choiceId.startsWith('reply:')){
+      const match=/^reply:(.+):([01])$/.exec(choiceId),scene=match&&loreById[match[1]],which=match?Number(match[2]):-1;
+      if(!scene||scene.npcId!==npcId||!state.discoveries.includes(scene.id)||state.decisions[scene.id]!==undefined)return currentDialogue();
+      const choice=scene.choices[which];state.decisions[scene.id]=which;friendship(npcId,1);remember('lore:'+scene.id,npcId,choice.memory);log('decision',scene.id);changed();
+      return show(npcId,choice.reply,'response',[{id:'back',label:'Continuar a conversa'},{id:'close',label:'Até depois'}],scene.title);
+    }
     if(npcId==='rosa' && state.chapterIndex===6 && ['community:gather','community:release'].includes(choiceId)){
       const gathering=choiceId==='community:gather';state.flags.communityGathering=gathering;
       if(gathering)remember('community:first-meeting','rosa','Você chamou os seis moradores para um encontro na Casa das Sementes.');
@@ -351,7 +504,13 @@
       const topic=chats[npcId].topics.find(t=>t[0]===choiceId.slice(5));if(!topic)return currentDialogue();
       const key='topic:'+npcId+':'+topic[0],again=state.flags[key];
       if(!again){state.flags[key]=true;friendship(npcId,2);remember(key,npcId,topic[3]);changed();}
-      return show(npcId,(again?'Lembro de termos falado disso. ':'')+topic[2],'response',[{id:'back',label:'Continuar a conversa'},{id:'close',label:'Até depois'}]);
+      const followUp={rosa:'Lembro da nossa conversa. Desde então, a caixa parece guardar também o que você trouxe para a história.',
+        lia:'Lembro da pergunta. Retomá-la depois de observar outra vez pode mudar nossa explicação.',
+        tomas:'Lembro do combinado. O que fizemos depois dele vale mais que repetir minha primeira promessa.',
+        ines:'Lembro do caminho que discutimos. Hoje eu começaria conferindo o próximo apoio de novo.',
+        caio:'Lembro dessa troca. Na próxima travessia, podemos escutar o que ficou faltando desta vez.',
+        nico:'Lembro! Anotei nossa ideia. Se tentarmos de novo, quero comparar os passos, não só a última caixa.'};
+      return show(npcId,again?followUp[npcId]+'\n\n'+(decisionEcho(npcId)||topic[2]):topic[2],'response',[{id:'back',label:'Continuar a conversa'},{id:'close',label:'Até depois'}]);
     }
     return currentDialogue();
   }
@@ -384,11 +543,16 @@
     for(let i=state.chapterIndex+1;i<6;i++)state.main[i]=recordFor(chapters[i]);
     for(const npcId of IDS){
       state.friendships[npcId]=num(saved.friendships?.[npcId],100);
+      state.visits[npcId]=num(saved.visits?.[npcId]);state.spokenActions[npcId]=Math.min(state.sequence,num(saved.spokenActions?.[npcId]));noticeLines[npcId]='';
       if(plain(saved.jobs?.[npcId]))state.jobs[npcId]=sanitizeRecord(saved.jobs[npcId],jobDefinition(npcId,state.season,state.cycleId),state.sequence);
     }
     const validFlags=new Set(['casaAberta','communityGathering',...IDS.map(id=>'met:'+id),...IDS.map(id=>'greet:'+id),
       ...IDS.flatMap(id=>chats[id].topics.map(t=>'topic:'+id+':'+t[0]))]);
     if(plain(saved.flags))for(const key of validFlags)if(saved.flags[key]===true)state.flags[key]=true;
+    state.discoveries=[...new Set((Array.isArray(saved.discoveries)?saved.discoveries:[]).filter(knownLore))].slice(0,18);
+    if(plain(saved.decisions))for(const id of state.discoveries)if(saved.decisions[id]===0||saved.decisions[id]===1)state.decisions[id]=saved.decisions[id];
+    for(const a of (Array.isArray(saved.recentActions)?saved.recentActions:[]).slice(-6))if(plain(a)&&EVENTS.includes(a.event)&&Number.isFinite(a.sequence)&&a.sequence>0&&a.sequence<=state.sequence)
+      state.recentActions.push({event:a.event,sequence:num(a.sequence),item:text(a.item,32),correct:a.correct===true});
     state.flags.casaAberta=state.chapterIndex===6;if(!state.flags.casaAberta)delete state.flags.communityGathering;
     const seen=new Set();
     for(const m of (Array.isArray(saved.memories)?saved.memories:[]).slice(-72)){
@@ -410,6 +574,6 @@
     init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh(ctx());initialized=true;}return snapshot();},
     interact,currentDialogue,choose,advance,close,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
     serialize:()=>clone(state),restore,
-    reset(value){state=fresh(ctx(value));close();changed();return snapshot();}
+    reset(value){state=fresh(ctx(value));for(const id of IDS)noticeLines[id]='';close();changed();return snapshot();}
   };
 })();

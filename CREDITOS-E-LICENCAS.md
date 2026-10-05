@@ -1,8 +1,8 @@
 # Créditos e Licenças — Fazenda 37 °C
 
-**Estado da distribuição de 02/10/2026:** o jogo atual usa áudio gerado por
+**Estado da distribuição de 05/10/2026:** o jogo atual usa áudio gerado por
 código (`70-synth-sfx.js`, `71-original-audio.js`, `90-ambient-synth.js` e a
-trilha `AmbientMusic`). As 20 chaves do banco original usam fórmulas, ruído
+trilha `AmbientMusic`). As 23 chaves do banco original usam fórmulas, ruído
 com sementes próprias e envelopes, sem gravações externas. O empacotador
 inclui apenas arquivos de áudio efetivamente referenciados; nesta versão,
 nenhum OGG é distribuído. A pasta histórica `audio/` foi preservada no projeto.
@@ -46,11 +46,12 @@ As licenças mais comuns e o que cada uma exige:
 
 ### 1.2 Banco sintetizado atual
 Ambientes, passos, respiração estilizada, dentes batendo, pulsação e as dez
-ações são gerados em `71-original-audio.js`. Interface e quiz usam também o
+ações e três novos ambientes internos/desérticos são gerados em `71-original-audio.js`. Interface e quiz usam também o
 módulo 70; água/grilos, o módulo 90; a trilha é gerada por `AmbientMusic`.
 O código não carrega amostras nem gravações de terceiros. A regressão
-`tools/validar-audio-original.cjs` verifica 20 sinais, reprodução, volumes,
-loops e limpeza. A escuta humana no aparelho da apresentação permanece um
+`tools/validar-audio-original.cjs` verifica 23 sinais, reprodução, volumes,
+loops e limpeza. A auditoria `tools/validar-audio-v4.cjs` verifica também
+saudações, cuidado dos animais, descanso, música, mute e troca de aba. A escuta humana no aparelho da apresentação permanece um
 ensaio recomendado; testes de sinal não avaliam a qualidade percebida.
 
 ---
@@ -120,4 +121,4 @@ lançamento:
 
 ---
 
-*Última atualização: 02/10/2026. Mantenha este arquivo versionado junto ao código.*
+*Última atualização: 05/10/2026. Mantenha este arquivo versionado junto ao código.*

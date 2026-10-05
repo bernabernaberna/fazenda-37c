@@ -1,7 +1,7 @@
 /* Ponte pequena entre mundo, narrativa e UI. A fonte principal chama os hooks. */
 (function(){
   'use strict';
-  let active=false, restoring=false, pendingSave=false;
+  let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
   const actors=[];
   const homes={};
   let navigation=null,navVersion='',community={x:608,y:1260};
@@ -36,7 +36,8 @@
   const read=()=>({season:currentSeason,timeOfDay,region:currentRegion(),scene:currentScene,
     playerName:player.name,name:player.name,gender:player.gender,x:worldPosition().x,y:worldPosition().y,
     worldWidth:scenes.main.MW*TS,worldHeight:scenes.main.MH*TS,npcs:actors,
-    inventory:player.inv,coatEquipped:player.coatEquipped,activities:activityLines,community:{...community}});
+    inventory:player.inv,coatEquipped:player.coatEquipped,energy:player.en,resting:player.resting===true,
+    activities:activityLines,community:{...community}});
   function safePoint(x,y){
     const main=scenes.main;const tx=Math.floor(x/TS),ty=Math.floor(y/TS),t=main.map[ty]?.[tx];
     if(t===undefined||[T.WATER,T.RIVER,T.OASIS,T.FENCE].includes(t))return false;
@@ -106,7 +107,14 @@
           pendingSave=true;queueMicrotask(()=>{pendingSave=false;if(gameStarted&&!restoring)saveGame(true);});
         }
       },
-      onDialogue(d){if(d)beforeOpen();FarmStoryUI.showDialogue(d);}
+      onDialogue(d){
+        if(d)beforeOpen();FarmStoryUI.showDialogue(d);
+        if(!restoring&&gameStarted){
+          if(d)window.synthSfx?.dialogue?.(d.npcId,dialogueSoundNpc===d.npcId?'choice':'greet');
+          else if(dialogueSoundNpc)window.synthSfx?.dialogue?.(dialogueSoundNpc,'close');
+        }
+        dialogueSoundNpc=d?.npcId||'';
+      }
     });
     for(const def of FarmStoryWorld.characters)place(def);
     rebuildNavigation();
@@ -163,7 +171,13 @@
       // Lugares ao redor da praça; espaço entre corpos e frente da porta livres.
       const seats=[[-48,16],[-16,32],[16,32],[48,16],[48,48],[-48,48]],seat=seats[index];
       return {key:'gather:'+community.x+':'+community.y,x:community.x+seat[0],y:community.y+seat[1],
-        activity:'talk',label:'Encontro na Casa das Sementes',line:'Vim para o encontro. É bom ver a mesa cercada de gente outra vez.'};
+        activity:'talk',label:'Encontro na Casa das Sementes',line:{
+          rosa:'Guardei a caixa sem etiqueta perto da porta. Um encontro também precisa de lugar para quem ainda chegar.',
+          lia:'Trouxe os três desenhos e uma página em branco. Hoje quero mais vozes nas margens do caderno.',
+          tomas:'Todas as cadeiras conferidas. Agora vou sentar em uma delas antes de inventar outro reparo.',
+          ines:'Da curva ouvi o movimento da casa. A última parte do caminho ficou mais leve que a primeira.',
+          caio:'Minha caixa está encostada na parede. Hoje vim para a conversa que não cabe dentro dela.',
+          nico:'A placa ficou um pouco torta. Eu ia endireitar, mas todo mundo entrou sem problema. Posso sentar também?'}[o.npcId]};
     }
     return {key:'routine:'+band,x:home.x+normal.dx,y:home.y+normal.dy,...normal};
   }

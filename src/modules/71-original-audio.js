@@ -8,8 +8,8 @@
 (function(){
   const TAU=Math.PI*2, SAMPLE_RATE=24000, MAX_EFFECTS=16;
   const BANK={
-    farm_ambience:{duration:12,loop:true,seed:37001,label:'Campo: brisa e pequenos chamados sintetizados'},
-    birds_loop:{duration:8,loop:true,seed:37002,label:'Pássaros estilizados por senóides moduladas'},
+    farm_ambience:{duration:12,loop:true,seed:37001,label:'Campo: brisa leve sem duplicar os pássaros'},
+    birds_loop:{duration:18,loop:true,seed:37002,label:'Pássaros distantes em frases espaçadas'},
     cicadas_loop:{duration:6,loop:true,seed:37003,label:'Cigarras estilizadas por pulsos agudos'},
     cold_wind:{duration:8,loop:true,seed:37004,label:'Vento frio por ruído filtrado e ondulações'},
     fireplace:{duration:6,loop:true,seed:37005,label:'Lareira por rumble e estalos de ruído'},
@@ -27,9 +27,12 @@
     coat_equip:{duration:0.52,loop:false,seed:37017,label:'Casaco: movimento de tecido'},
     death_sound:{duration:1.15,loop:false,seed:37018,label:'Fim da tentativa: sinal musical descendente'},
     wool_collect:{duration:0.56,loop:false,seed:37019,label:'Coleta de lã: textura macia e toque'},
-    fire_action:{duration:0.48,loop:false,seed:37020,label:'Acender fogo: fricção, estalo e sopro'}
+    fire_action:{duration:0.48,loop:false,seed:37020,label:'Acender fogo: fricção, estalo e sopro'},
+    room_tone:{duration:10,loop:true,seed:37021,label:'Casa: ar abafado e madeira discreta'},
+    desert_breeze:{duration:12,loop:true,seed:37022,label:'Deserto: brisa seca com grãos finos'},
+    barn_room:{duration:14,loop:true,seed:37023,label:'Celeiro: madeira e palha em intervalos longos'}
   };
-  let ctx=null, output=null, enabled=true, preparing=null, master=0.75;
+  let ctx=null, output=null, enabled=true, preparing=null, master=0.75,suspended=false;
   const buffers=new Map(), prepared=new Map(), voices=new Map();
   const stepBuffers=new Map();
   const footsteps={x:null,y:null,scene:null,distance:0,count:0,surface:null,phase:null,mode:'distance'};
@@ -64,12 +67,14 @@
     if(stop)for(const [audio,voice]of [...voices])if(voice.footstep)audio.pause();
   }
   function playFootstep(surface,running){
-    if(!enabled||master<=0)return false;
+    if(!enabled||master<=0||suspended)return false;
     if(!['grass','dirt','sand','snow','stone','wood'].includes(surface))surface='grass';
     const c=ensure();if(c.state==='suspended')c.resume().catch(()=>{});
     const variant=footsteps.count%4,key=surface+':'+variant;
     if(!stepBuffers.has(key)){const pcm=generateFootstep(surface,variant),b=c.createBuffer(1,pcm.length,SAMPLE_RATE);b.copyToChannel(pcm,0);stepBuffers.set(key,b);}
     const source=c.createBufferSource(),gain=c.createGain();source.buffer=stepBuffers.get(key);
+    const steps=[...voices].filter(([,voice])=>voice.footstep);
+    if(steps.length>=4)steps[0][0].pause();
     const relative=running?.31:.24;gain.gain.value=relative*master;source.connect(gain);gain.connect(output);
     const audio={loop:false,pause(){try{source.stop();}catch{}cleanup();}};
     function cleanup(){source.disconnect();gain.disconnect();voices.delete(audio);}
@@ -127,17 +132,13 @@
       switch(name){
         case 'farm_ambience':
           v=low*(0.19+0.07*wave(0.25,t))+soft*0.035;
-          for(let k=0;k<5;k++){
-            const e=events[k];
-            v+=chirp(t,e.t,0.16,e.f,1600,0.085);
-            v+=chirp(t,e.t+0.21,0.13,e.f*1.13,-1300,0.065);
-          }
           break;
         case 'birds_loop':
-          for(let k=0;k<8;k++){
+          // Seis chamados em dezoito segundos, com pausas entre pares.
+          for(let k=0;k<6;k++){
             const e=events[k];
-            v+=chirp(t,e.t,0.18,e.f,2800,0.23);
-            v+=chirp(t,e.t+0.22,0.12,e.f*1.15,-2100,0.16);
+            v+=chirp(t,1.2+k*2.7,0.22,e.f,1600,0.18);
+            v+=chirp(t,1.48+k*2.7,0.15,e.f*1.09,-1100,0.12);
           }
           break;
         case 'cicadas_loop':{
@@ -148,6 +149,20 @@
         case 'cold_wind':
           v=(low*1.35+soft*0.13)*(0.58+0.26*wave(0.25,t)+0.13*wave(0.625,t));
           v+=wave(92,t)*wave(0.125,t)*0.011;
+          break;
+        case 'desert_breeze':
+          v=(low*.72+soft*.21)*(0.6+0.22*wave(1/12,t)+0.1*wave(.25,t));
+          v+=high*envelope(t,5.2,.5,.13)*.023;
+          break;
+        case 'room_tone':
+          v=low*.1*(.85+.15*wave(.2,t));
+          v+=wave(118,t)*envelope(t,3.2,.19,.02)*.04;
+          v+=soft*envelope(t,7.4,.42,.055)*.06;
+          break;
+        case 'barn_room':
+          v=low*.12;
+          v+=soft*(envelope(t,2.1,.7,.09)+envelope(t,10.5,.5,.12))*.13;
+          v+=wave(105,t)*envelope(t,7.6,.22,.015)*.055;
           break;
         case 'fireplace':
           v=low*0.75+soft*0.09;
@@ -272,7 +287,9 @@
       get paused(){ return !source; },
       get volume(){ return volume; },
       set volume(value){
-        volume=Math.max(0,Math.min(1,Number(value)||0));
+        const next=Math.max(0,Math.min(1,Number(value)||0));
+        if(Math.abs(next-volume)<.00005)return;
+        volume=next;
         relativeVolume=master>0?volume/master:0;
         if(gain && ctx){ gain.gain.cancelScheduledValues(ctx.currentTime); gain.gain.setTargetAtTime(volume,ctx.currentTime,0.008); }
       },
@@ -282,10 +299,10 @@
         if(starting) return starting;
         const token=stopped;
         starting=(async()=>{
-          if(!enabled) return;
+          if(!enabled||suspended||master<=0||volume<=0) return;
           const c=ensure();
           if(c.state==='suspended') await c.resume();
-          if(!enabled || token!==stopped) return;
+          if(!enabled || suspended || master<=0 || volume<=0 || token!==stopped) return;
           // Evita crescimento ilimitado de vozes ao repetir ações rapidamente.
           if(!audio.loop){
             const effects=[...voices.keys()].filter(v=>!v.loop);
@@ -326,12 +343,12 @@
       master=Math.max(0,Math.min(1,Number(value)||0));
       for(const voice of voices.values()) if(!voice.loop) voice.scale(master);
     },
-    suspend(){ return ctx&&ctx.state!=='closed'?ctx.suspend():Promise.resolve(); },
-    resume(){ return ctx&&ctx.state==='suspended'&&enabled?ctx.resume():Promise.resolve(); },
+    suspend(){ suspended=true;resetFootsteps();return ctx&&ctx.state!=='closed'?ctx.suspend():Promise.resolve(); },
+    resume(){ suspended=false;return ctx&&ctx.state==='suspended'&&enabled&&master>0?ctx.resume():Promise.resolve(); },
     state(){ return {enabled,master,outputGain:output?.gain.value??null,currentTime:ctx?.currentTime??null,context:ctx?.state||'not-created',buffers:buffers.size,prepared:prepared.size,
       bytes:[...buffers.values(),...stepBuffers.values()].reduce((sum,b)=>sum+b.length*4,0)+[...prepared.values()].reduce((sum,b)=>sum+b.byteLength,0),voices:voices.size,
       footsteps:{count:footsteps.count,surface:footsteps.surface,buffers:stepBuffers.size,mode:footsteps.mode,phase:footsteps.phase},
-      loops:[...voices.values()].filter(v=>v.loop).length,effects:[...voices.values()].filter(v=>!v.loop).length}; },
+      loops:[...voices.values()].filter(v=>v.loop).length,effects:[...voices.values()].filter(v=>!v.loop).length,suspended}; },
     stopAll(){ for(const audio of [...voices.keys()]) audio.pause(); resetFootsteps(false); }
   };
 })();
