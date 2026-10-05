@@ -74,6 +74,35 @@
       accepted:'Cada pessoa precisa receber o convite em conversa. Depois cuide da horta e passe pela caixa de venda. A Casa das Sementes não termina o vale: ela dá um lugar para a gente continuar.',
       ready:'Tomás apertou o último parafuso. Nico já pendurou a placa — um pouco torta, mas eu gostei. A Casa das Sementes está aberta! Quando quiser reunir o pessoal, é só me chamar. Hoje celebramos; amanhã plantamos de novo.'}
   ];
+  // A saga pode recuperar a Casa antes destes seis projetos didáticos. A
+  // apresentação acompanha esse mundo; IDs, objetivos, aceite e moedas continuam
+  // no estado legado, sem converter trabalho da saga em conclusão retroativa.
+  const ongoingProjects=[
+    {title:'1 · Vozes para a próxima rodada',description:'Rosa propõe ouvir Lia, Tomás e Nico antes de combinar novos trabalhos na Casa das Sementes.',
+      offer:'Já fizemos a Casa ganhar movimento. Quero cuidar da próxima rodada com as pessoas que a usam: converse com Lia, Tomás e Nico depois deste combinado. O trabalho continua mesmo quando uma etapa termina.',
+      accepted:'Combinado. Lia anda perto da horta, Tomás confere o trabalho do celeiro e Nico tem ideias para a próxima experiência. Converse com os três nesta rodada e depois volte para me contar o que ouviram.',
+      ready:'Você trouxe as três vozes para este novo combinado. Tomás continua cuidando da bancada; Nico quer preparar outro canteiro para a Casa. Procure-o quando quiser começar essa experiência.'},
+    {title:'2 · Um novo canteiro para comparar',description:'Nico propõe uma nova experiência de plantio, rega e colheita para continuar abastecendo e aprendendo com a Casa.',
+      offer:'A Casa já tem histórias para mostrar. Quero acrescentar uma experiência nova: três plantas depois do nosso aceite, as primeiras regas e duas colheitas maduras. O canteiro anterior conta como lembrança; este serve para comparar o que fazemos agora.',
+      accepted:'Vou anotar esta rodada numa página nova. Você planta e rega três plantas; eu observo sem puxar a raiz. Quando tivermos duas colheitas, levamos os resultados à bancada e comparamos com as tentativas anteriores.',
+      ready:'Mais uma caixa da horta e uma página nova no caderno. Não é a primeira tentativa do vale; é a que acabamos de cuidar juntos. Lia quer observar também como ficou quem fez o trabalho. Procure-a para a próxima rodada.'},
+    {title:'3 · O cuidado faz parte do trabalho',description:'Lia combina uma nova observação da pele, uma pausa protegida e uma resposta de histologia, mantendo o cuidado na rotina da Casa.',
+      offer:'A Casa tem trabalho para amanhã também. Quero incluir quem trabalha no mesmo planejamento: abra a Visão da Pele, faça uma pausa protegida e responda corretamente uma questão nesta etapa. Uma observação nova pode mudar o que pensamos sobre uma rotina antiga.',
+      accepted:'Vamos separar esta observação das anteriores. Abra a Visão da Pele, faça uma nova pausa à sombra ou em abrigo e retome uma questão com atenção ao feedback. O cuidado também precisa continuar depois da festa.',
+      ready:'Esta rodada registrou observação, pausa e explicação. O espaço de descanso da Casa continua à disposição; não precisa esperar outro projeto para usá-lo. Inês quer combinar um novo preparo para a rota da montanha.'},
+    {title:'4 · Preparar a próxima ida à montanha',description:'Inês propõe renovar o preparo da rota: uma coleta de lã, vestir o casaco nesta etapa e uma nova coleta de gelo.',
+      offer:'A montanha continua ligada à Casa, mas cada viagem pede preparo próprio. Vamos fazer uma coleta de lã, vestir o casaco e buscar gelo depois deste aceite. Conhecer o caminho não substitui conferir as condições de hoje.',
+      accepted:'As ovelhas fornecem lã na estação fria. O tear e o celeiro ajudam a preparar o casaco. Se já possui um, guarde e vista novamente nesta rodada. Depois visite o ponto de gelo: queremos observar ações novas, sem apagar a experiência anterior.',
+      ready:'A rota da montanha ganhou mais uma viagem preparada. A cesta de lã continua tendo lugar na bancada; não estamos trazendo a montanha à Casa pela primeira vez. Caio quer combinar a próxima reserva do oásis com você.'},
+    {title:'5 · Reservas para uma nova travessia',description:'Caio combina uma nova coleta e uso de água do oásis, para manter as trocas e os trajetos do vale.',
+      offer:'A troca entre o oásis e a Casa continua. Quero conferir uma nova reserva com você: colete água depois de aceitar e use-a quando a hidratação da simulação precisar. Ter feito uma viagem boa não prepara sozinho a próxima.',
+      accepted:'O ponto de coleta continua na margem sul. Faça uma nova coleta nesta etapa e guarde a reserva. Beba quando precisar; depois volte para contar como foi cuidar do trajeto desta vez.',
+      ready:'A reserva foi coletada e usada no momento necessário. Podemos seguir mantendo o caminho de ida e volta. Rosa está organizando outra roda na Casa; diga que vou levar minha parte e deixar tempo para ouvir.'},
+    {title:'6 · Outra roda à mesa dos três ventos',description:'Convide os cinco moradores para um novo encontro, colha dois produtos e faça uma venda para apoiar a vida contínua da Casa.',
+      offer:'A Casa já tem uma mesa; o que não podemos deixar de preparar são os próximos encontros. Convide Lia, Tomás, Inês, Caio e Nico nesta rodada, faça duas novas colheitas e uma venda para organizar a nossa roda. Depois venha me buscar.',
+      accepted:'Cada convite desta rodada precisa de uma conversa. Depois cuide de duas novas colheitas e passe pela caixa de venda. Não estamos começando a Casa de novo: estamos mantendo lugar para as pessoas voltarem.',
+      ready:'Mais uma roda preparada! A Casa continua recebendo o vale, com sua placa, suas caixas e suas histórias. Quando quiser chamar o pessoal novamente, fale comigo. O encontro de hoje não apaga o anterior; deixa o de amanhã possível.'}
+  ];
   const chats={
     rosa:{first:'Você veio! Reconheci esse jeito de olhar as caixas antes mesmo de ouvir seus passos. Guardei sua carta aqui. A Casa das Sementes pode voltar a ser ponto de encontro, mas a primeira conversa é nossa.',
       hot:'Nesta estação, escolho trabalho que deixa tempo para a sombra. Semente boa não exige que a gente esqueça de si.',cold:'O frio diminui o barulho lá fora. Aqui eu separo as caixas devagar e espero as visitas com conversa.',
@@ -273,7 +302,24 @@
   // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
   // save da nova investigação permanecem separados dos seis capítulos legados.
   function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
-  function chapter(){return chapters[state.chapterIndex]||null;}
+  function sagaStage(){return num(window.FarmValleySaga?.worldState?.()?.stage,8);}
+  function chapter(){const def=chapters[state.chapterIndex];if(!def)return null;const stage=sagaStage();if(!stage)return def;
+    const context=ongoingProjects[state.chapterIndex],objectives=def.objectives.map(o=>o.id==='sell'?{...o,text:'Venda a produção para apoiar o novo encontro'}:o);
+    if(state.chapterIndex===0&&stage>=7)return{...def,...context,objectives,
+      description:'A Casa está aberta. Rosa propõe ouvir Lia, Tomás e Nico para preparar novos projetos, sem repetir a sua recuperação.',
+      offer:'A Casa está aberta, e nossa próxima rodada merece tanto cuidado quanto o caminho até aqui. Converse com Lia, Tomás e Nico depois deste combinado. Quero ouvir o que cada um deseja fazer agora, com a bancada e a mesa já em uso.'};
+    return{...def,...context,objectives};
+  }
+  function letterView(){return sagaStage()?{title:'A carta de Rosa · antes do retorno',text:'Esta é a carta que Rosa enviou antes do seu retorno. Ela permanece guardada como memória daquele começo.\n\n'+letter.text}:letter;}
+  function currentTopic(npcId,topic){if(sagaStage()<7)return topic;
+    if(npcId==='tomas'&&topic[0]==='bench')return['bench','Como manter a Casa em atividade?',
+      'A bancada e a mesa já estão em uso. Agora quero manter os encaixes firmes, cumprir os prazos e deixar espaço para quem aprende. Produção, venda e manutenção ajudam a Casa a continuar útil depois da investigação.',
+      'Tomás lembrou que manter a Casa em atividade também exige cuidado, prazos e espaço para aprender.'];
+    if(npcId==='nico'&&topic[0]==='idea')return['idea','Qual experiência fazemos agora?',
+      'Quero um canteiro novo para comparar com o anterior. A placa já aponta para uma Casa viva; meu caderno ainda tem perguntas. Podemos escolher uma pequena e acompanhar os passos sem apagar o que já descobrimos.',
+      'Nico escolheu uma nova experiência para continuar aprendendo com a Casa em atividade.'];
+    return topic;
+  }
   function objectives(def,data){return def.objectives.map(o=>({id:o.id,text:o.text,n:num(data?.counts?.[o.id],o.goal),goal:o.goal}));}
   function complete(def,data){return def.objectives.every(o=>num(data.counts[o.id],o.goal)>=o.goal);}
   function objectiveLine(list){return list.map(o=>o.text+' ('+o.n+'/'+o.goal+')').join(' · ');}
@@ -319,7 +365,7 @@
         progress:list.reduce((n,o)=>n+o.n,0),goal:list.reduce((n,o)=>n+o.goal,0),coins:d.coins};
     });
     return {version:VERSION,chapter:chapterView,quests,friendships:clone(state.friendships),memories:clone(state.memories),
-      season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letter),
+      season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letterView()),
       coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
       discoveries:discoveryViews(),discoveryTotal:Object.keys(loreById).length,
       relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
@@ -412,7 +458,7 @@
       {id:'community:release',label:'Deixar o pessoal voltar às suas tarefas'}:
       {id:'community:gather',label:'Vamos reunir o pessoal na Casa das Sementes?'});
     if(state.chapterIndex===5 && state.main[5].status==='active' && npcId!=='rosa'
-      && state.main[5].counts['invite_'+npcId]===0)choices.push({id:'invite',label:'Convidar para a reabertura'});
+      && state.main[5].counts['invite_'+npcId]===0)choices.push({id:'invite',label:sagaStage()?'Convidar para o próximo encontro':'Convidar para a reabertura'});
     if(!q || q.status==='offered')choices.push({id:'job:offer',label:'Há um pedido para esta estação?'});
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
@@ -422,12 +468,12 @@
     const next=pending||nextLore(npcId);
     if(next)choices.push({id:'lore:'+next.id,label:(pending?'Retomar: ':'Ouvir lembrança: ')+next.title});
     if(state.discoveries.some(id=>loreById[id].npcId===npcId))choices.push({id:'lore:revisit',label:'Revisitar suas histórias'});
-    for(const [id,label]of chats[npcId].topics)choices.push({id:'chat:'+id,label});
+    for(const topic of chats[npcId].topics){const [id,label]=currentTopic(npcId,topic);choices.push({id:'chat:'+id,label});}
     choices.push({id:'memory',label:'Você lembra do que já fizemos?'},{id:'close',label:'Até depois'});
     return show(npcId,message,'menu',choices);
   }
   function interact(npcId){
-    if(npcId==='letter')return show('rosa',letter.text,'letter',[{id:'close',label:'Guardar a carta'}],letter.title);
+    if(npcId==='letter'){const savedLetter=letterView();return show('rosa',savedLetter.text,'letter',[{id:'close',label:'Guardar a carta'}],savedLetter.title);}
     if(!byId[npcId])return null;
     window.FarmValleySaga?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
@@ -515,7 +561,7 @@
       return show(npcId,memories.length?'Lembro, sim.\n\n'+memories.map(m=>'• '+m.text).join('\n'):'Ainda temos muita coisa para fazer juntos. A primeira conversa já é um começo.');
     }
     if(choiceId.startsWith('chat:')){
-      const topic=chats[npcId].topics.find(t=>t[0]===choiceId.slice(5));if(!topic)return currentDialogue();
+      const found=chats[npcId].topics.find(t=>t[0]===choiceId.slice(5));if(!found)return currentDialogue();const topic=currentTopic(npcId,found);
       const key='topic:'+npcId+':'+topic[0],again=state.flags[key];
       if(!again){state.flags[key]=true;friendship(npcId,2);remember(key,npcId,topic[3]);changed();}
       const followUp={rosa:'Lembro da nossa conversa. Desde então, a caixa parece guardar também o que você trouxe para a história.',

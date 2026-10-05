@@ -5998,7 +5998,7 @@ function saveGame(auto=false){
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
       histologyPlayTime,lastHistMissionAt:_lastHistMissionAt,
-      objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0}))
+      objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0,...(o.type==='animal'?{well:typeof o.well==='number'&&Number.isFinite(o.well)?Math.max(0,Math.min(1,o.well)):.85}:{})}))
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     refreshSaveButtons();
@@ -6057,11 +6057,18 @@ function loadGameFromData(data){
   if(data.stats) Object.assign(stats, data.stats);
   restoreHistologyState(data);
   journalUnlocked.clear(); (data.journalUnlocked||['intro']).forEach(id=>journalUnlocked.add(id));
+  // Saves antigos não guardavam saciedade. O padrão também evita herdar a
+  // fome de outra partida ao carregar novamente sem recarregar a página.
+  for(const o of objects)if(o.type==='animal')o.well=.85;
+  window.FarmAnimalLife?.reset();
   if(Array.isArray(data.objects)){
     const targets=new Map(keyedObjectStates(objects).map(({o,key})=>[key,o]));
     for(const {o:saved,key}of keyedObjectStates(data.objects.filter(Boolean))){
       const target=targets.get(key);if(!target||target.type!==saved.type||(target.kind||null)!==(saved.kind||null))continue;
-      if(target.type==='animal'&&'shorn'in saved)target.shorn=!!saved.shorn;
+      if(target.type==='animal'){
+        if('shorn'in saved)target.shorn=!!saved.shorn;
+        if(typeof saved.well==='number'&&Number.isFinite(saved.well))target.well=Math.max(0,Math.min(1,saved.well));
+      }
       if(['fireplace','mtn_fire','i_fireplace','b_stove'].includes(target.type)){
         if('lit'in saved)target.lit=!!saved.lit;if('fuel'in saved)target.fuel=Math.max(0,Number(saved.fuel)||0);
       }
