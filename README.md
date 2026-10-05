@@ -9,7 +9,24 @@ Os moradores têm **18 lembranças para descobrir e 36 respostas possíveis**.
 Suas escolhas ficam no diário, reaparecem nas conversas e abrem histórias
 depois da reabertura. Os NPCs também comentam ações recentes do jogador.
 
-Seis cenas animadas acompanham os encontros principais da história, com
+**O que o vento guardou** acompanha o retorno de Alex Vale, uma pessoa de
+humor seco e forte lealdade que precisa aprender a pedir ajuda. O mistério
+acolhedor tem oito episódios com decisões que alteram os próximos objetivos,
+seis arcos pessoais em duas etapas, sete pistas e um diário de consequências.
+O **Caderno de Alex** mostra a história, os moradores e a vida na fazenda.
+
+Recupere oficina, cozinha, apiário e irrigação. Prepare seis receitas,
+recolha frutas, leite, ovos e mel, cuide do curral e entregue encomendas.
+As obras já prontas podem receber manutenção com efeitos reais. A exploração
+e os pedidos continuam depois do desfecho, sem um limite de duração da partida.
+
+A **Visão da Pele (H)** apresenta oito estruturas e sua relação com tecidos,
+células e termorregulação. Compare calor, frio, esforço e descanso, registre
+observações reais e resolva três investigações de Lia. A prática mantém as
+43 questões de histologia. O desenho original representa pele fina com pelo;
+as referências de consulta estão no painel.
+
+Quatorze cenas animadas acompanham os encontros das duas histórias, com
 cenários do próprio vale. Os personagens mexem a boca, piscam e gesticulam
 nas cenas e nas conversas. Retratos mostram suas expressões enquanto o texto
 aparece. A Jornada do Vale permite assistir ou rever as cenas desbloqueadas.
@@ -29,6 +46,7 @@ abri-lo no navegador sem internet. O progresso é salvo no próprio navegador.
 | E | Interagir e conversar |
 | R | Descansar ou levantar |
 | G ou clique no minimapa | Abrir o mapa do vale |
+| H | Explorar os tecidos na Visão da Pele |
 | I | Abrir a mochila |
 | Z | Alternar o zoom |
 | M | Ligar ou desligar os sons |

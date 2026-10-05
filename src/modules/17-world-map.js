@@ -54,6 +54,11 @@
   for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y),number:places.length+1});}
   const fruit=objects.find(o=>o.type==='fx_fruittree'&&o.x>45*TS);
   if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y),number:places.length+1});
+  const farm=window.FarmLife?.snapshot?.();
+  for(const station of farm?.stations||[]){
+   places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y),number:places.length+1});
+  }
+  for(const clue of farm?.clues||[]){if(clue.found)places.push({id:'clue:'+clue.id,name:clue.title,kind:'place',x:clue.x,y:clue.y,description:'Pista encontrada · releia o registro',region:regionAt(clue.y),number:places.length+1});}
  }
  function ensureBase(info){
   if(base&&baseMap===info.main.map&&baseObjects===info.main.objects&&baseSeason===info.season)return;
@@ -185,7 +190,7 @@
  }
  function open(){
   if(!ready||opened||!canOpen())return false;const info=read();if(!info)return false;
-  previousFocus=document.activeElement;adapter.beforeOpen?.();opened=true;overlay.hidden=false;mini.hidden=true;ensureBase(info);renderList(info);resize();refresh(info);overlay.querySelector('button')?.focus({preventScroll:true});return true;
+  previousFocus=document.activeElement;adapter.beforeOpen?.();opened=true;overlay.hidden=false;mini.hidden=true;ensureBase(info);buildPlaces(info);renderList(info);resize();refresh(info);overlay.querySelector('button')?.focus({preventScroll:true});return true;
  }
  function close(){if(!opened)return false;opened=false;overlay.hidden=true;refresh();const f=previousFocus;previousFocus=null;if(f?.isConnected&&!f.hidden&&f.getClientRects().length)f.focus({preventScroll:true});else adapter.focusGame?.();return true;}
  function reset(){close();selected=null;base=null;baseMap=null;baseObjects=null;refresh();}

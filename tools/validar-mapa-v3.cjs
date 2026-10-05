@@ -19,7 +19,8 @@ async function shot(name){await refresh();await page.screenshot({path:path.join(
  await page.evaluate(()=>FarmWorldMap.draw());check('Minimapa fica oculto no tutorial',await page.locator('#worldMapMini').isHidden());await page.getByRole('button',{name:'Pular tutorial',exact:true}).click();
  await page.evaluate(()=>{A11Y.noDeath=true;currentWeather=null;weatherCooldown=1e9;histologyMissionQueue.length=0;_lastHistMissionAt=1e9;});await refresh();
  check('Minimapa aparece durante a exploração',await page.locator('#worldMapMini').isVisible());
- const initial=await snapshot();check('Mapa completo tem60×124tiles e13locais reais',initial.world.tilesX===60&&initial.world.tilesY===124&&initial.markers.filter(m=>m.kind==='place').length===13,initial);
+ const initial=await snapshot();check('Mapa tem60×124tiles,13locais originais e7estações da fazenda',initial.world.tilesX===60&&initial.world.tilesY===124&&initial.markers.filter(m=>m.kind==='place').length===20&&initial.markers.filter(m=>m.id.startsWith('farm:')).length===7,initial);
+ check('Mapa não revela pistas antes da descoberta',!initial.markers.some(m=>m.id.startsWith('clue:')));
  check('Seis NPCs usam posições do mundo atual',initial.markers.filter(m=>m.kind==='npc').length===6&&initial.markers.every(m=>m.x>=0&&m.x<=960&&m.y>=0&&m.y<=1984));
  check('Jogador amarelo tem cor distinta dos NPCs verdes',initial.playerColor!==initial.npcColor&&initial.playerColor==='#ffdc67');
  for(const name of ['Casa','Celeiro','Estufa','Casa das Sementes','Coleta de gelo','Água do oásis'])assert.ok(initial.markers.some(m=>m.name===name),name);
@@ -65,6 +66,9 @@ async function shot(name){await refresh();await page.screenshot({path:path.join(
  check('Minimapa390 cabe e não cobre os controles',smallMini.x>=0&&smallMini.x+smallMini.width<=390&&!overlap(smallMini,smallInv)&&!overlap(smallMini,top),{mini:smallMini,inventory:smallInv,top});await shot('mapa-minimapa-390');
  await page.locator('#worldMapMini').click();const card=await page.locator('.fm-card').boundingBox();check('Mapa390 cabe na tela sem transbordar',card.x>=0&&card.y>=0&&card.width<=390&&card.height<=844,card);
  await page.locator('[data-map-id="place:oasis"]').click();await page.locator('.fm-body').evaluate(el=>el.scrollTop=0);await shot('mapa-completo-390');
- check('Locais e moradores continuam acessíveis pelo teclado no celular',await page.locator('.fm-destination').count()===19);await page.keyboard.press('Escape');await refresh();
+ check('Locais e moradores continuam acessíveis pelo teclado no celular',await page.locator('.fm-destination').count()===26);await page.keyboard.press('Escape');await refresh();
+ const discovery=await page.evaluate(()=>{const clue=FarmLife.snapshot().clues[0];player.x=clue.x+12;player.y=clue.y+12;const result=FarmLife.inspect(clue.id);FarmWorldMap.open();return {id:clue.id,ok:result.ok,markers:FarmWorldMap.snapshot().markers};});
+ check('Pista lida aparece no mapa ao abrir, sem revelar as outras',discovery.ok&&discovery.markers.some(m=>m.id==='clue:'+discovery.id)&&discovery.markers.filter(m=>m.id.startsWith('clue:')).length===1,discovery);
+ await page.keyboard.press('Escape');
  check('Nenhum erro JavaScript ou dependência externa',out.erros.length===0&&out.externos.length===0,{errors:out.erros,external:out.externos});out.passou=true;
 })().catch(e=>{out.erroFatal=e.stack;process.exitCode=1;}).finally(async()=>{fs.writeFileSync(path.join(dir,'mapa-validacao.json'),JSON.stringify(out,null,2));if(browser)await browser.close();console.log(JSON.stringify({passou:out.passou,checagens:out.checagens.length,erro:out.erroFatal}));});

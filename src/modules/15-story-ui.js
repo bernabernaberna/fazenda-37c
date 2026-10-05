@@ -129,24 +129,24 @@
       @media(max-width:520px){#characterSelect .csCard,#startMenu .menuCard{padding:16px;border-width:3px}#characterSelect .cs-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#characterSelect .cs-option{padding:10px 4px;min-width:0}#characterSelect .cs-portrait{width:64px;height:86px}#characterSelect .cs-nameRow{flex-wrap:wrap}#characterSelect input{box-sizing:border-box;max-width:100%;min-width:0}#startMenu .menuGrid{grid-template-columns:1fr}#startMenu .vale-menu-story{font-size:15px;line-height:1.5}}
     `;
     document.head.append(style);
-    panel=button('',()=>openBook(),'panel');panel.id='valeHud';panel.setAttribute('aria-label','Abrir Jornada do Vale, carta e moradores');
+    panel=button('',()=>window.FarmValleyPanels?FarmValleyPanels.open('saga'):openBook(),'panel');panel.id='valeHud';panel.setAttribute('aria-label','Abrir o caderno, a história de Alex e a vida na fazenda');
     document.getElementById('topright')?.append(panel);
     dialog=el('div','vale-overlay');dialog.id='valeDialogue';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','valeSpeaker');dialog.setAttribute('aria-describedby','valeSpeechText');
     book=el('div','vale-book-overlay');book.id='valeBook';book.setAttribute('role','dialog');book.setAttribute('aria-modal','true');book.setAttribute('aria-labelledby','valeBookTitle');
     document.body.append(dialog,book);
     // Captura antes dos controles do mundo: nenhuma escolha vira movimento/ação.
     window.addEventListener('keydown',keyboard,true);
-    const entry=button('Jornada do Vale',()=>{adapter.beforeOpen?.();openBook();},'pause-secondary');
+    const entry=button('Jornada das Sementes',()=>{adapter.beforeOpen?.();openBook();},'pause-secondary');
     entry.id='valePauseEntry';document.querySelector('#pauseMenu .pause-row')?.append(entry);
     refresh();
   }
   function refresh(){
     if(!ready)return;const s=story()?.snapshot();if(!s)return;
-    const c=s.chapter||{},giver=cast().find(n=>n.id===c.targetNpc)?.name||'Rosa',next=c.objectives?.find(o=>o.n<o.goal);
-    const objective=c.status==='available'?'Converse com '+giver+' para combinar esta etapa.':c.status==='ready'?'Volte a '+giver+' para concluir a etapa.':next?next.text+' · '+next.n+'/'+next.goal:c.objective;
-    const signature=JSON.stringify([c.title,objective,s.completed,c.index]);
+    const extended=window.FarmValleySaga?.snapshot?.(),c=extended?.act||s.chapter||{},completed=extended?.completed??s.completed,giver=cast().find(n=>n.id===(c.npcId||c.targetNpc))?.name||'Rosa',next=c.objectives?.find(o=>o.n<o.goal);
+    const objective=c.status==='available'?'Converse com '+giver+' para combinar esta etapa.':c.status==='ready'?'Volte a '+giver+' para concluir a etapa.':next?next.text+' · '+next.n+'/'+next.goal:c.objective||c.description;
+    const signature=JSON.stringify([c.title,objective,completed,c.index,!!extended]);
     if(signature!==lastHud){lastHud=signature;panel.replaceChildren();
-      panel.append(el('span','vale-kicker','O Vale dos Três Ventos'),el('strong','',c.title||'Uma carta de Rosa'),el('span','vale-hud-objective',objective||'Encontre Rosa perto da casa.'),el('span','vale-hud-footer',(s.completed?'Vida no vale':'Capítulo '+((c.index||0)+1)+' / 6')+' · abrir jornada'));
+      panel.append(el('span','vale-kicker',extended?.title||'O Vale dos Três Ventos'),el('strong','',c.title||'Uma carta de Rosa'),el('span','vale-hud-objective',objective||'Encontre Rosa perto da casa.'),el('span','vale-hud-footer',(completed?'Vida no vale':(extended?'Página ':'Capítulo ')+((c.index||0)+1)+' / '+(extended?.episodes?.length||6))+' · abrir caderno'));
     }
     if(bookOpen)renderBook();
   }
@@ -205,6 +205,7 @@
     if(!bookOpen)return;const s=story()?.snapshot();if(!s)return;const info=state();book.replaceChildren();
     const card=el('article','vale-book'),head=el('div','vale-dialog-header'),titles=el('div');titles.append(el('span','vale-kicker','Cartas, encontros e memórias'));
     const h=el('h2','','O Vale dos Três Ventos');h.id='valeBookTitle';titles.append(h);head.append(titles,button('Voltar · Esc',closeBook,'vale-close'));card.append(head);
+    if(window.FarmValleyPanels){const entries=el('div','vale-choices');entries.style.marginBottom='18px';entries.append(button('Alex e o mistério do vale',()=>{closeBook(false);FarmValleyPanels.open('saga');},'vale-button vale-button-primary'),button('Vida na fazenda · projetos, receitas e entregas',()=>{closeBook(false);FarmValleyPanels.openFarm();}));card.append(entries);}
     const grid=el('div','vale-book-grid'),main=el('div'),aside=el('aside');
     main.append(el('p','',s.completed?'A Casa das Sementes voltou a reunir o vale. A história continua nos pedidos, nas amizades e nas próximas estações.':'Rosa guardou sementes, histórias e um lugar para você. Cada encontro abre uma parte deste vale.'),questBlock(s.chapter));
     const house=s.world?.seedHouse;

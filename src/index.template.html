@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -2552,7 +2552,7 @@ body.hud-game #legend{display:none !important;}
       </div>
     </div>
     <div class="cs-nameRow">
-      <label for="csName">Seu nome ou apelido:</label>
+      <label for="csName">Nome ou apelido de Alex no vale:</label>
       <input type="text" id="csName" maxlength="18" placeholder="ex: Bê, FazendeiroX" autocomplete="off"
              oninput="validateCharacterSelect()" />
     </div>
@@ -4776,7 +4776,7 @@ const player = {
   hyd: 100,
   en: 100,
   // Identity (set in character-select before startGame; defaults stay for safety)
-  name: 'Fazendeiro',
+  name: 'Alex Vale',
   gender: 'm',                              // 'm' or 'f'
   hat:true, light:true, scarf:false, boots:false, glovesEquipped:false, blanketEquipped:false, towelTimer:0,
   inv: { seed:5, seeds:{tomato:5,corn:0,carrot:0,forage:2}, water:1, watercan:1, veg:0, hay:3, towel:1, wool:0, coat:0, wood:0, isotonic:0, warmDrink:0, soup:0, blanket:0, gloves:0, scarf:0, boots:0, ice:0, oasisWater:0 },
@@ -5993,6 +5993,9 @@ function saveGame(auto=false){
       learningJourney: window.FarmLearningJourney.serialize(),
       storyWorld: window.FarmStoryWorld?.serialize(),
       storyCinematics: window.FarmStoryCinematics?.serialize(),
+      valleySaga: window.FarmValleySaga?.serialize(),
+      farmLife: window.FarmLife?.serialize(),
+      skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
       histologyPlayTime,lastHistMissionAt:_lastHistMissionAt,
       objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0}))
@@ -6042,7 +6045,7 @@ function loadGameFromData(data){
   player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
   if(player.inv && !player.inv.seeds) player.inv.seeds = {tomato:player.inv.seed||0,corn:0,carrot:0,forage:0};
   // Backward-compat: older saves don't have name/gender
-  if(typeof player.name !== 'string' || !player.name) player.name = 'Fazendeiro';
+  if(typeof player.name !== 'string' || !player.name) player.name = 'Alex Vale';
   if(player.gender !== 'f' && player.gender !== 'm') player.gender = 'm';
   normalizePlayerState();
   for(const k in crops) delete crops[k];
@@ -6066,6 +6069,9 @@ function loadGameFromData(data){
   }
   tasks = isFrio() ? coldTasks : hotTasks;
   window.FarmLearningJourney.restore(data.learningJourney,learningContext());
+  window.FarmValleySaga?.restore(data.valleySaga);
+  window.FarmLife?.restore(data.farmLife);
+  window.FarmSkinLearning?.restore(data.skinLearning);
   window.FarmStoryIntegration?.restore(data.storyWorld);
   window.FarmStoryCinematics?.restore(data.storyCinematics,{chapterIndex:window.FarmStoryWorld?.snapshot()?.chapter?.index||0});
   renderTasks(); renderInv(); renderShop(); renderJournal(); renderHistologyHud(); updateBars(); renderAchievements?.();
@@ -6104,7 +6110,7 @@ function openCharacterSelect(){
   // Reset UI
   document.querySelectorAll('.cs-option').forEach(el => el.classList.remove('selected'));
   const inp = document.getElementById('csName');
-  if(inp){ inp.value = ''; inp.focus(); }
+  if(inp){ inp.value = 'Alex Vale'; inp.focus(); }
   validateCharacterSelect();
   // Show
   if(startPanel) startPanel.classList.add('hide');
@@ -8825,7 +8831,7 @@ function learningContext(){
 }
 function readingPanelOpen(){
   const shown=id=>!!document.getElementById(id)?.classList.contains('show');
-  return window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || journalOpen || inventoryOpen || shopOpen
+  return window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || skinOpen || journalOpen || inventoryOpen || shopOpen
     || ['summary','accessMenu','achPanel','creditsPanel','tutorialOverlay'].some(shown);
 }
 function resetSeasonTasks(list){
@@ -8868,6 +8874,9 @@ function resetSandboxRun(){
   footprints.length=0;_camSnap=true;
   journalUnlocked.clear();journalUnlocked.add('intro');renderJournal();
   window.FarmActivityReport.close();
+  window.FarmValleySaga?.reset();
+  window.FarmLife?.reset();
+  window.FarmSkinLearning?.reset();
   window.FarmStoryIntegration?.reset();
   for(const id of ['summary','death','pauseMenu']) document.getElementById(id)?.classList.remove('show');
   unlockedAchievements.clear();saveAchievements();renderAchievements();
@@ -14461,9 +14470,21 @@ const sctx = skinCvs.getContext('2d');
 sctx.imageSmoothingEnabled = true;
 
 function toggleSkinView(){
+  if(!skinOpen&&(!gameStarted||player.dead||histologyMissionOpen||cutsceneActive||window.FarmStoryIntegration?.isOpen()||tutorialActive))return;
+  if(!skinOpen){
+    if(inventoryOpen)toggleInventory(false);
+    if(shopOpen)closeShop();
+    if(journalOpen)toggleJournal(false);
+    window.FarmActivityReport?.close();
+  }
   skinOpen = !skinOpen;
   document.getElementById('skinView').classList.toggle('show', skinOpen);
-  if(skinOpen){ stats.skinOpened++; tickTask('skin');window.FarmStoryIntegration?.record('skin',{amount:1}); unlockJournal('hypothalamus'); drawSkinView(); }
+  if(skinOpen){
+    window.FarmSkinLearning?.onOpen();
+    for(const k in keys)keys[k]=false;
+    player.moving=false;player.running=false;
+    stats.skinOpened++; tickTask('skin');window.FarmStoryIntegration?.record('skin',{amount:1}); unlockJournal('hypothalamus'); drawSkinView();
+  }else window.FarmSkinLearning?.onClose();
 }
 const skinBtnEl = document.getElementById('skinBtn'); if(skinBtnEl) skinBtnEl.onclick = toggleSkinView;
 
@@ -14493,6 +14514,7 @@ function _skinResize(){
 }
 function drawSkinView(){
   const _s = _skinResize();
+  if(window.FarmSkinLearning?.draw(sctx,_s))return;
   sctx.setTransform(_s, 0, 0, _s, 0, 0);   // desenha em coords lógicas 760×430
   sctx.imageSmoothingEnabled = true;
   const W = SKIN_W, H = SKIN_H;
@@ -14860,7 +14882,6 @@ function loop(now){
     }
     _hudElapsed+=dt;
     if(_hudElapsed>=.1){updateBars(false);_hudElapsed%=.1;}
-    if(skinOpen)drawSkinView();
     // Background activity timers run across scenes (so soup keeps cooking
     // even while the player is on the main map)
     if(typeof updatePot === 'function') updatePot();
@@ -14878,6 +14899,7 @@ function loop(now){
   else if(player && player.dead){ resetThermalUI(); }
   window.FarmThermalFeedback.draw({ativo:gameStarted,suspenso:isPaused || cutsceneActive || histologyMissionOpen || reportPaused,morto:player.dead});
   window.FarmWorldMap?.update(dt);
+  if(skinOpen)drawSkinView();
   render(); updateInteractionHint();
   if(gameStarted && !player.dead && !isPaused && !cutsceneActive && now-lastAutoSave>10000){ saveGame(true); lastAutoSave = now; }
   requestAnimationFrame(loop);
@@ -14988,6 +15010,13 @@ FarmActivityReport.init({
   practice:practiceHistology
 });
 window.FarmStoryIntegration?.init();
+window.FarmSkinLearning?.init({
+  readState(){return {player,region:currentRegion(),scene:currentScene,thermal:FarmThermalFeedback.snapshot()};},
+  record(type,payload){FarmStoryIntegration?.record(type,payload);},
+  onChange(){if(gameStarted)saveGame(true);},
+  close(){if(skinOpen)toggleSkinView();},practice:practiceHistology,draw:drawSkinView,
+  reducedMotion:()=>!!A11Y.reduceMotion
+});
 window.FarmWorldMap?.init({
   canOpen:()=>gameStarted&&!player.dead&&!_gameInputBlocked()&&!_actionUiOpen(),
   beforeOpen(){for(const k in keys)keys[k]=false;player.moving=false;player.running=false;FarmOriginalAudio.resetFootsteps();},
@@ -15116,6 +15145,17 @@ function toggleFullscreen(){
 }
 // Captura ESC antes do handler antigo para abrir menu de pause / acessibilidade quando não houver modal prioritário.
 window.addEventListener('keydown', function(e){
+  if(skinOpen){
+    const k=e.key.toLowerCase();
+    if(k==='h'||e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();toggleSkinView();return;}
+    if(k==='m'){e.preventDefault();e.stopImmediatePropagation();toggleSound();return;}
+    if(['w','a','s','d','i','j','g','e','q','f','c','r','z','v','b','1','2','3','4','5','6'].includes(k)){e.preventDefault();e.stopImmediatePropagation();}
+    return;
+  }
+  if(window.FarmValleyPanels?.isOpen()){
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();FarmValleyPanels.close();}
+    return;
+  }
   // O diretor instalado ao abrir uma cena vem depois deste listener.
   // Escape precisa fechar a cena antes de chegar ao menu de pausa.
   if(window.FarmStoryCinematics?.isOpen()){

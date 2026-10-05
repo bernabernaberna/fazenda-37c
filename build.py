@@ -75,6 +75,10 @@ MODULE_ORDER = [
     "31-interior-art.js",    # paredes, marcenaria, tecidos e vidro dos interiores
     "32-animal-life.js",     # anatomia, comportamento e movimento dos animais
     "34-story-cinematics.js", # cenas do vale, falas animadas e galeria de reprises
+    "35-valley-saga.js",      # mistério do vale, escolhas e arcos pessoais
+    "36-farm-life.js",        # projetos, produção, receitas e pistas
+    "37-valley-panels.js",    # caderno de Alex e gestão das atividades
+    "38-skin-learning.js",    # tecidos da pele e investigações de Lia
     "40-grass-sway.js",       # animated grass blades + wind streaks
     "50-window-glow.js",      # warm halos from house/barn windows at night
     "60-histology-annotations.js", # realtime science labels over the player

@@ -49,7 +49,7 @@ const fits=r=>r.x>=-1&&r.y>=-1&&r.right<=r.width+1&&r.bottom<=r.height+1&&!r.ove
  check('Resposta não duplica o botão continuar',await page.locator('.vale-choices button').count()===2);
  await page.waitForTimeout(50);const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem(SAVE_KEY)).storyWorld);
  check('Escolha e lembrança persistem no save v2',saved.decisions['rosa:caixa']===1&&saved.discoveries.includes('rosa:caixa'));
- await close();await page.locator('#valeHud').click();
+ await close();await page.evaluate(()=>FarmStoryUI.open());
  check('Diário registra o título e sua consequência',await page.locator('.vale-discovery summary').textContent().then(t=>t==='A caixa sem etiqueta')&&await page.locator('.vale-decision').textContent().then(t=>t.includes('semente guardada')));
  await page.locator('.vale-discovery summary').focus();await page.keyboard.press('Enter');check('Enter expande lembrança no diário',await page.locator('.vale-discovery').evaluate(n=>n.open===true));
  await page.evaluate(()=>render());await page.screenshot({path:path.join(dir,'diario-escolha-1280.png')});out.capturas.push('diario-escolha-1280.png');await close();
@@ -59,7 +59,7 @@ const fits=r=>r.x>=-1&&r.y>=-1&&r.right<=r.width+1&&r.bottom<=r.height+1&&!r.ove
  check('Revisitar mantém sua postura e não oferece resposta repetida',await page.locator('[data-vale-choice^="reply:"]').count()===0&&await page.locator('.vale-dialog-text').textContent().then(t=>t.includes('embrulho dos três riscos')));
  await close();
  for(const viewport of [{width:390,height:844},{width:320,height:640},{width:844,height:390}]){
-  await page.setViewportSize(viewport);await page.locator('#valeHud').click();const r=await bounds('.vale-book');check('Diário de lembranças cabe em '+viewport.width+'x'+viewport.height,fits(r),r);await page.evaluate(()=>render());await page.screenshot({path:path.join(dir,'diario-'+viewport.width+'x'+viewport.height+'.png')});out.capturas.push('diario-'+viewport.width+'x'+viewport.height+'.png');await close();
+  await page.setViewportSize(viewport);await page.evaluate(()=>FarmStoryUI.open());const r=await bounds('.vale-book');check('Diário de lembranças cabe em '+viewport.width+'x'+viewport.height,fits(r),r);await page.evaluate(()=>render());await page.screenshot({path:path.join(dir,'diario-'+viewport.width+'x'+viewport.height+'.png')});out.capturas.push('diario-'+viewport.width+'x'+viewport.height+'.png');await close();
  }
  check('Sem erros JavaScript',out.erros.length===0,out.erros);out.passou=true;
 })().catch(e=>{out.passou=false;out.falha=e.stack;process.exitCode=1;}).finally(async()=>{fs.writeFileSync(path.join(dir,'ui.json'),JSON.stringify(out,null,2));console.log(JSON.stringify({passou:out.passou,checagens:out.checagens.length,erros:out.erros,falha:out.falha}));await browser?.close();});

@@ -51,6 +51,22 @@
   const ease=n=>{n=Math.max(0,Math.min(1,n));return n*n*(3-2*n);};
   const safely=(fn,...args)=>{if(typeof fn!=='function')return undefined;try{return fn(...args);}catch(err){console.warn('Cena do vale:',err);return undefined;}};
   const read=()=>safely(adapter.readState||adapter.read)||{};
+  function registerScenes(definitions){
+    if(!Array.isArray(definitions))return 0;let count=0;
+    for(const def of definitions.slice(0,16)){
+      if(!def||!/^saga-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(!def.shots.every(s=>s&&names[s.speaker]&&typeof s.line==='string'&&s.line.length<1800))continue;
+      const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.slice(5)};
+      films.push(film);byId.set(film.id,film);count++;
+    }
+    return count;
+  }
+  function available(film){
+    if(seen.has(film.id))return true;
+    if(!film.sagaEpisode)return film.chapter<=chapterIndex();
+    const saga=read().saga;
+    return !!saga?.episodes?.some(e=>e.id===film.sagaEpisode&&(e.completed||e.status==='completed'));
+  }
   const isReduced=()=>!!read().reducedMotion||!!read().reduceMotion||!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   function install(){
     if(root)return;
@@ -75,7 +91,7 @@
     install();safely(adapter.beforeOpen);previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';root.setAttribute('aria-hidden','false');reduced=isReduced();
   }
   function play(id,opts={}){
-    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay)return false;
+    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||film.sagaEpisode&&!available(film))return false;
     showOverlay();const state=read();active={kind:'film',film,index:0,elapsed:0,speech:0,reveal:0,replay:!!opts.replay,player:{name:typeof state.name==='string'?state.name.slice(0,40):'Você',gender:state.gender==='f'?'f':'m'},backdrop:null};
     root.querySelector('.vc-gallery').hidden=true;stage.hidden=false;root.querySelector('.vc-dialogue').hidden=false;root.querySelector('.vc-controls').hidden=false;root.querySelector('.vc-skip').textContent='Pular cena';
     heading.textContent=film.title;subheading.textContent='Uma lembrança do vale · avance no seu ritmo';enterShot();nextButton.focus({preventScroll:true});return true;
@@ -172,13 +188,16 @@
     else if(film.prop==='notebook'){rect(g,'#596f53',x-10,y-9,22,17);rect(g,'#e6d7b3',x-8,y-7,18,13);rect(g,'#b29672',x,y-7,1,13);for(let i=0;i<3;i++)rect(g,'#8b8d6b',x-6,y-5+i*4,5,1);}
     else if(film.prop==='sign'){rect(g,'#73503a',x-2,y+7,4,15);rect(g,'#dbbd86',x-23,y-8,46,16);g.fillStyle='#405b3f';g.font='bold 9px sans-serif';g.textAlign='center';g.fillText('ENTRE',x,y+3);}
     else if(film.prop==='vessel'){rect(g,'#a7744b',x-9,y-10,18,20);rect(g,'#dbb474',x-11,y-10,22,4);rect(g,'#e6ce9a',x-6,y-6,3,14);for(let i=0;i<3;i++)rect(g,'#684d3a',x-4+i*4,y+3,2,3);}
+    else if(film.prop==='crate'){rect(g,'#735139',x-19,y-11,38,27);rect(g,'#b48957',x-17,y-9,34,23);for(let i=0;i<3;i++)rect(g,'#81623e',x-17,y-7+i*8,34,2);rect(g,'#d9c293',x-13,y-4,12,9);rect(g,'#b5d6b4',x+3,y-4,11,9);rect(g,'#74644b',x-10,y-1,6,1);rect(g,'#557c60',x+5,y-1,6,1);}
   }
   function render(){
     if(active?.kind!=='film'||!stageContext)return;const {film,index,elapsed,speech}=active,s=film.shots[index],g=stageContext;const blend=reduced?1:ease(elapsed/3),focus=s.focus*blend;
     g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,960,480);g.imageSmoothingEnabled=false;
     const zoom=reduced?1:1.025+blend*.025,pan=reduced?0:focus*6;g.drawImage(active.backdrop,-(960*(zoom-1)/2)-pan,-480*(zoom-1)/2,960*zoom,480*zoom);g.scale(2,2);
-    const art=window.FarmCharacterArt,cast=film.cast,meeting=film.id==='reabertura';
-    const positions=meeting?[[110,204],[164,185],[219,183],[269,183],[322,185],[374,204]]:film.id==='rio'?[[151,210],[330,215]]:cast.length===3?[[172,209],[306,205],[249,223]]:[[178,210],[304,215]];
+    const art=window.FarmCharacterArt,cast=film.cast,meeting=film.id==='reabertura'||film.prop==='table';
+    const group=cast.map((_,i)=>[110+264*i/Math.max(1,cast.length-1),i===0||i===cast.length-1?204:185]);
+    const positions=meeting?(cast.length===6?[[110,204],[164,185],[219,183],[269,183],[322,185],[374,204]]:group):cast.length>3?group:film.id==='rio'?[[151,210],[330,215]]:cast.length===3?[[172,209],[306,205],[249,223]]:[[178,210],[304,215]];
+    if(meeting){rect(g,'#634f36',201,208,78,7);rect(g,'#b89965',199,204,82,6);rect(g,'#d4bd83',199,204,82,2);rect(g,'#634f36',205,214,5,14);rect(g,'#634f36',269,214,5,14);rect(g,'#e4d7ad',232,200,16,5);rect(g,'#72865b',240,201,2,3);}
     for(let i=0;i<cast.length;i++){
       const id=cast[i],[x0,y]=positions[i],x=x0-focus*4,actor={npcId:id,gender:active.player.gender,dir:0,x:0,y:0,moving:false,running:false,equipment:{},temp:37,gaitBlend:0};const speaking=id===s.speaker&&(active.reveal<s.line.length||elapsed<1.4),opts={x:0,y:0,speaking,speechTime:speech,expression:id===s.speaker?s.expression:'warm',gesture:id===s.speaker?s.gesture:'listen',reducedMotion:reduced,time:elapsed*1000};
       g.save();g.translate(x,y);g.scale(meeting?1.3:1.6,meeting?1.3:1.6);if(art){if(id==='player')art.drawPlayer(g,actor,opts);else art.drawNPC(g,actor,opts);}else{rect(g,id==='player'?'#b99654':'#6c8a69',-7,-21,14,24);rect(g,'#dbb08a',-5,-31,10,11);}g.restore();
@@ -188,10 +207,10 @@
     g.restore();if(art?.drawPortrait)art.drawPortrait(portrait,s.speaker,{name:s.speaker==='player'?active.player.name:names[s.speaker],gender:active.player.gender,speaking:active.reveal<s.line.length,speechTime:speech,expression:s.expression,gesture:s.gesture,reducedMotion:reduced,time:elapsed*1000});
   }
   function chapterIndex(){const state=read(),value=state?.story?.chapter?.index??state?.story?.chaptersCompleted??state?.story?.chapterIndex??state?.chapterIndex;return Number.isFinite(value)?Math.max(unlockedChapter,Math.max(0,Math.min(6,Math.floor(value)))):unlockedChapter;}
-  const catalogue=()=>{const available=chapterIndex();return films.map(({id,title,chapter,description})=>({id,title,chapter,description,seen:seen.has(id),unlocked:seen.has(id)||chapter<=available,available:seen.has(id)||chapter<=available}));};
+  const catalogue=()=>films.map(f=>({id:f.id,title:f.title,chapter:f.chapter,description:f.description,seen:seen.has(f.id),unlocked:available(f),available:available(f)}));
   function restore(data,opts={}){dismiss(false,false);seen=new Set();unlockedChapter=Number.isFinite(opts.chapterIndex)?Math.max(0,Math.min(6,Math.floor(opts.chapterIndex))):0;if(data&&typeof data==='object'&&Array.isArray(data.seenScenes))for(const id of data.seenScenes.slice(0,films.length*2))if(byId.has(id))seen.add(id);}
   window.FarmStoryCinematics=Object.freeze({
-    init(value={}){adapter=value&&typeof value==='object'?value:{};initialized=true;return catalogue();},play,update,isOpen:()=>!!active,close,
+    init(value={}){adapter=value&&typeof value==='object'?value:{};initialized=true;return catalogue();},registerScenes,play,update,isOpen:()=>!!active,close,
     reset(){dismiss(false,false);seen.clear();unlockedChapter=0;},restore,serialize:()=>({version:1,seenScenes:films.filter(f=>seen.has(f.id)).map(f=>f.id)}),catalogue,openGallery,
     info:()=>({initialized,open:!!active,kind:active?.kind||null,id:active?.film?.id||null,shot:active?.index??null,replay:!!active?.replay,reducedMotion:reduced})
   });

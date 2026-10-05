@@ -149,6 +149,7 @@
 
   function footprint(o){
    switch(o.type){
+    case 'farm_life_project':return window.FarmLife?.footprint(o)||null;
     case 'house':case 'barn':case 'story_seed_house':return{x:o.x-3,y:o.y+4,w:o.w+6,h:o.h-7};
     case 'mtn_cabin':return{x:o.x-33,y:o.y-35,w:64,h:38};
     case 'tree':case 'fx_fruittree':return{x:o.x-5,y:o.y-3,w:10,h:12};
@@ -165,7 +166,7 @@
   function isBlocked(x,y,from){
    const m=API.scenes.main;if(!m||x<8||y<8||x>m.MW*S-8||y>m.MH*S-8)return true;
    if([undefined,T.WATER,T.RIVER,T.OASIS].includes(m.map[Math.floor(y/S)]?.[Math.floor(x/S)]))return true;
-   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
+   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
      // Saves anteriores podem começar dentro de um novo tronco/volume.
      // Permite somente sair em direção à borda, nunca atravessar o obstáculo.
      if(from&&contains(b,from.x,from.y+7)){
@@ -219,6 +220,6 @@
    if(o.type!=='barn')points.push({x:o.x+o.w-34,y:o.y+64,r:25},{x:o.x+o.w/2,y:o.y+o.h-26,r:16});
    return points;
   }
-  window.FarmWorldDepth=Object.freeze({version:1,navigationVersion:1,footprint,isBlocked,depth,drawSeedHouse,drawGround,drawPenBase,penParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
+  window.FarmWorldDepth=Object.freeze({version:1,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawPenBase,penParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
  });
 })();

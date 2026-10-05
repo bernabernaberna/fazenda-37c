@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
-  let cinematicReady=false,lastStory=null;
+  let cinematicReady=false,lastStory=null,lastSaga=null;
   const cinematicQueue=[];
   const chapterScenes={1:'horta',2:'rio',3:'abrigo',4:'oasis'};
   const actors=[];
@@ -41,6 +41,10 @@
     worldWidth:scenes.main.MW*TS,worldHeight:scenes.main.MH*TS,npcs:actors,
     inventory:player.inv,coatEquipped:player.coatEquipped,energy:player.en,resting:player.resting===true,
     activities:activityLines,community:{...community}});
+  const expandedRead=()=>({...read(),player,coins:player.coins,active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen(),story:window.FarmStoryWorld?.snapshot?.(),saga:window.FarmValleySaga?.snapshot?.()});
+  const farmRead=()=>({...read(),player,objects:scenes.main.objects,mainCrops:currentScene==='main'?crops:scenes.main.crops,active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen()});
+  function canOpenReading(){return gameStarted&&!player.dead&&!cutsceneActive&&!window.FarmStoryCinematics?.isOpen?.()&&!histologyMissionOpen&&!tutorialActive
+    &&!(typeof _pendingTutorialAfterCutscene!=='undefined'&&_pendingTutorialAfterCutscene)&&!document.getElementById('tutorialOverlay')?.classList.contains('show');}
   function safePoint(x,y){
     const main=scenes.main;const tx=Math.floor(x/TS),ty=Math.floor(y/TS),t=main.map[ty]?.[tx];
     if(t===undefined||[T.WATER,T.RIVER,T.OASIS,T.FENCE].includes(t))return false;
@@ -83,6 +87,18 @@
       pendingSave=true;queueMicrotask(()=>{pendingSave=false;if(gameStarted&&!restoring)saveGame(true);});
     }
   }
+  function refreshNarrative(){FarmStoryUI.refresh();window.FarmValleyPanels?.refresh?.();}
+  function record(type,payload={}){
+    if(!active||!gameStarted||player.dead)return false;
+    // Eventos novos (estudo, oficina, produção) também chegam à saga quando o legado não os usa.
+    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);return true;
+  }
+  function reward(event){
+    const coins=Math.floor(Number(event.coins)||0);if(coins<=0||coins>1000)return;
+    player.coins+=coins;renderInv();if(shopOpen)renderShop();
+    showToast(event.label+' · +'+coins+' moedas','success',4800);
+    flashFx(player.x,player.y-24,'+'+coins+' moedas','#efd19a');window.synthSfx?.chimeOk?.();
+  }
   function queueScene(id){
     if(!id||cinematicQueue.includes(id)||window.FarmStoryCinematics?.catalogue?.().find(s=>s.id===id)?.seen)return;
     cinematicQueue.push(id);
@@ -95,19 +111,29 @@
     }
     lastStory=current;
   }
+  function observeSaga(snapshot){
+    const act=snapshot?.act||snapshot?.episode;
+    if(!act)return;
+    const current={id:act.id,index:Number(act.index)||0,status:act.status,completed:!!snapshot.completed,cinematicId:act.cinematicId||'saga-'+act.id};
+    // As cenas mostram consequências: entram depois da entrega, nunca antes do trabalho.
+    if(lastSaga&&gameStarted&&!restoring&&current.index>lastSaga.index&&lastSaga.id&&lastSaga.index<8)
+      queueScene(lastSaga.cinematicId);
+    lastSaga=current;
+  }
   function initializeCinematics(){
     if(cinematicReady||!window.FarmStoryCinematics)return;cinematicReady=true;
-    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),reducedMotion:!!A11Y.reduceMotion}),
-      beforeOpen(){FarmStoryUI.close();beforeOpen();},
-      onClose(){document.getElementById('game')?.focus({preventScroll:true});FarmStoryUI.refresh();},
-      onChange(){FarmStoryUI.refresh();scheduleSave();},
+    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
+      beforeOpen(){window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();beforeOpen();},
+      onClose(){document.getElementById('game')?.focus({preventScroll:true});refreshNarrative();},
+      onChange(){refreshNarrative();scheduleSave();},
       drawWorld(g,view){return window.drawCinematicWorld?.(g,view)===true;}
     });
+    if(window.FarmValleySaga?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmValleySaga.cinematicScenes());
   }
   function visualUpdate(dt){
     if(!active||!gameStarted||document.hidden)return;initializeCinematics();
     FarmStoryUI.update(dt);window.FarmStoryCinematics?.update?.(dt);
-    if(!cinematicQueue.length||!window.FarmStoryCinematics||FarmStoryCinematics.isOpen()||FarmStoryUI.isOpen()
+    if(!cinematicQueue.length||!window.FarmStoryCinematics||FarmStoryCinematics.isOpen()||FarmStoryUI.isOpen()||window.FarmValleyPanels?.isOpen?.()||skinOpen
       ||isPaused||cutsceneActive||player.dead||histologyMissionOpen||tutorialActive
       ||(typeof _pendingTutorialAfterCutscene!=='undefined'&&_pendingTutorialAfterCutscene)
       ||document.getElementById('tutorialOverlay')?.classList.contains('show'))return;
@@ -132,23 +158,16 @@
   }
   function init(){
     if(active)return;active=true;
-    FarmStoryUI.init({read,drawMap:map,beforeOpen,reducedMotion:()=>!!A11Y.reduceMotion,focusGame(){document.getElementById('game')?.focus({preventScroll:true});},
-      canOpen:()=>gameStarted&&!player.dead&&!cutsceneActive&&!window.FarmStoryCinematics?.isOpen?.()&&!histologyMissionOpen&&!document.getElementById('tutorialOverlay')?.classList.contains('show')});
+    FarmStoryUI.init({read,drawMap:map,beforeOpen(){window.FarmValleyPanels?.close?.(false);beforeOpen();},reducedMotion:()=>!!A11Y.reduceMotion,focusGame(){document.getElementById('game')?.focus({preventScroll:true});},canOpen:canOpenReading});
     FarmStoryWorld.init({readState:read,
-      reward(event){
-        const coins=Math.floor(Number(event.coins)||0);if(coins<=0||coins>1000)return;
-        player.coins+=coins;renderInv();if(shopOpen)renderShop();
-        showToast(event.label+' · +'+coins+' moedas','success',4800);
-        flashFx(player.x,player.y-24,'+'+coins+' moedas','#efd19a');
-        window.synthSfx?.chimeOk?.();
-      },
+      reward,
       onChange(snapshot){
         observeStory(snapshot);
         FarmStoryUI.refresh();
         scheduleSave();
       },
       onDialogue(d){
-        if(d)beforeOpen();FarmStoryUI.showDialogue(d);
+        if(d){window.FarmValleyPanels?.close?.(false);beforeOpen();}FarmStoryUI.showDialogue(d);
         if(!restoring&&gameStarted){
           if(d)window.synthSfx?.dialogue?.(d.npcId,dialogueSoundNpc===d.npcId?'choice':'greet');
           else if(dialogueSoundNpc)window.synthSfx?.dialogue?.(dialogueSoundNpc,'close');
@@ -156,8 +175,18 @@
         dialogueSoundNpc=d?.npcId||'';
       }
     });
+    window.FarmValleySaga?.init?.({readState:read,reward,
+      onDialogue(d){FarmStoryWorld.presentSaga?.(d);},
+      onChange(snapshot){observeSaga(snapshot);refreshNarrative();scheduleSave();}
+    });
+    window.FarmLife?.init?.({readState:farmRead,onChange(){refreshNarrative();scheduleSave();},onEvent:record});
+    window.FarmValleyPanels?.init?.({readState:expandedRead,canOpen:()=>canOpenReading()&&!FarmStoryWorld.isOpen(),
+      beforeOpen(){FarmStoryUI.close();beforeOpen();},focusGame(){document.getElementById('game')?.focus({preventScroll:true});},
+      openSkin(){toggleSkinView();},
+      onTransaction(result){if(result?.ok){renderInv();window.synthSfx?.chimeOk?.();}else window.synthSfx?.cancel?.();}
+    });
     for(const def of FarmStoryWorld.characters)place(def);
-    observeStory(FarmStoryWorld.snapshot());initializeCinematics();
+    observeStory(FarmStoryWorld.snapshot());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());initializeCinematics();
     rebuildNavigation();
     FarmBiomes.registerObjectDrawer('story_npc',drawNPC);
     FarmBiomes.registerInteraction('story_npc',o=>{if(!gameStarted||player.dead)return false;FarmStoryWorld.interact(o.npcId);return true;});
@@ -208,7 +237,7 @@
   function destination(o,index,world){
     const band=timeOfDay<6||timeOfDay>=20?3:timeOfDay<11?0:timeOfDay<15?1:2;
     const normal=routines[o.npcId][band],home=homes[o.npcId];
-    if(world.gathering){
+    if(world.gathering||world.sagaGathering){
       // Lugares ao redor da praça; espaço entre corpos e frente da porta livres.
       const seats=[[-48,16],[-16,32],[16,32],[48,16],[48,48],[-48,48]],seat=seats[index];
       return {key:'gather:'+community.x+':'+community.y,x:community.x+seat[0],y:community.y+seat[1],
@@ -223,8 +252,9 @@
     return {key:'routine:'+band,x:home.x+normal.dx,y:home.y+normal.dy,...normal};
   }
   function update(dt){
-    if(!active||!gameStarted||player.dead||!Number.isFinite(dt)||dt<=0)return;
-    FarmStoryWorld.update(dt,read());const world=FarmStoryWorld.worldState();
+    if(!active||!gameStarted||player.dead||document.hidden||!Number.isFinite(dt)||dt<=0||isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen())return;
+    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);
+    const sagaWorld=window.FarmValleySaga?.worldState?.(),world={...FarmStoryWorld.worldState(),sagaGathering:!!sagaWorld?.festival&&timeOfDay>=16&&timeOfDay<20};
     // Rotinas também avançam ao entrar em casa; não somem nem teleportam na volta.
     for(let i=0;i<actors.length;i++){
       const o=actors[i];o._npcTime+=dt;o.activityPhase+=dt;
@@ -257,11 +287,11 @@
     if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.y))return false;
     community={x:point.x,y:point.y};navigation=null;for(const o of actors)o._routineKey='';return true;
   }
-  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}FarmStoryUI.refresh();}
-  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;restoring=true;try{FarmStoryUI.close();FarmStoryWorld.restore(data,read());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}FarmStoryUI.refresh();}
+  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
+  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
+  function isOpen(){return !!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()||!!window.FarmValleyPanels?.isOpen?.();}
   window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,
     cinematicQueue:()=>cinematicQueue.slice(),
     navigationState(){return actors.map(o=>({npcId:o.npcId,x:o.x,y:o.y,moving:o.moving,anim:o.anim,activity:o.npcActivity,routeLength:o._route.length,routine:o.routineDescription,region:o.region}));},
-    record(type,payload){if(active&&gameStarted&&!player.dead)FarmStoryWorld.record(type,payload||{});},
-    isOpen:()=>!!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()};
+    record,isOpen,queueScene,refresh:refreshNarrative};
 })();

@@ -269,7 +269,10 @@
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function close(){dialogue=null;emit('onDialogue',null);return null;}
+  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});emit('onDialogue',null);return null;}
+  // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
+  // save da nova investigação permanecem separados dos seis capítulos legados.
+  function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
   function chapter(){return chapters[state.chapterIndex]||null;}
   function objectives(def,data){return def.objectives.map(o=>({id:o.id,text:o.text,n:num(data?.counts?.[o.id],o.goal),goal:o.goal}));}
   function complete(def,data){return def.objectives.every(o=>num(data.counts[o.id],o.goal)>=o.goal);}
@@ -291,11 +294,14 @@
   }
   // Consequências derivadas dos capítulos pagos: carregar não constrói nem paga de novo.
   function worldState(){
-    const n=state.chapterIndex,open=n===chapters.length;
-    return {seedHouse:{stage:open?'open':n>=2?'supplied':n>=1?'preparing':'closed',
-      level:open?3:n>=2?2:n>=1?1:0,open,workbench:n>=1,seedCrates:n>=2,
-      shadeAndWater:n>=3,woolAndMountainRoute:n>=4,oasisRoute:n>=5,bunting:open},
-      gathering:open&&state.flags.communityGathering===true,
+    const n=state.chapterIndex,legacyOpen=n===chapters.length,saga=num(window.FarmValleySaga?.worldState?.()?.stage,8),open=legacyOpen||saga>=7;
+    // Arte compartilhada, progresso separado: as novas entregas deixam marcas
+    // visíveis na Casa sem concluir ou remunerar capítulos didáticos legados.
+    const legacyLevel=legacyOpen?3:n>=2?2:n>=1?1:0,sagaLevel=saga>=7?3:saga>=2?2:saga>=1?1:0,level=Math.max(legacyLevel,sagaLevel);
+    return {seedHouse:{stage:open?'open':level>=2?'supplied':level>=1?'preparing':'closed',
+      level,open,workbench:n>=1||saga>=1,seedCrates:n>=2||saga>=2,
+      shadeAndWater:n>=3||saga>=3,woolAndMountainRoute:n>=4||saga>=4,oasisRoute:n>=5||saga>=5,bunting:legacyOpen||saga>=8},
+      gathering:legacyOpen&&state.flags.communityGathering===true,
       communityName:'Casa das Sementes',chaptersCompleted:n};
   }
   function snapshot(){
@@ -388,6 +394,7 @@
       message=visit%3===1?after[npcId]:greetings[npcId][(visit-1)%greetings[npcId].length];
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
+    if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId);
     const activity=text(s.activities[npcId],180);
     if(!preamble){
       const echo=decisionEcho(npcId),notice=noticeLines[npcId];
@@ -410,6 +417,7 @@
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
     else message+='\n\nSeu pedido desta estação já foi entregue. Na próxima estação combinamos outro.';
+    if(window.FarmValleySaga)choices.push({id:'saga:menu',label:window.FarmValleySaga.menuLabel(npcId)});
     const pending=lore[npcId].find(scene=>state.discoveries.includes(scene.id)&&state.decisions[scene.id]===undefined);
     const next=pending||nextLore(npcId);
     if(next)choices.push({id:'lore:'+next.id,label:(pending?'Retomar: ':'Ouvir lembrança: ')+next.title});
@@ -421,16 +429,22 @@
   function interact(npcId){
     if(npcId==='letter')return show('rosa',letter.text,'letter',[{id:'close',label:'Guardar a carta'}],letter.title);
     if(!byId[npcId])return null;
+    window.FarmValleySaga?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
     state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
-    record('talk',{npcId});
-    return menu(npcId,first?chats[npcId].first:undefined);
+    record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});
+    return menu(npcId,first?(window.FarmValleySaga?.greeting?.(npcId,{first:true})||chats[npcId].first):undefined);
   }
   function choose(choiceId){
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
     if(choiceId==='back')return menu(npcId);
+    if(choiceId.startsWith('saga:')){
+      if(choiceId==='saga:back'){window.FarmValleySaga?.close?.({silent:true});return menu(npcId);}
+      if(choiceId==='saga:menu'&&!window.FarmValleySaga?.isOpen?.())return window.FarmValleySaga?.interact?.(npcId)||currentDialogue();
+      return window.FarmValleySaga?.choose?.(choiceId)||currentDialogue();
+    }
     if(choiceId==='lore:revisit'){
       const found=state.discoveries.filter(id=>loreById[id].npcId===npcId);
       return show(npcId,'Cada lembrança ganhou um lugar no nosso caminho. Qual você quer ouvir de novo?','lore-list',
@@ -572,7 +586,7 @@
   window.FarmStoryWorld={
     characters:clone(characters),chapters:clone(chapters),
     init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh(ctx());initialized=true;}return snapshot();},
-    interact,currentDialogue,choose,advance,close,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
+    interact,currentDialogue,choose,advance,close,presentSaga,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
     serialize:()=>clone(state),restore,
     reset(value){state=fresh(ctx(value));for(const id of IDS)noticeLines[id]='';close();changed();return snapshot();}
   };
