@@ -4376,6 +4376,14 @@ function makeBlankMap(w, h, fill){
   scatter(34, 0, 0, (tx,ty)=> obj({type:'flower', x:tx*TS+8, y:ty*TS+9, seed:(tx*7+ty*13)%6}));         // flores: podem encostar nos campos
 })();
 
+// Corrige três implantações autorais depois da decoração: preserva o consumo
+// do gerador aleatório, a distribuição restante e a ordem/identidade dos objetos.
+// A árvore do lago vai para a margem; as duas do celeiro, para terreno aberto.
+for(const [fromX,fromY,toX,toY] of [[45,20,41,18],[28,7,30,0],[34,5,37,5]]){
+  const tree=objects.find(o=>o.type==='tree'&&o.x===fromX*TS+8&&o.y===fromY*TS+12);
+  if(tree){tree.x=toX*TS+8;tree.y=toY*TS+12;}
+}
+
 /* ============================================================================
    MUNDO CONTÍNUO (sandbox) — Fatia 1
    ----------------------------------------------------------------------------

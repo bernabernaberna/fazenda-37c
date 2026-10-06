@@ -33,7 +33,7 @@
   {id:'leite',name:'Ordenhar o curral',item:'leite',projectId:null,x:548,y:918,kind:'cow',cycleSeconds:100},
   {id:'ovos',name:'Recolher os ovos',item:'ovos',projectId:null,x:548,y:918,kind:'chicken',cycleSeconds:80}
  ];
- const BOARD={id:'quadro',name:'Quadro de encomendas',x:566,y:1276};
+ const BOARD={id:'quadro',name:'Quadro de encomendas',x:588,y:1258};
  const ORDERS=[
   {id:'cesta-rosa',npcId:'rosa',title:'A cesta de Rosa',description:'Rosa leva uma cesta às pessoas que ainda não conseguem visitar a feira.',cost:{items:{veg:2,fruta:1}},reward:64},
   {id:'fio-ines',npcId:'ines',title:'Fios e cuidado',description:'Inês prepara um cobertor para a cabana e guarda mel para o chá de quem chega.',cost:{items:{wool:2,mel:1}},reward:42},
@@ -43,13 +43,13 @@
   {id:'rota-caio',npcId:'caio',title:'Provisões de Caio',description:'Caio prepara provisões para os visitantes do oásis; ninguém precisa caminhar de estômago vazio.',cost:{items:{fruta:2,mel:1}},reward:30}
  ];
  const CLUES=[
-  {id:'carta-perdida',title:'Uma dobra na carta',x:264,y:928,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Uma dobra guarda terra fresca da horta.'},
+  {id:'carta-perdida',title:'Uma dobra na carta',x:208,y:896,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Uma dobra guarda terra fresca da horta.'},
   {id:'ponte-marca',title:'Marcas sob a ponte',x:720,y:936,text:'O verso da placa tem uma seta feita para virar. Tomás reconhece o encaixe: estas marcas orientavam as trocas antes da ventania.'},
   {id:'horta-caderno',title:'O caderno da horta',x:332,y:976,text:'Três colunas dizem “alto, margem, areia”. São os lugares de quem guardou as amostras antes da ventania, não coordenadas de um tesouro.'},
   {id:'cabana-fita',title:'Uma fita na cabana',x:520,y:272,text:'Uma fita de lã prende um recado de Inês, datado de antes da ventania: “Reserva entregue; se a neve fechar a rota, a próxima tentativa continua aqui.”'},
   {id:'oasis-caixa',title:'A caixa do oásis',x:640,y:1812,text:'A etiqueta tem as assinaturas de Rosa e Caio: “Esta reserva pertence ao vale. Não confundir troca com dívida.” A rede também alcançava o oásis.'},
-  {id:'mapa-nico',title:'O mapa de Nico',x:392,y:1000,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Você já conhecia esta ideia.'},
-  {id:'arquivo-casa',title:'O arquivo da Casa',x:650,y:1274,text:'O acordo distribuía amostras entre os três biomas e previa encontros para comparar o que crescia. Os papéis voaram; o silêncio desfez os encontros. As sementes já estavam protegidas pela rede.'}
+  {id:'mapa-nico',title:'O mapa de Nico',x:624,y:1064,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Você já conhecia esta ideia.'},
+  {id:'arquivo-casa',title:'O arquivo da Casa',x:650,y:1264,text:'O acordo distribuía amostras entre os três biomas e previa encontros para comparar o que crescia. Os papéis voaram; o silêncio desfez os encontros. As sementes já estavam protegidas pela rede.'}
  ];
  let callbacks={},API=null,state=fresh(),animalCache={objects:null,length:0,list:[]};
  const sprites=new Map();
@@ -146,16 +146,18 @@
  // As atividades usam móveis e anexos do cenário, sem toldos ou placas soltas.
  // O contato no chão permanece pequeno e coincide com o volume de colisão.
  function paintProject(g,id,done){
-  R(g,'rgba(32,50,38,.16)',7,39,34,4);
+  R(g,'rgba(32,50,38,.10)',9,40,32,3);R(g,'rgba(32,50,38,.18)',11,39,26,2);
   if(id==='oficina'){
    R(g,P.dark,10,27,28,5);R(g,P.wood,10,26,28,4);R(g,P.light,10,26,28,1);
-   R(g,P.dark,12,31,3,10);R(g,P.dark,33,31,3,done?10:6);R(g,P.wood,14,36,20,3);
+   R(g,P.dark,12,31,3,10);R(g,P.dark,33,31,3,done?10:6);R(g,P.wood,14,36,20,3);R(g,P.light,12,32,1,8);R(g,P.light,33,32,1,done?8:4);
+   R(g,'#796044',35,27,3,4);R(g,P.dark,16,29,2,1);R(g,P.dark,31,29,2,1);
    if(done){R(g,P.cream,15,23,10,3);R(g,P.clay,16,23,8,1);R(g,P.dark,29,16,2,10);R(g,'#aeb3a0',26,16,8,3);R(g,P.dark,22,23,11,2);R(g,P.light,32,21,3,4);}
    else{R(g,P.dark,25,26,3,4);R(g,P.wood,14,38,15,2);R(g,'#aeb3a0',19,23,7,2);}
   }else if(id==='cozinha'){
    R(g,'#7f8174',12,25,24,15);R(g,'#a3a48e',12,25,22,2);R(g,P.dark,12,37,24,3);
    for(let y=29;y<37;y+=4){R(g,'#626d60',13,y,22,1);R(g,'#626d60',y%3?20:27,y-2,1,3);}
    R(g,P.dark,18,31,10,6);R(g,done?P.clay:P.dark,19,32,8,4);if(done)R(g,P.amber,21,34,4,2);
+   R(g,'#616c61',33,27,3,10);R(g,'#bab79e',14,27,2,9);
    R(g,P.dark,16,20,16,6);R(g,done?'#bec1aa':'#858b7b',17,20,14,4);R(g,P.cream,19,19,10,1);R(g,P.dark,22,17,4,2);
    if(done){R(g,P.dark,33,13,3,13);R(g,'#b2b3a1',33,13,2,12);R(g,P.wood,10,40,6,2);R(g,P.wood,31,40,8,2);}else{R(g,P.dark,23,21,2,4);R(g,'#787b6d',13,40,10,2);}
   }else if(id==='apiario'){
@@ -163,10 +165,12 @@
     R(g,P.dark,x+2,37,2,4);R(g,P.dark,x+13,37,2,4);R(g,done?P.wood:P.dark,x,y,17,37-y);
     for(let row=y+2;row<37;row+=5){R(g,done?P.light:'#8b7959',x+1,row,15,1);R(g,P.dark,x+1,row+3,15,1);}
     R(g,P.dark,x-1,y-2,19,3);R(g,done?P.green:'#777456',x,y-2,17,1);R(g,P.ink,x+5,35,7,2);
+    R(g,'#786449',x+14,y+1,3,14);R(g,P.light,x+1,y+1,1,13);R(g,P.wood,x+3,37,11,2);
    }
   }else{
    R(g,P.dark,13,23,17,16);R(g,P.wood,14,23,15,15);R(g,P.light,15,24,2,13);
    R(g,P.dark,13,28,17,2);R(g,P.dark,13,35,17,2);R(g,done?'#81958c':'#767b6c',29,17,3,21);
+   R(g,'#715d43',26,24,3,13);R(g,P.light,19,25,1,10);R(g,P.light,23,25,1,10);
    R(g,P.dark,27,16,9,3);R(g,done?'#aeb9a6':'#7c8374',29,17,12,2);R(g,P.dark,38,18,3,8);
    R(g,done?P.water:P.dark,15,22,13,2);R(g,P.dark,32,37,10,3);R(g,done?P.water:'#777456',33,38,8,1);
    if(!done){R(g,P.dark,21,30,2,7);R(g,P.wood,17,40,12,2);}
@@ -178,31 +182,41 @@
   if(done&&maintained(o.projectId))R(g,P.light,o.x-8,o.y-9,8,1);
  }
  function footprint(o){
+  if(o?.type==='farm_life_clue'){
+   const size={'carta-perdida':[20,9],'horta-caderno':[22,8],'oasis-caixa':[20,9],'arquivo-casa':[20,9]}[o.clueId];
+   return size?{x:o.x-size[0]/2,y:o.y-size[1],w:size[0],h:size[1]}:null;
+  }
+  if(o?.type==='farm_life_station'){
+   const size={curral:[24,6],pomar:[16,6]}[o.stationId];
+   return size?{x:o.x-size[0]/2,y:o.y-size[1],w:size[0],h:size[1]}:null;
+  }
   if(o?.type!=='farm_life_project'||!project(o.projectId))return null;
   const h=built(o.projectId)?(o.projectId==='apiario'?18:o.projectId==='oficina'?12:16):8;
   const w=o.projectId==='apiario'?40:o.projectId==='cozinha'?26:24;
   return{x:o.x-w/2,y:o.y-h,w,h};
  }
  function drawMarker(o,g){
+  // O quadro pertence à fachada desenhada em 29-world-depth; aqui fica só o E.
+  if(o.type==='farm_life_station'&&o.stationId==='quadro')return;
   const key=o.type==='farm_life_clue'?'clue:'+o.clueId:'station:'+o.stationId,c=cached(key,32,30,c=>{
    if(o.type==='farm_life_clue'){
     const id=o.clueId;
     if(id==='ponte-marca'){for(let n=0;n<3;n++){R(c,'#786a4a',10+n*4,20,1,6);R(c,'#ad9565',11+n*4,20,1,6);}return;}
     if(id==='cabana-fita'){R(c,P.dark,14,11,3,16);R(c,P.cream,15,12,1,14);R(c,P.clay,11,12,9,3);R(c,P.clay,16,15,3,6);R(c,P.light,13,13,3,1);return;}
-    R(c,'rgba(30,48,36,.14)',7,26,19,3);
+    if(id!=='mapa-nico')R(c,'rgba(30,48,36,.14)',7,26,19,3);
     if(id==='oasis-caixa'||id==='arquivo-casa'){
      R(c,P.dark,6,17,20,10);R(c,P.wood,7,18,18,8);R(c,P.light,7,18,18,1);R(c,P.dark,7,22,18,1);R(c,P.cream,13,16,10,4);R(c,P.dark,16,18,5,1);
+     R(c,'#705e45',23,19,3,8);R(c,P.light,8,20,1,6);R(c,P.dark,9,20,1,1);R(c,P.dark,20,24,1,1);R(c,P.clay,15,16,2,2);
     }else if(id==='horta-caderno'){
-     R(c,P.dark,9,20,15,8);R(c,P.green,9,19,14,7);R(c,P.cream,11,20,11,4);R(c,P.light,9,25,14,1);R(c,P.dark,15,21,6,1);
+     R(c,P.dark,8,21,3,7);R(c,P.dark,22,21,3,7);R(c,P.wood,6,19,22,4);R(c,P.light,6,19,22,1);R(c,'#756345',24,20,4,3);
+     R(c,P.dark,9,17,15,4);R(c,P.green,9,14,14,6);R(c,P.cream,11,15,11,4);R(c,P.light,9,20,14,1);R(c,P.dark,15,16,6,1);
     }else if(id==='mapa-nico'){
-     R(c,P.dark,8,20,16,8);R(c,P.cream,8,19,15,7);R(c,P.light,13,19,1,7);R(c,P.light,18,19,1,7);R(c,P.green,10,21,4,1);R(c,P.green,14,22,6,1);R(c,P.clay,20,23,2,2);
+     // O papel repousa no banco já existente, fora da via principal.
+     R(c,'#715e40',8,27,16,1);R(c,P.cream,8,22,15,5);R(c,P.light,13,22,1,5);R(c,P.light,18,22,1,5);R(c,P.green,10,23,4,1);R(c,P.green,14,24,6,1);R(c,P.clay,20,25,2,1);
     }else{
-     R(c,P.wood,8,24,17,4);R(c,P.dark,8,27,17,1);R(c,P.cream,10,20,13,6);R(c,P.light,12,21,9,1);R(c,P.light,14,23,5,1);R(c,P.clay,16,23,2,2);
+     R(c,P.dark,6,18,20,10);R(c,P.wood,7,19,18,8);R(c,P.light,7,19,18,1);R(c,'#715f44',23,20,3,7);R(c,P.dark,7,24,16,1);
+     R(c,P.cream,10,14,13,6);R(c,P.light,12,15,9,1);R(c,P.light,14,17,5,1);R(c,P.clay,16,17,2,2);
     }
-   }else if(o.stationId==='quadro'){
-    R(c,P.dark,6,8,21,16);R(c,P.wood,7,9,19,14);R(c,P.light,7,9,19,1);
-    for(let n=0;n<2;n++){R(c,P.cream,9+n*9,12,7,8);R(c,P.dark,10+n*9,14,4,1);R(c,P.clay,11+n*9,11,2,1);}
-    R(c,P.dark,8,24,17,2);
    }else if(o.stationId==='curral'){
     R(c,'rgba(30,48,36,.14)',4,27,24,2);R(c,P.dark,4,20,24,7);R(c,P.wood,5,21,22,5);R(c,P.light,5,21,22,1);R(c,P.green,7,22,18,2);R(c,P.dark,7,26,2,2);R(c,P.dark,23,26,2,2);
    }else{

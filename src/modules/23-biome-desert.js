@@ -42,7 +42,7 @@
     add({type:'des_bones', x:18*TS+8, y:11*TS+12});
     add({type:'des_bones', x:33*TS+8, y:28*TS+12});
     // palmeiras no oásis
-    add({type:'des_palm', x:29*TS+8, y:15*TS+18});
+    add({type:'des_palm', x:27*TS+8, y:14*TS+18});
     add({type:'des_palm', x:37*TS+8, y:19*TS+18});
     // Areia caminhável na margem sul do oásis, sem exigir entrar na água.
     add({type:'des_oasis_fillpoint', x:33*TS+8, y:21*TS+14, interactionHint:'coletar água do oásis'});

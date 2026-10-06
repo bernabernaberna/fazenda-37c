@@ -77,6 +77,11 @@
     // Cada etapa da história deixa trabalho visível no espaço comunitário.
     const signY=eave+2;R(g,P.woodDark,x+front/2-27,signY,54,9);R(g,P.pathLight,x+front/2-26,signY+1,52,7);
     g.fillStyle=P.woodDark;g.textAlign='center';g.font='bold 5px monospace';g.fillText('CASA DAS SEMENTES',x+front/2,signY+6);
+    // Quadro preso à parede, entre janela e porta, em todas as etapas da Casa.
+    // A interação fica nos pés da fachada; a arte compartilha sua profundidade.
+    const qx=x+30,qy=base-19;R(g,'rgba(36,42,31,.25)',qx+1,qy+1,14,14);
+    R(g,P.woodDark,qx,qy,14,14);R(g,P.wood,qx+1,qy+1,12,12);R(g,P.woodLight,qx+1,qy+1,12,1);
+    for(let k=0;k<2;k++){R(g,P.cream,qx+2+k*6,qy+4,4,7);R(g,P.woodDark,qx+2+k*6,qy+7,3,1);R(g,P.clayDark,qx+3+k*6,qy+3,1,1);}
     if(stage>=1){R(g,P.woodDark,x-13,base-3,17,4);R(g,P.woodLight,x-13,base-4,17,2);R(g,P.woodDark,x-11,base,2,8);R(g,P.woodDark,x+1,base,2,8);R(g,P.stone,x-9,base-7,6,3);}
     if(stage>=2){for(let k=0;k<2;k++){const xx=x+w+2+k*10;R(g,P.woodDark,xx,base-9-k*3,10,10);R(g,P.woodLight,xx+1,base-8-k*3,8,7);R(g,P.wood,xx+1,base-5-k*3,8,1);R(g,P.sage,xx+2,base-11-k*3,5,3);}}
     if(stage===3){line(g,P.woodDark,x-6,eave+6,x+w+5,eave-6);for(let i=0;i<8;i++){const xx=x+i*14,yy=eave+6-i;poly(g,[P.teal,P.amber,P.berry][i%3],[[xx,yy],[xx+8,yy-1],[xx+4,yy+7]]);}R(g,P.amber,dx+3,dy+2,dw-6,3);}
@@ -149,7 +154,7 @@
 
   function footprint(o){
    switch(o.type){
-    case 'farm_life_project':return window.FarmLife?.footprint(o)||null;
+    case 'farm_life_project':case 'farm_life_clue':case 'farm_life_station':return window.FarmLife?.footprint(o)||null;
     case 'house':case 'barn':case 'story_seed_house':return{x:o.x-3,y:o.y+4,w:o.w+6,h:o.h-7};
     case 'mtn_cabin':return{x:o.x-33,y:o.y-35,w:64,h:38};
     case 'tree':case 'fx_fruittree':return{x:o.x-5,y:o.y-3,w:10,h:12};
@@ -166,7 +171,7 @@
   function isBlocked(x,y,from){
    const m=API.scenes.main;if(!m||x<8||y<8||x>m.MW*S-8||y>m.MH*S-8)return true;
    if([undefined,T.WATER,T.RIVER,T.OASIS].includes(m.map[Math.floor(y/S)]?.[Math.floor(x/S)]))return true;
-   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
+   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project','farm_life_clue','farm_life_station']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
      // Saves anteriores podem começar dentro de um novo tronco/volume.
      // Permite somente sair em direção à borda, nunca atravessar o obstáculo.
      if(from&&contains(b,from.x,from.y+7)){

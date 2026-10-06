@@ -28,7 +28,7 @@
       {type:'fx_berry', x:px(20), y:px(37)+8, _pickT:0},
       {type:'fx_lookout', x:px(30), y:px(37)+8},
       {type:'fx_fruittree', x:px(8),  y:px(36)+8, kind:1},
-      {type:'fx_fruittree', x:px(40), y:px(34)+8, kind:0},
+      {type:'fx_fruittree', x:px(44), y:px(35)+8, kind:0},
     ];
     [...east, ...south].forEach(o=> API.addObjectToMain(o));
 
