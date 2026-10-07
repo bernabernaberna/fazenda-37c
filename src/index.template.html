@@ -9590,22 +9590,6 @@ function updateAndDrawSnow(camX, camY){
   }
 }
 
-/* ---------- Clouds (drift across sky) ---------- */
-const clouds = (()=>{ const a=[]; for(let i=0;i<5;i++){ a.push({ x: Math.random()*VW*1.4 - 60, y: 18 + Math.random()*70, w: 32 + Math.random()*36, h: 10 + Math.random()*6, sp: 0.06 + Math.random()*0.08 }); } return a; })();
-function updateAndDrawClouds(camX, camY, alpha){
-  for(const c of clouds){
-    c.x += c.sp;
-    if(c.x > _visW + 60) c.x = -c.w - 20;
-    const cx = camX + c.x, cy = camY + c.y;
-    ctx.fillStyle = `rgba(255,255,255,${alpha*0.55})`;
-    ctx.fillRect(cx, cy, c.w, c.h);
-    ctx.fillRect(cx+5, cy-3, c.w-12, 4);
-    ctx.fillRect(cx+10, cy-6, c.w-22, 4);
-    ctx.fillStyle = `rgba(220,228,240,${alpha*0.42})`;
-    ctx.fillRect(cx, cy+c.h-2, c.w, 2);
-  }
-}
-
 /* ---------- Sun / Moon ----------
    timeOfDay is a number 0..24 (game hours).
    Sun rises at 6h, peaks at 12h, sets at 18h.
@@ -9993,10 +9977,7 @@ function drawCrop(tx,ty,c){
 function drawTree(o){
   let x=o.x, y=o.y;
   const winter = isFrio();
-  // Sombra da copa — mesma elipse que `inShade()` testa (ver treeShadowEllipse).
-  const sh = treeShadowEllipse(o);
-  ctx.fillStyle = winter ? 'rgba(10,18,22,0.18)' : 'rgba(20,30,10,0.28)';
-  ctx.beginPath(); ctx.ellipse(sh.cx, sh.cy, sh.rx, sh.ry, 0, 0, Math.PI*2); ctx.fill();
+  // A projeção da copa pertence à passagem de chão, antes das entidades.
   if(winter){
     ctx.fillStyle='rgba(245,250,255,0.55)';
     ctx.beginPath(); ctx.ellipse(x, y+11, o.shadeR*0.42, 2.8, 0, 0, Math.PI*2); ctx.fill();
@@ -13828,14 +13809,12 @@ function treeShadowEllipse(o, sv){
            rx: o.shadeR * (1 + spread * 0.30),
            ry: o.shadeR * 0.45 };
 }
-// Meia-largura/altura do "pé" de cada objeto que projeta sombra.
-// Casa/celeiro NÃO entram: já desenham a própria sombra de contato.
-// ÁRVORE também não: `drawTree` desenha a dela (com o raio real de sombra,
-// que é o que a física lê). Estava nas duas listas e cada árvore aparecia com
-// DUAS sombras sobrepostas, de tamanhos e direções diferentes.
+// Meia-largura/altura e deslocamento até o apoio visual de cada objeto.
+// Vegetação alta e construções são atendidas por FarmWorldDepth.drawGroundShadows.
+// Esta lista contém só entidades e objetos menores, evitando projeções duplicadas.
 const SUN_SHADOW_SIZE = {
-  bush:[6,2.4], scarecrow:[5,2.2], sunflower:[4,1.9],
-  well:[8,3.2], woodpile:[8,3.0], sellbox:[7,2.8], loom:[7,2.8], bench:[8,2.6],
+  bush:[6,2.4,3], scarecrow:[5,2.2,16], sunflower:[4,1.9,8],
+  well:[8,3.2,1], woodpile:[8,3.0,8], sellbox:[7,2.8,10], loom:[7,2.8,12], bench:[8,2.6,8],
   // Jogador e animais também projetam sombra direcional. Sem eles a cena contava
   // duas histórias de luz: às 7h a árvore jogava sombra longa para o lado e a
   // vaca ao lado mantinha uma bolinha redonda colada aos pés.
@@ -13859,7 +13838,7 @@ function drawSunShadows(list){
     const dim = SUN_SHADOW_SIZE[o.type]; if(!dim) continue;
     const rx = dim[0], ry = dim[1];
     const ox = s.dx * rx * 1.1;
-    const footY=o.y+(o.type==='player'?10:o.type==='animal'?(['chick','chicken'].includes(o.kind)?4:6):1);
+    const footY=o.y+(o.type==='player'?10:o.type==='animal'?(['chick','chicken'].includes(o.kind)?4:6):(dim[2]??1));
     // penumbra (maior e mais fraca) primeiro, depois o núcleo da sombra
     ctx.globalAlpha = s.a * 0.45;
     ctx.beginPath();
@@ -13902,6 +13881,7 @@ function drawCinematicWorld(g,view={}){
     for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
     visible.sort((a,b)=>(window.FarmWorldDepth?FarmWorldDepth.depth(a)-FarmWorldDepth.depth(b):a.y-b.y));
     drawSunShadows(visible);
+    window.FarmWorldDepth?.drawGroundShadows(g,visible,sunShadowVec());
     for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
     return true;
   }finally{
@@ -14070,13 +14050,11 @@ function render(){
     drawRiverAnimation(camX, camY, visW, visH);
   }
 
-  // Animated grass blades + wind streaks (outdoor)
+  // Riscos discretos de vento; tufos são desenhados uma vez pelo módulo 27.
   if(typeof drawGrassSway === 'function') drawGrassSway(camX, camY, visW, visH);
 
-  // Sky elements that drift behind everything (outdoor only)
+  // Vista superior: nuvens brancas não são pintadas sobre o terreno.
   if(!isIndoor()){
-    // Vista de cima: a fonte de luz fica fora do quadro; sombras indicam o sol.
-    updateAndDrawClouds(camX, camY, isFrio() ? 0.7 : 0.55);
     // Pássaros cruzando o céu (atrás dos objetos)
     if(typeof drawSongbirds === 'function') drawSongbirds();
   }
@@ -14111,6 +14089,7 @@ function render(){
   });
   // Sombras projetadas do sol — sob TODOS os objetos, antes de desenhá-los
   drawSunShadows(drawables);
+  if(!isIndoor())window.FarmWorldDepth?.drawGroundShadows(ctx,drawables,sunShadowVec());
 
   for(const o of drawables){
     if(OBJECT_DRAWERS[o.type]) OBJECT_DRAWERS[o.type](o, ctx);

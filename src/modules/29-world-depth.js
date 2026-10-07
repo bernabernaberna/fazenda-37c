@@ -31,8 +31,7 @@
    const barn=kind==='barn',cabin=kind==='cabin',seed=kind==='seed';
    const wall= barn?'#9f5948':cabin?'#92704f':'#d9c899';
    const trim=barn?'#e3c496':P.woodDark;
-   // Contato, penumbra e projeção lateral apoiam a construção no terreno.
-   poly(g,'rgba(30,48,40,.16)',[[x+5,base+5],[x+w+7,base-3],[x+w+30,base+14],[x+24,base+22]]);
+   // Só contato fica no sprite. A projeção do sol vem antes das entidades.
    R(g,'rgba(25,40,34,.24)',x-3,base,w+10,7);
    poly(g,P.stoneDark,[[x+front,base-1],[x+w,base-12],[x+w,base-5],[x+front,base+6]]);
    R(g,P.stoneDark,x,base-2,front,8);R(g,P.stone,x,base-2,front,3);
@@ -126,7 +125,7 @@
    sprite(g,'ridge:'+o.biome+o.w+o.rise,o.x-10,o.y-o.rise-12,o.w+45,o.h+o.rise+40,c=>{
     const x=10,y=o.rise+12,w=o.w,h=o.h,z=o.rise,d=o.biome==='desert';
     const top=d?'#d6b37b':'#b6cdcb',face=d?'#ad7653':'#718988',shade=d?'#795746':'#4b686b';
-    poly(c,'rgba(33,50,42,.17)',[[x,y+h-1],[x+w,y+h-5],[x+w+25,y+h+16],[x+23,y+h+23]]);
+    R(c,'rgba(33,50,42,.19)',x+2,y+h-1,w-4,4);
     poly(c,shade,[[x+w-12,y-z+5],[x+w,y-z+16],[x+w,y+h-12],[x+w-12,y+h]]);
     const pts=[[x,y-z+18],[x+12,y-z+4],[x+w*.35,y-z],[x+w*.53,y-z+9],[x+w*.82,y-z+3],[x+w-12,y-z+7],[x+w-12,y+h],[x+15,y+h-3],[x,y+h-13]];
     poly(c,face,pts);
@@ -218,6 +217,60 @@
    // Pequenos contrafortes de terra sob as bordas dos canteiros existentes.
    for(const f of fields){R(g,'rgba(36,50,31,.2)',f.x*S,(f.y+f.h)*S,f.w*S,3);R(g,'#9a7954',f.x*S,(f.y+f.h)*S,f.w*S,1);}
   }
+  // Silhuetas pequenas e imutáveis: não há cache novo por objeto, câmera ou hora.
+  // A transformação achata a altura sobre o chão e acompanha o MESMO eixo do sol.
+  const pineShadow=[[-3,0],[3,0],[3,-13],[21,-13],[12,-27],[17,-27],[8,-39],[12,-39],[4,-51],[7,-51],[0,-64],[-7,-51],[-4,-51],[-12,-39],[-8,-39],[-17,-27],[-12,-27],[-21,-13],[-3,-13]];
+  const palmShadow=[[-2,0],[3,0],[0,-40],[8,-35],[21,-25],[13,-38],[26,-42],[10,-46],[22,-54],[8,-51],[0,-44],[-8,-51],[-22,-54],[-10,-46],[-26,-42],[-13,-38],[-21,-25],[-8,-35],[-3,-40]];
+  function foliageProjection(g,shape,x,y,dx){
+   g.beginPath();
+   for(let i=0;i<shape.length;i++){
+    const [xx,yy]=shape[i],px=x+xx-yy*dx*.58,py=y-yy*(.12+Math.abs(dx)*.05);
+    if(i)g.lineTo(px,py);else g.moveTo(px,py);
+   }
+   g.closePath();g.fill();
+  }
+  function volumeProjection(g,x,base,w,height,dx,ridge){
+   const ox=dx*Math.min(34,height*.42),reach=5+Math.abs(dx)*7,side=ridge?3:8;
+   // Mesmo apoio da fachada; o vetor desloca somente a ponta da projeção.
+   g.beginPath();g.moveTo(x-2,base);g.lineTo(x+w+2,base-side);
+   g.lineTo(x+w+2+ox,base+reach-side);g.lineTo(x+ox,base+reach+2);
+   g.closePath();g.fill();
+  }
+  function drawGroundShadows(g,visible,sol){
+   if(API.rawScene!=='main'||!g||!visible)return 0;
+   const sun=sol===undefined?(typeof sunShadowVec==='function'?sunShadowVec():null):sol;
+   const projected=!!sun&&Number.isFinite(sun.dx)&&Number.isFinite(sun.a)&&sun.a>0;
+   const dx=projected?Math.max(-1.6,Math.min(1.6,sun.dx)):0,cold=!!API.isFrio();
+   const alpha=projected?Math.min(.19,sun.a*.78):0;
+   let count=0;g.save();
+   try{
+    for(const o of visible){
+     if(o.type==='tree'){
+      // Contrato didático: a área visível continua EXATAMENTE a de inShade().
+      // Sem sol/reduzir movimento mantém a elipse central, inclusive no frio.
+      const sh=treeShadowEllipse(o,sun);
+      g.fillStyle=cold?'rgba(24,59,54,.17)':'rgba(24,59,54,.27)';
+      g.beginPath();g.ellipse(sh.cx,sh.cy,sh.rx,sh.ry,0,0,Math.PI*2);g.fill();count++;
+      continue;
+     }
+     if(!projected)continue;
+     g.fillStyle='rgba(24,47,40,'+alpha+')';
+     switch(o.type){
+      case 'mtn_pine':foliageProjection(g,pineShadow,o.x,o.y+1,dx);break;
+      case 'des_palm':foliageProjection(g,palmShadow,o.x+2,o.y+1,dx);break;
+      case 'fx_fruittree':
+       g.beginPath();g.ellipse(o.x+dx*14,o.y+9,21+Math.abs(dx)*5,8,0,0,Math.PI*2);g.fill();break;
+      case 'house':case 'barn':case 'story_seed_house':
+       volumeProjection(g,o.x,o.y+o.h-2,o.w,o.h,dx,false);break;
+      case 'mtn_cabin':volumeProjection(g,o.x-32,o.y,64,68,dx,false);break;
+      case 'world_ridge':volumeProjection(g,o.x,o.y+o.h,o.w,o.rise,dx,true);break;
+      default:continue;
+     }
+     count++;
+    }
+   }finally{g.restore();}
+   return count;
+  }
   function windowLights(o){
    if(o.type==='mtn_cabin')return[{x:o.x,y:o.y-10,r:17}];
    if(!['house','barn','story_seed_house'].includes(o.type))return null;
@@ -225,6 +278,6 @@
    if(o.type!=='barn')points.push({x:o.x+o.w-34,y:o.y+64,r:25},{x:o.x+o.w/2,y:o.y+o.h-26,r:16});
    return points;
   }
-  window.FarmWorldDepth=Object.freeze({version:1,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawPenBase,penParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
+  window.FarmWorldDepth=Object.freeze({version:2,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawGroundShadows,drawPenBase,penParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
  });
 })();
