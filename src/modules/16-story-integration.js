@@ -140,8 +140,19 @@
     FarmStoryCinematics.play(cinematicQueue.shift());
   }
   function notifyNewGame(){cinematicQueue.length=0;lastStory=null;observeStory(FarmStoryWorld.snapshot());queueScene('carta');}
+  function conversationPose(o,hero=false){
+    const delivery=window.FarmStoryUI?.speechState?.(hero?undefined:o.npcId)||{};
+    if(!delivery.expression)return null;
+    const target=hero?actors.find(a=>a.npcId===FarmStoryUI.presentation()?.npcId):player;
+    if(!target)return null;
+    const dx=target.x-o.x,dy=target.y-o.y;
+    // Olhar é só apresentação; direção de rota, fase e posição da simulação
+    // ficam intactas enquanto o jogador lê ou decide o que responder.
+    return {...delivery,facing:Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0),gaze:Math.sign(dx),
+      speaking:hero?false:delivery.speaking,gesture:hero?'listen':delivery.gesture,expression:hero?'thoughtful':delivery.expression};
+  }
   function drawNPC(o,g){
-    const delivery=window.FarmStoryUI?.speechState?.(o.npcId)||{};
+    const delivery=conversationPose(o)||{};
     const pose=delivery.expression?{...o,moving:false,gaitBlend:0,npcActivity:'talk'}:o;
     window.FarmCharacterArt?.drawNPC(g,pose,{winter:isFrio(),time:performance.now(),...delivery,reducedMotion:!!A11Y.reduceMotion});
     if(!gameStarted||cutsceneActive||player.dead||currentScene!=='main')return;
@@ -290,7 +301,7 @@
   function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
   function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
   function isOpen(){return !!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()||!!window.FarmValleyPanels?.isOpen?.();}
-  window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,
+  window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,conversationPose,
     cinematicQueue:()=>cinematicQueue.slice(),
     navigationState(){return actors.map(o=>({npcId:o.npcId,x:o.x,y:o.y,moving:o.moving,anim:o.anim,activity:o.npcActivity,routeLength:o._route.length,routine:o.routineDescription,region:o.region}));},
     record,isOpen,queueScene,refresh:refreshNarrative};

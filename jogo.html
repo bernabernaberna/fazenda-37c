@@ -4281,9 +4281,11 @@ body.hud-game #legend{display:none !important;}
   function log(kind,id){state.log.push({kind,id,cycleId:state.cycleId,sequence:state.sequence});state.log=state.log.slice(-48);}
   function changed(){emit('onChange',snapshot());}
   function show(npcId,message,kind='response',choices=[],title){
+    const acting={rosa:{expression:'warm',gesture:'reassure'},lia:{expression:'thoughtful',gesture:'point'},tomas:{expression:'warm',gesture:'shrug'},ines:{expression:'thoughtful',gesture:'point'},caio:{expression:'warm',gesture:'nod'},nico:{expression:'joyful',gesture:'point'}};
+    const performance=kind==='lore'||kind==='letter'?{expression:'thoughtful',gesture:'reflect'}:kind==='response'?{expression:'warm',gesture:'nod'}:acting[npcId]||acting.rosa;
     const c=byId[npcId];dialogue={npcId,speaker:c?c.name:'Rosa',role:c?c.role:'A carta que trouxe você ao vale',
       title:title||'Conversa com '+(c?c.name:'Rosa'),text:message,kind,
-      choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:kind==='response'};
+      choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:kind==='response',...performance};
     // Respostas com escolhas conservam avanço por API; a UI exibe só as respostas
     // explícitas para não duplicar "continuar" ao lado de "continuar a conversa".
     emit('onDialogue',currentDialogue());return currentDialogue();
@@ -4302,7 +4304,10 @@ body.hud-game #legend{display:none !important;}
     return{...def,...context,objectives};
   }
   function letterView(){return sagaStage()?{title:'A carta de Rosa · antes do retorno',text:'Esta é a carta que Rosa enviou antes do seu retorno. Ela permanece guardada como memória daquele começo.\n\n'+letter.text}:letter;}
-  function currentTopic(npcId,topic){if(sagaStage()<7)return topic;
+  function currentTopic(npcId,topic){
+    const current=window.FarmValleySaga?.conversationTopic?.(npcId,topic[0]);
+    if(current)return[topic[0],current.label,current.reply,current.memory];
+    if(sagaStage()<7)return topic;
     if(npcId==='tomas'&&topic[0]==='bench')return['bench','Como manter a Casa em atividade?',
       'A bancada e a mesa já estão em uso. Agora quero manter os encaixes firmes, cumprir os prazos e deixar espaço para quem aprende. Produção, venda e manutenção ajudam a Casa a continuar útil depois da investigação.',
       'Tomás lembrou que manter a Casa em atividade também exige cuidado, prazos e espaço para aprender.'];
@@ -4431,7 +4436,7 @@ body.hud-game #legend{display:none !important;}
       message=visit%3===1?after[npcId]:greetings[npcId][(visit-1)%greetings[npcId].length];
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
-    if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId);
+    if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
     const activity=text(s.activities[npcId],180);
     if(!preamble){
       const echo=decisionEcho(npcId),notice=noticeLines[npcId];
@@ -5057,8 +5062,19 @@ body.hud-game #legend{display:none !important;}
     FarmStoryCinematics.play(cinematicQueue.shift());
   }
   function notifyNewGame(){cinematicQueue.length=0;lastStory=null;observeStory(FarmStoryWorld.snapshot());queueScene('carta');}
+  function conversationPose(o,hero=false){
+    const delivery=window.FarmStoryUI?.speechState?.(hero?undefined:o.npcId)||{};
+    if(!delivery.expression)return null;
+    const target=hero?actors.find(a=>a.npcId===FarmStoryUI.presentation()?.npcId):player;
+    if(!target)return null;
+    const dx=target.x-o.x,dy=target.y-o.y;
+    // Olhar é só apresentação; direção de rota, fase e posição da simulação
+    // ficam intactas enquanto o jogador lê ou decide o que responder.
+    return {...delivery,facing:Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0),gaze:Math.sign(dx),
+      speaking:hero?false:delivery.speaking,gesture:hero?'listen':delivery.gesture,expression:hero?'thoughtful':delivery.expression};
+  }
   function drawNPC(o,g){
-    const delivery=window.FarmStoryUI?.speechState?.(o.npcId)||{};
+    const delivery=conversationPose(o)||{};
     const pose=delivery.expression?{...o,moving:false,gaitBlend:0,npcActivity:'talk'}:o;
     window.FarmCharacterArt?.drawNPC(g,pose,{winter:isFrio(),time:performance.now(),...delivery,reducedMotion:!!A11Y.reduceMotion});
     if(!gameStarted||cutsceneActive||player.dead||currentScene!=='main')return;
@@ -5207,7 +5223,7 @@ body.hud-game #legend{display:none !important;}
   function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
   function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
   function isOpen(){return !!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()||!!window.FarmValleyPanels?.isOpen?.();}
-  window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,
+  window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,conversationPose,
     cinematicQueue:()=>cinematicQueue.slice(),
     navigationState(){return actors.map(o=>({npcId:o.npcId,x:o.x,y:o.y,moving:o.moving,anim:o.anim,activity:o.npcActivity,routeLength:o._route.length,routine:o.routineDescription,region:o.region}));},
     record,isOpen,queueScene,refresh:refreshNarrative};
@@ -7108,6 +7124,16 @@ body.hud-game #legend{display:none !important;}
   // A margem é transparente: reserva o arco de passada e a ponta da ferramenta.
   // O contato com o chão continua em y+10, sem alterar colisão ou profundidade.
   const W=48,H=52,AX=24,AY=38,FEET_Y=10,MAX_SPRITES=768,MAX_PORTRAITS=256,MAX_SPEECH_BANKS=48;
+  const SPEECH_POSES=4,SPEECH_FRAMES=SPEECH_POSES*8;
+  const gestures=Object.freeze(['explain','invite','nod','listen','point','reflect','reassure','shrug']);
+  const expressions=Object.freeze(['neutral','warm','thoughtful','concerned','joyful','resolved','surprised']);
+  const armGestures=Object.freeze(['explain','invite','point','reflect','reassure','shrug']);
+  const heldProps=Object.freeze(['seed','notebook','sign','ribbon','crate','vessel']);
+  // Rosa acompanha a fala com calma; Nico começa rápido e logo espera. Os
+  // tempos pertencem à identidade, sem sorteio ou estado persistente extra.
+  const acting=Object.freeze({rosa:[4.9,1.12,.20],lia:[3.8,.95,.09],tomas:[5.3,1.22,.27],
+    ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],player:[4.4,1,.12]});
+  const syllables=Object.freeze(['0121031200103200012010300','01321003001210300121000','01200132000130121000300']);
   const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
     if(typeof OffscreenCanvas!=='undefined') return new OffscreenCanvas(w,h);
@@ -7125,17 +7151,26 @@ body.hud-game #legend{display:none !important;}
   function blend(value,fallback){return Math.round(Math.max(0,Math.min(1,Number.isFinite(value)?value:fallback))*8);}
   function position(actor,opts){return {x:Number.isFinite(opts.x)?opts.x:Math.round(Number(actor.x)||0),
     y:Number.isFinite(opts.y)?opts.y:Math.round(Number(actor.y)||0)};}
-  function conversation(opts,allowed=true){
-    const conversing=allowed&&(!!opts.speaking||['explain','invite','nod','listen'].includes(opts.gesture));
-    const expression=conversing&&['warm','thoughtful','concerned','joyful'].includes(opts.expression)?opts.expression:'neutral';
-    const gesture=conversing&&['explain','invite','nod','listen'].includes(opts.gesture)?opts.gesture:'';
+  function conversation(opts,allowed=true,id='player'){
+    const conversing=allowed&&(!!opts.speaking||gestures.includes(opts.gesture));
+    const expression=conversing&&expressions.includes(opts.expression)?opts.expression:'neutral';
+    const gesture=conversing&&gestures.includes(opts.gesture)?opts.gesture:'';
     const t=Math.max(0,Number.isFinite(opts.speechTime)?opts.speechTime:clock(opts)/1000);
-    // A cadência tem pausas entre sílabas, em vez de abrir e fechar como um
-    // metrônomo. São quatro bocas e três níveis de gesto, sempre cacheáveis.
-    const mouth=conversing&&opts.speaking&&!opts.reducedMotion?[0,1,2,1,0,3,1,2,0,1,3,0][Math.floor(t/.12)%12]:0;
-    const speechPhase=conversing&&!opts.reducedMotion&&gesture?[0,0,1,1,2,2,1,0][Math.floor(t/.24)%8]:0;
-    const speechBlink=conversing&&!opts.reducedMotion&&t%4.6>4.42;
-    return{conversing,expression,gesture,mouth,speechPhase,speechBlink};
+    const identity=id==='player'?6:Math.max(0,keys.indexOf(id)),[period,pace,delay]=acting[id]||acting.player;
+    const animated=conversing&&!opts.reducedMotion,pattern=syllables[identity%syllables.length];
+    const mouth=animated&&opts.speaking?Number(pattern[Math.floor(t/(.105*pace))%pattern.length]):0;
+    // Preparação -> gesto -> acomodação -> silêncio. A escuta reage apenas
+    // de vez em quando; não faz o mesmo aceno repetido de quem está falando.
+    const listening=gesture==='listen',beat=Math.max(0,t-delay-(listening?1.35:0))%(period+(listening?2.1:0));
+    const entered=t>=delay+(listening?1.35:0),duration=(listening?1.0:1.5)*pace;
+    let speechPhase=0;
+    if(animated&&gesture&&entered&&beat<duration){
+      const progress=beat/duration;speechPhase=progress<.18?1:progress<.61?2:progress<.90?3:0;
+    }
+    const blinkPeriod=4.1+identity*.29,blinkAt=(t+1.2+identity*.21)%blinkPeriod;
+    const speechBlink=animated&&blinkAt>blinkPeriod-.12;
+    const gaze=conversing?Math.sign(Number(opts.gaze)||0):0;
+    return{conversing,expression,gesture,mouth,speechPhase,speechBlink,gaze};
   }
   function state(actor,opts,hero){
     const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
@@ -7147,7 +7182,7 @@ body.hud-game #legend{display:none !important;}
     // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
     const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
     const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
-    const speech=conversation(opts,!actor.dead&&!rest);
+    const speech=conversation(opts,!actor.dead&&!rest,hero?'player':actor.npcId||actor.id);
     const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
@@ -7156,8 +7191,9 @@ body.hud-game #legend{display:none !important;}
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
-    return {dir:dirOf(actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
+    return {dir:dirOf(opts.facing??actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
       moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
+      heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
       actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
       blink:speech.conversing?speech.speechBlink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
@@ -7208,8 +7244,17 @@ body.hud-game #legend{display:none !important;}
   }
   // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
+  function headDip(s){
+    if(!s.conversing||!s.speechPhase)return 0;
+    if(s.gesture==='nod')return [0,-1,1,0][s.speechPhase];
+    if(s.gesture==='listen'||s.gesture==='reflect')return s.speechPhase===2?1:0;
+    if(s.gesture==='reassure')return s.speechPhase===3?1:0;
+    return 0;
+  }
+  function speechArms(s){return !s.moving&&(!!s.heldProp||(s.conversing&&s.speechPhase>0&&armGestures.includes(s.gesture)));}
+  function bothSpeechArms(s){return speechArms(s)&&(s.gesture==='shrug'||s.heldProp==='crate'||s.heldProp==='notebook'||s.heldProp==='vessel');}
   function paintHead(g,d,s){
-    if(s.conversing){g.save();if(['nod','listen'].includes(s.gesture)&&s.speechPhase===2)g.translate(0,1);}
+    if(s.conversing){g.save();g.translate(0,headDip(s));}
     const side=s.dir===1||s.dir===2,back=s.dir===3;
     // Pescoço, cabeça e cabelo têm silhuetas distintas por membro do elenco.
     rect(g,d.skinSh,-2,-18,4,3);rect(g,d.skinHi,-2,-18,2,2);
@@ -7266,6 +7311,12 @@ body.hud-game #legend{display:none !important;}
       // O queixo continua no mesmo rosto, inclusive sob a barba do Caio.
       // Expressão e boca não atravessam os equipamentos ou o penteado.
       const mx=side?3:-1,my=-18;
+      if(!side&&s.gaze&&!s.blink){
+        // Só as pupilas mudam: não deslocamos olhos, óculos ou a silhueta.
+        rect(g,d.skin,-3,-22,3,2);rect(g,d.skin,1,-22,3,2);
+        rect(g,P.cream,-3,-22,3,1);rect(g,P.cream,1,-22,3,1);
+        rect(g,P.ink,-2+s.gaze,-22,1,2);rect(g,P.ink,2+s.gaze,-22,1,2);
+      }
       rect(g,d.skin,side?2:-2,-19,side?3:5,2);
       if(s.mouth===1){rect(g,d.skinSh,mx,my-1,side?2:3,2);rect(g,P.cream,mx,my-1,side?1:2,1);}
       else if(s.mouth===2){rect(g,P.ink,mx,my-1,side?2:3,2);rect(g,d.skinSh,mx,my+1,side?2:3,1);}
@@ -7279,19 +7330,79 @@ body.hud-game #legend{display:none !important;}
       }else if(s.expression==='joyful'){
         rect(g,d.skinSh,side?4:-4,-20,1,1);if(!side)rect(g,d.skinSh,3,-20,1,1);
         rect(g,P.cream,mx,my-1,side?1:2,1);
+      }else if(s.expression==='resolved'){
+        rect(g,d.hairSh,side?2:-3,-23,3,1);if(!side)rect(g,d.hairSh,1,-23,3,1);
+        if(!s.mouth)rect(g,d.skinSh,mx,my,side?2:3,1);
+      }else if(s.expression==='surprised'){
+        rect(g,d.hairSh,side?2:-3,-25,3,1);if(!side)rect(g,d.hairSh,1,-25,3,1);
+        if(!s.mouth)rect(g,P.ink,mx,my-1,2,2);
       }
     }
     if(s.towel){rect(g,P.cream,side?-3:-4,-15,2,6);rect(g,P.snow,side?-3:-4,-15,1,6);}
     if(s.conversing)g.restore();
   }
   function paintSpeechGesture(g,d,s,hand,behind){
-    if(!s.conversing||s.moving||(s.dir===3)!==behind||!['explain','invite'].includes(s.gesture))return;
+    if(!speechArms(s)||(s.dir===3)!==behind)return;
     const side=s.dir===1||s.dir===2,back=s.dir===3,phase=s.speechPhase;
-    const invite=s.gesture==='invite',hx=side?3+phase:back?5:6+phase,hy=-9-phase*(invite?1:2);
+    const broad=d.expression==='curious'||d.expression==='bright',quiet=d.expression==='kind'||d.expression==='thoughtful';
+    const emphasis=phase===2,settling=phase===3;
+    let hx=side?3:7,hy=-9,w=2;
+    if(phase){
+      if(s.gesture==='explain'){hx+=(emphasis?3:1)+(broad?1:0);hy-=emphasis?(quiet?2:3):1;}
+      if(s.gesture==='invite'){hx+=emphasis?4:settling?2:0;hy-=emphasis?2:1;w=emphasis?4:3;}
+      if(s.gesture==='point'){hx+=emphasis?6:settling?3:1;hy-=emphasis?4:2;w=emphasis?3:2;}
+      if(s.gesture==='reflect'){hx=side?2:1;hy=emphasis?-14:-11;w=3;}
+      if(s.gesture==='reassure'){hx=side?1:0;hy=emphasis?-12:settling?-10:-9;w=3;}
+      if(s.gesture==='shrug'){hx=side?6:9;hy=emphasis?-13:-10;w=3;}
+    }
+    // Papel/caixa pedem apoio contínuo das duas mãos. A interpretação segue
+    // no rosto; não arremessa o objeto a cada gesto do personagem.
+    if(s.heldProp==='crate'){hx=6;hy=-6;w=3;}
+    if(s.heldProp==='notebook'){hx=side?4:5;hy=-10;w=3;}
+    if(s.heldProp==='vessel'){hx=5;hy=-6;w=3;}
+    if(s.heldProp==='sign'){hx=side?8:11;hy=-7;w=3;}
+    if(s.heldProp==='seed'||s.heldProp==='ribbon')hy=Math.max(-11,hy);
+    // A articulação em dois segmentos mantém as mãos abaixo do queixo.
+    // Em três quartos/costas, o tronco cobre o braço distante de verdade.
     const sleeve=s.coat?'#739598':d.shirtHi;
-    limb(g,sleeve,side?0:5,-14,side?1:6,-11,3);limb(g,sleeve,side?1:6,-11,hx-1,hy-1,2);
-    rect(g,hand,hx,hy,invite?3:2,2);rect(g,d.skinHi,hx,hy,invite?2:1,1);
-    if(invite&&phase>0)rect(g,hand,hx+2,hy-1,1,1);
+    const shoulder=side?-1:5,elbow=side?1:6,elbowY=s.gesture==='reflect'||s.gesture==='reassure'?-8:-10;
+    limb(g,sleeve,shoulder,-14,elbow,elbowY,3);limb(g,sleeve,elbow,elbowY,hx,hy,2);
+    rect(g,hand,hx,hy,w,2);rect(g,d.skinHi,hx,hy,w-1,1);
+    if(s.gesture==='point'&&emphasis&&!s.heldProp)rect(g,hand,hx+w,hy,2,1);
+    if(s.gesture==='invite'&&emphasis&&!s.heldProp)rect(g,hand,hx+1,hy-1,1,1);
+    if(bothSpeechArms(s)){
+      const other=s.heldProp==='crate'?hx-12:['notebook','vessel'].includes(s.heldProp)?hx-9:side?-6:-11,otherY=hy+(side&&!s.heldProp?1:0);
+      limb(g,s.coat?'#2e505b':d.shirtSh,side?-3:-7,-14,other+1,-10,3);
+      limb(g,s.coat?'#2e505b':d.shirtSh,other+1,-10,other,otherY,2);
+      rect(g,hand,other,otherY,3,2);rect(g,d.skinHi,other,otherY,2,1);
+    }
+    if(s.heldProp)paintHeldProp(g,d,s,hx,hy,hand);
+  }
+  function paintHeldProp(g,d,s,x,y,hand){
+    if(s.heldProp==='seed'){
+      rect(g,P.soil,x,y-4,4,5);rect(g,P.cream,x,y-4,3,4);rect(g,P.amber,x+1,y-3,2,2);rect(g,P.leaf,x+1,y-4,1,1);
+    }else if(s.heldProp==='ribbon'){
+      rect(g,P.amber,x,y-2,7,2);rect(g,P.cream,x+1,y-2,3,1);rect(g,P.terra,x+4,y,2,4);rect(g,P.cream,x+4,y,1,2);
+    }else if(s.heldProp==='sign'){
+      rect(g,P.soil,x,y-5,2,6);rect(g,'#8d6d4d',x-3,y-8,8,5);rect(g,P.amber,x-3,y-8,8,1);rect(g,P.cream,x-2,y-6,5,1);rect(g,P.edge,x-1,y-5,4,1);
+    }else if(s.heldProp==='notebook'){
+      rect(g,P.edge,x-8,y-6,10,7);rect(g,P.cream,x-7,y-6,8,6);rect(g,P.amber,x-3,y-6,1,6);
+      rect(g,P.sage,x-6,y-4,2,1);rect(g,P.sage,x-1,y-3,2,1);rect(g,hand,x-9,y,3,2);
+    }else if(s.heldProp==='crate'){
+      rect(g,P.soil,x-11,y-5,12,7);rect(g,'#b99861',x-11,y-5,11,6);rect(g,P.amber,x-10,y-5,9,1);
+      rect(g,P.soil,x-11,y-2,12,1);rect(g,P.soil,x-9,y-4,1,6);rect(g,P.soil,x-2,y-4,1,6);
+      rect(g,P.leaf,x-8,y-7,3,2);rect(g,P.terra,x-5,y-6,3,1);rect(g,hand,x-12,y,3,2);
+    }else if(s.heldProp==='vessel'){
+      // Jarro de barro: boca estreita, bojo e três marcas de procedência.
+      // Fica abaixo do queixo, abraçado pelas mãos, sem oscilar no discurso.
+      rect(g,P.soil,x-7,y-9,8,3);rect(g,'#c68b5d',x-7,y-9,8,1);rect(g,P.soil,x-6,y-8,6,1);
+      rect(g,P.soil,x-9,y-6,12,5);rect(g,P.soil,x-8,y-7,10,8);
+      rect(g,P.terra,x-8,y-6,10,6);rect(g,'#c68b5d',x-7,y-7,8,2);
+      rect(g,P.amber,x-7,y-5,1,4);rect(g,P.cream,x-5,y-3,1,2);rect(g,P.sage,x-3,y-3,1,2);rect(g,P.amber,x-1,y-3,1,2);
+      rect(g,hand,x-9,y,3,2);
+    }
+    // Palma à frente do objeto, com o cabo/papel apoiado na mesma âncora.
+    rect(g,hand,x,y,3,2);rect(g,d.skinHi,x,y,2,1);
   }
   function paintRest(g,d,s){
     // O primeiro estágio conserva a silhueta anterior ao agachar. A mesma
@@ -7404,19 +7515,21 @@ body.hud-game #legend{display:none !important;}
     if(side){
       const arm=(gaitX(s.frame)+1)*(.45+run*.1)*strength;
       const rearHand=Math.round(arm),frontHand=Math.round(-arm),handY=-7-Math.round(run*2);
-      limb(g,shirtSh,-2,-15,Math.round(rearHand*.45)-2,-11,3);
-      limb(g,shirtSh,Math.round(rearHand*.45)-2,-11,rearHand-1,handY-1,2);rect(g,hand,rearHand,handY,2,2);
+      if(!(bothSpeechArms(s))){
+        limb(g,shirtSh,-2,-15,Math.round(rearHand*.45)-2,-11,3);
+        limb(g,shirtSh,Math.round(rearHand*.45)-2,-11,rearHand-1,handY-1,2);rect(g,hand,rearHand,handY,2,2);
+      }
       rect(g,shirt,-4,-16,8,9);rect(g,shirtHi,-4,-15,2,7);rect(g,shirtSh,2,-15,2,9);
-      if(!s.action&&!(s.conversing&&!s.moving&&['explain','invite'].includes(s.gesture))){
+      if(!s.action&&!speechArms(s)){
         limb(g,shirtHi,-1,-14,Math.round(frontHand*.4)-1,-10,3);
         limb(g,shirtHi,Math.round(frontHand*.4)-1,-10,frontHand,handY-1,2);rect(g,hand,frontHand+1,handY,2,2);
       }
     }else{
-      rect(g,shirtSh,-8,-14+swing,3,6);rect(g,hand,-8,-8+swing,2,2);
+      if(!(bothSpeechArms(s))){rect(g,shirtSh,-8,-14+swing,3,6);rect(g,hand,-8,-8+swing,2,2);}
       rect(g,shirt,-6,-16,12,9);rect(g,shirtHi,-6,-15,2,7);rect(g,shirtSh,4,-15,2,8);
       rect(g,shirt,-6,-7,12,1);rect(g,shirt,-6,-15,12,2);
       rect(g,shirt,-6,-15,12,2);
-      if(!s.action&&!(s.conversing&&!s.moving&&['explain','invite'].includes(s.gesture))){rect(g,shirtHi,5,-14-swing,3,6);rect(g,hand,6,-8-swing,2,2);}
+      if(!s.action&&!speechArms(s)){rect(g,shirtHi,5,-14-swing,3,6);rect(g,hand,6,-8-swing,2,2);}
     }
     if(d.style==='apron'&&!s.coat){
       rect(g,d.shirt,side?-5:-7,-8,side?10:14,4);rect(g,d.shirtSh,side?3:5,-8,2,4);
@@ -7467,20 +7580,20 @@ body.hud-game #legend{display:none !important;}
   function speechFrame(s){return (s.speechPhase*2+Number(s.blink))*4+s.mouth;}
   function drawSprite(g,id,gender,s,x,y){
     if(!s.conversing){g.drawImage(sprite(id,gender,s),x,y);return;}
-    // Cada banco contém a combinação inteira: 4 bocas × 2 olhos × 3 gestos.
+    // Cada banco contém a combinação inteira: 4 bocas × 2 olhos × 4 poses.
     // Abrir uma fala aquece um banco; avançar o texto só recorta drawImage.
     // A identidade, roupa e fase da passada continuam no mesmo desenho.
     const bankState={...s,mouth:0,blink:false,speechBlink:false,speechPhase:0};
     const key=id+'|'+(id==='player'?gender:'m')+'|'+Object.values(bankState).join(',');let bank=speechBanks.get(key);
     if(!bank){
-      const raw=canvas(W*24,H),rg=raw.getContext('2d');rg.imageSmoothingEnabled=false;
-      for(let phase=0;phase<3;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
+      const raw=canvas(W*SPEECH_FRAMES,H),rg=raw.getContext('2d');rg.imageSmoothingEnabled=false;
+      for(let phase=0;phase<SPEECH_POSES;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
         const frame=(phase*2+blink)*4+mouth;rg.save();rg.translate(frame*W,0);
         paintBody(rg,profile(id,gender),{...s,mouth,blink:!!blink,speechBlink:!!blink,speechPhase:phase});rg.restore();
       }
-      bank=canvas(W*24,H);const bg=bank.getContext('2d');bg.imageSmoothingEnabled=false;
+      bank=canvas(W*SPEECH_FRAMES,H);const bg=bank.getContext('2d');bg.imageSmoothingEnabled=false;
       bg.drawImage(raw,-1,0);bg.drawImage(raw,1,0);bg.drawImage(raw,0,-1);bg.drawImage(raw,0,1);
-      bg.globalCompositeOperation='source-in';rect(bg,P.ink,0,0,W*24,H);bg.globalCompositeOperation='source-over';bg.drawImage(raw,0,0);
+      bg.globalCompositeOperation='source-in';rect(bg,P.ink,0,0,W*SPEECH_FRAMES,H);bg.globalCompositeOperation='source-over';bg.drawImage(raw,0,0);
       if(speechBanks.size>=MAX_SPEECH_BANKS)speechBanks.delete(speechBanks.keys().next().value);speechBanks.set(key,bank);
     }
     g.drawImage(bank,speechFrame(s)*W,0,W,H,x,y,W,H);
@@ -7513,7 +7626,7 @@ body.hud-game #legend{display:none !important;}
     rect(g,'#91a676',4,4,9,10);rect(g,P.leaf,5,5,5,1);
     // Pequeno ramo bordado no fundo, coerente com o vale.
     for(let i=0;i<4;i++){rect(g,P.edge,25-i,18+i*2,1,2);rect(g,P.leaf,24-i,17+i*2,2,1);}
-    if(s){g.save();if(['nod','listen'].includes(s.gesture)&&s.speechPhase===2)g.translate(0,1);}
+    if(s){g.save();g.translate(0,headDip(s));}
     rect(g,d.shirtSh,6,26,21,4);rect(g,d.shirt,8,24,17,6);rect(g,d.shirtHi,8,25,5,5);
     rect(g,d.shirtSh,23,26,3,4);rect(g,d.skinSh,13,21,7,5);rect(g,d.skin,14,21,4,4);
     rect(g,d.trim,11,25,3,2);rect(g,P.cream,13,25,3,3);rect(g,P.cream,18,25,3,2);
@@ -7592,15 +7705,22 @@ body.hud-game #legend{display:none !important;}
     for(const [x,w]of [[12,4],[19,3]]){
       rect(g,d.skin,x,14,w,2);
       if(s.blink)rect(g,d.hairSh,x,15,w-1,1);
-      else{rect(g,P.cream,x,14,w,bright||s.expression==='joyful'?2:1);rect(g,P.ink,x+(x===12?2:1),14,1,bright||s.expression==='joyful'?2:1);}
+      else{
+        const eyeHeight=bright||['joyful','surprised'].includes(s.expression)?2:1;
+        rect(g,P.cream,x,14,w,eyeHeight);
+        rect(g,P.ink,x+Math.max(0,Math.min(w-1,(x===12?2:1)+s.gaze)),14,1,eyeHeight);
+      }
     }
     rect(g,d.skin,12,12,4,2);rect(g,d.skin,19,12,3,2);
     if(s.expression==='concerned'){
       rect(g,d.hairSh,12,13,2,1);rect(g,d.hairSh,14,12,2,1);rect(g,d.hairSh,19,12,2,1);rect(g,d.hairSh,21,13,1,1);
     }else if(s.expression==='thoughtful'){
       rect(g,d.hairSh,12,12,4,1);rect(g,d.hairSh,19,13,3,1);
+    }else if(s.expression==='resolved'){
+      rect(g,d.hairSh,12,13,4,1);rect(g,d.hairSh,19,13,3,1);rect(g,d.hairSh,15,14,1,1);
     }else{
-      rect(g,d.hairSh,12,13-(s.expression==='joyful'?1:0),4,1);rect(g,d.hairSh,19,13-(s.expression==='joyful'?1:0),3,1);
+      const lifted=['joyful','surprised'].includes(s.expression);
+      rect(g,d.hairSh,12,13-Number(lifted),4,1);rect(g,d.hairSh,19,13-Number(lifted),3,1);
     }
     // A armação da Rosa continua dourada; sobrancelhas ficam logo acima dela.
     if(d.hairStyle==='bun'){rect(g,P.amber,11,13,6,1);rect(g,P.amber,18,13,5,1);}
@@ -7613,20 +7733,28 @@ body.hud-game #legend{display:none !important;}
       if(['warm','joyful'].includes(s.expression)){rect(g,P.cream,16,20,3,1);rect(g,d.skinSh,15,19,1,1);rect(g,d.skinSh,19,19,1,1);}
       if(s.expression==='concerned'){rect(g,d.skinSh,16,19,3,1);rect(g,d.skin,16,20,3,1);}
       if(s.expression==='thoughtful'){rect(g,d.skinSh,18,19,3,1);}
+      if(s.expression==='surprised'){rect(g,P.ink,17,19,2,3);rect(g,d.skinSh,16,20,1,1);}
+      if(s.expression==='resolved'){rect(g,d.skinSh,15,20,6,1);rect(g,d.skinHi,15,21,5,1);}
     }
     if(s.expression==='joyful'){rect(g,d.skinSh,12,18,2,1);rect(g,d.skinSh,21,18,1,1);}
-    if(['explain','invite'].includes(s.gesture)&&s.speechPhase>0){
-      const x=s.gesture==='invite'?24:22,y=28-s.speechPhase;
-      rect(g,d.shirtHi,x-1,y+1,3,3);rect(g,d.skin,x,y,3,2);rect(g,d.skinHi,x,y,2,1);
+    if(armGestures.includes(s.gesture)&&s.speechPhase>0){
+      const peak=s.speechPhase===2,folded=['reflect','reassure'].includes(s.gesture);
+      const x=folded?18:s.gesture==='invite'?25:23,y=peak?(folded?25:24):28;
+      rect(g,d.shirtHi,x-2,y+1,4,4);rect(g,d.skin,x,y,3,2);rect(g,d.skinHi,x,y,2,1);
+      if(s.gesture==='point'&&peak)rect(g,d.skin,x+2,y-2,1,3);
+      if(s.gesture==='invite'&&peak)rect(g,d.skin,x+2,y-1,1,2);
+      if(s.gesture==='shrug'){
+        rect(g,d.shirtSh,6,y+1,4,4);rect(g,d.skin,5,y,4,2);rect(g,d.skinHi,5,y,3,1);
+      }
     }
   }
   function drawPortrait(target,id,opts={}){
     if(!target?.getContext) return false;id=profiles[id]?id:'player';const gender=opts.gender==='f'?'f':'m';
-    const speech=conversation(opts),s={...speech,blink:speech.speechBlink};
-    const key=s.conversing?'fala|'+id+'|'+(id==='player'?gender:'m')+'|'+s.expression+'|'+s.gesture:id+'|'+gender;let cached=portraits.get(key);
+    const speech=conversation(opts,true,id),s={...speech,blink:speech.speechBlink};
+    const key=s.conversing?'fala|'+id+'|'+(id==='player'?gender:'m')+'|'+s.expression+'|'+s.gesture+'|'+s.gaze:id+'|'+gender;let cached=portraits.get(key);
     if(!cached){
-      cached=canvas(s.conversing?32*24:32,32);const cg=cached.getContext('2d');
-      if(s.conversing){for(let phase=0;phase<3;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
+      cached=canvas(s.conversing?32*SPEECH_FRAMES:32,32);const cg=cached.getContext('2d');
+      if(s.conversing){for(let phase=0;phase<SPEECH_POSES;phase++)for(let blink=0;blink<2;blink++)for(let mouth=0;mouth<4;mouth++){
         const frame=(phase*2+blink)*4+mouth;cg.save();cg.translate(frame*32,0);paintPortrait(cg,profile(id,gender),id,gender,{...s,mouth,blink:!!blink,speechPhase:phase});cg.restore();
       }}else paintPortrait(cg,profile(id,gender),id,gender);
       if(portraits.size>=MAX_PORTRAITS)portraits.delete(portraits.keys().next().value);portraits.set(key,cached);
@@ -7639,7 +7767,7 @@ body.hud-game #legend{display:none !important;}
     target.setAttribute?.('role','img');target.setAttribute?.('aria-label','Retrato de '+(opts.name||profile(id,gender).name));return true;
   }
   window.FarmCharacterArt=Object.freeze({
-    keys,definitions,palette:P,anchor:Object.freeze({x:AX,y:AY,feetOffsetY:FEET_Y,width:W,height:H}),
+    keys,definitions,palette:P,gestures,expressions,heldProps,anchor:Object.freeze({x:AX,y:AY,feetOffsetY:FEET_Y,width:W,height:H}),
     drawPlayer(g,p,opts={}){return draw(g,p,'player',opts,true);},
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
@@ -8602,15 +8730,18 @@ body.hud-game #legend{display:none !important;}
   }
   function enterShot(){
     const s=active.film.shots[active.index];active.elapsed=0;active.speech=0;active.reveal=reduced?s.line.length:0;
+    active.panFrom=active.pan||0;active.panTarget=s.focus*6;
     root.querySelector('.vc-speaker').textContent=s.speaker==='player'?active.player.name:names[s.speaker];fullTextEl.textContent=(s.speaker==='player'?active.player.name:names[s.speaker])+': '+s.line;
     counter.textContent=(active.index+1)+' / '+active.film.shots.length;nextButton.textContent=reduced?(active.index===active.film.shots.length-1?'Voltar ao vale':'Continuar'):'Mostrar fala';
     textEl.textContent=reduced?s.line:'';safely(window.synthSfx?.dialogue?.bind(window.synthSfx),s.speaker,'greet');prepareBackdrop();render();
   }
   function prepareBackdrop(){
+    if(active.backdrop)return;
     const c=document.createElement('canvas');c.width=960;c.height=480;const g=c.getContext('2d'),film=active.film,s=film.shots[active.index];g.imageSmoothingEnabled=false;
-    const drawn=safely(adapter.drawWorld,g,{width:960,height:480,focusX:film.focusX+s.focus*24,focusY:film.focusY,zoom:3,region:film.region,scene:film.scene});
+    const worldStage={cast:film.cast.slice(),prop:film.prop};
+    const drawn=safely(adapter.drawWorld,g,{width:960,height:480,focusX:film.focusX,focusY:film.focusY+(film.prop==='table'?40:8),zoom:3,region:film.region,scene:film.scene,stage:worldStage});
     if(drawn!==true){g.setTransform(2,0,0,2,0,0);background(g,film,0,s.focus);}
-    active.backdrop=c;
+    active.backdrop=c;active.worldStage=drawn===true&&worldStage.layers?.length?worldStage:null;
   }
   function advance(){
     if(active?.kind!=='film')return;
@@ -8694,7 +8825,52 @@ body.hud-game #legend{display:none !important;}
     else if(film.prop==='vessel'){rect(g,'#a7744b',x-9,y-10,18,20);rect(g,'#dbb474',x-11,y-10,22,4);rect(g,'#e6ce9a',x-6,y-6,3,14);for(let i=0;i<3;i++)rect(g,'#684d3a',x-4+i*4,y+3,2,3);}
     else if(film.prop==='crate'){rect(g,'#735139',x-19,y-11,38,27);rect(g,'#b48957',x-17,y-9,34,23);for(let i=0;i<3;i++)rect(g,'#81623e',x-17,y-7+i*8,34,2);rect(g,'#d9c293',x-13,y-4,12,9);rect(g,'#b5d6b4',x+3,y-4,11,9);rect(g,'#74644b',x-10,y-1,6,1);rect(g,'#557c60',x+5,y-1,6,1);}
   }
+  function facing(a,b){
+    if(!b)return 0;
+    const dx=b.worldX-a.worldX,dy=b.worldY-a.worldY;
+    return Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);
+  }
+  function castPresentation(){
+    if(!active?.worldStage)return [];
+    const s=active.film.shots[active.index],actors=active.worldStage.actors,speaker=actors.find(a=>a.id===s.speaker);
+    return actors.map(a=>{
+      const other=a===speaker?actors.filter(b=>b!==a).sort((b,c)=>Math.hypot(b.worldX-a.worldX,b.worldY-a.worldY)-Math.hypot(c.worldX-a.worldX,c.worldY-a.worldY))[0]:speaker;
+      return {...a,dir:facing(a,other),gaze:other?Math.sign(other.worldX-a.worldX):0};
+    });
+  }
   function render(){
+    if(active?.kind!=='film'||!stageContext)return;
+    if(!active.worldStage){renderFallback();return;}
+    const {film,index,elapsed,speech,worldStage}=active,s=film.shots[index],g=stageContext,art=window.FarmCharacterArt;
+    const speaking=active.reveal<s.line.length,actors=castPresentation(),scale=worldStage.camera.zoom;
+    active.pan=reduced?0:Math.round(active.panFrom+(active.panTarget-active.panFrom)*ease(elapsed/.7));
+    g.save();g.setTransform(1,0,0,1,0,0);g.imageSmoothingEnabled=false;
+    g.fillStyle='#183329';g.fillRect(0,0,960,480);g.translate(-active.pan,0);
+    g.drawImage(active.backdrop,0,0);
+    for(let i=0;i<=actors.length;i++){
+      g.drawImage(worldStage.layers[i],0,0);
+      const a=actors[i];if(!a)continue;
+      const isSpeaker=a.id===s.speaker;
+      const actor={npcId:a.id,gender:active.player.gender,dir:a.dir,x:0,y:0,moving:false,running:false,temp:37,gaitBlend:0};
+      const opts={x:0,y:0,facing:a.dir,gaze:a.gaze,speaking:isSpeaker&&speaking,speechTime:speech,heldProp:a.id===film.cast[0]&&film.prop!=='table'?film.prop:'',
+        expression:isSpeaker?s.expression:'warm',gesture:isSpeaker&&speaking?s.gesture:'listen',reducedMotion:reduced,time:elapsed*1000};
+      g.save();g.translate(Math.round(a.x),Math.round(a.y));g.scale(scale,scale);
+      if(art){if(a.id==='player')art.drawPlayer(g,actor,opts);else art.drawNPC(g,actor,opts);}
+      g.restore();
+    }
+    const lead=actors.find(a=>a.id===s.speaker);
+    if(lead){g.textAlign='center';g.font='bold 15px Georgia';
+      const label=s.speaker==='player'?active.player.name:names[s.speaker],y=Math.max(22,lead.y-35*scale);
+      g.fillStyle='#183b36';for(const [dx,dy]of [[-1,0],[1,0],[0,-1],[0,1]])g.fillText(label,lead.x+dx,y+dy);
+      g.fillStyle='#f8de9b';g.fillText(label,lead.x,y);}
+    g.restore();
+    // Uma moldura estreita cobre a margem da câmera, sem escalar ou borrar
+    // sprites. Fundo, objetos e atores recebem o MESMO deslocamento inteiro.
+    g.save();g.fillStyle='#14241e';g.fillRect(0,0,10,480);g.fillRect(950,0,10,480);g.restore();
+    if(art?.drawPortrait)art.drawPortrait(portrait,s.speaker,{name:s.speaker==='player'?active.player.name:names[s.speaker],gender:active.player.gender,
+      speaking,speechTime:speech,expression:s.expression,gesture:speaking?s.gesture:'listen',reducedMotion:reduced,time:elapsed*1000});
+  }
+  function renderFallback(){
     if(active?.kind!=='film'||!stageContext)return;const {film,index,elapsed,speech}=active,s=film.shots[index],g=stageContext;const blend=reduced?1:ease(elapsed/3),focus=s.focus*blend;
     g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,960,480);g.imageSmoothingEnabled=false;
     const zoom=reduced?1:1.025+blend*.025,pan=reduced?0:focus*6;g.drawImage(active.backdrop,-(960*(zoom-1)/2)-pan,-480*(zoom-1)/2,960*zoom,480*zoom);g.scale(2,2);
@@ -8703,7 +8879,7 @@ body.hud-game #legend{display:none !important;}
     const positions=meeting?(cast.length===6?[[110,204],[164,185],[219,183],[269,183],[322,185],[374,204]]:group):cast.length>3?group:film.id==='rio'?[[151,210],[330,215]]:cast.length===3?[[172,209],[306,205],[249,223]]:[[178,210],[304,215]];
     if(meeting){rect(g,'#634f36',201,208,78,7);rect(g,'#b89965',199,204,82,6);rect(g,'#d4bd83',199,204,82,2);rect(g,'#634f36',205,214,5,14);rect(g,'#634f36',269,214,5,14);rect(g,'#e4d7ad',232,200,16,5);rect(g,'#72865b',240,201,2,3);}
     for(let i=0;i<cast.length;i++){
-      const id=cast[i],[x0,y]=positions[i],x=x0-focus*4,actor={npcId:id,gender:active.player.gender,dir:0,x:0,y:0,moving:false,running:false,equipment:{},temp:37,gaitBlend:0};const speaking=id===s.speaker&&(active.reveal<s.line.length||elapsed<1.4),opts={x:0,y:0,speaking,speechTime:speech,expression:id===s.speaker?s.expression:'warm',gesture:id===s.speaker?s.gesture:'listen',reducedMotion:reduced,time:elapsed*1000};
+      const id=cast[i],[x0,y]=positions[i],x=x0-focus*4,actor={npcId:id,gender:active.player.gender,dir:0,x:0,y:0,moving:false,running:false,equipment:{},temp:37,gaitBlend:0};const speaking=id===s.speaker&&active.reveal<s.line.length,opts={x:0,y:0,speaking,speechTime:speech,expression:id===s.speaker?s.expression:'warm',gesture:speaking?s.gesture:'listen',reducedMotion:reduced,time:elapsed*1000};
       g.save();g.translate(x,y);g.scale(meeting?1.3:1.6,meeting?1.3:1.6);if(art){if(id==='player')art.drawPlayer(g,actor,opts);else art.drawNPC(g,actor,opts);}else{rect(g,id==='player'?'#b99654':'#6c8a69',-7,-21,14,24);rect(g,'#dbb08a',-5,-31,10,11);}g.restore();
       if(id===s.speaker){g.fillStyle='#f8de9b';g.textAlign='center';g.font='bold 9px sans-serif';g.fillText(id==='player'?active.player.name:names[id],x,y-(meeting?48:59));rect(g,'#f8de9b',x-1,y-(meeting?44:55),2,2);}
     }
@@ -8716,7 +8892,10 @@ body.hud-game #legend{display:none !important;}
   window.FarmStoryCinematics=Object.freeze({
     init(value={}){adapter=value&&typeof value==='object'?value:{};initialized=true;return catalogue();},registerScenes,play,update,isOpen:()=>!!active,close,
     reset(){dismiss(false,false);seen.clear();unlockedChapter=0;},restore,serialize:()=>({version:1,seenScenes:films.filter(f=>seen.has(f.id)).map(f=>f.id)}),catalogue,openGallery,
-    info:()=>({initialized,open:!!active,kind:active?.kind||null,id:active?.film?.id||null,shot:active?.index??null,replay:!!active?.replay,reducedMotion:reduced})
+    info:()=>({initialized,open:!!active,kind:active?.kind||null,id:active?.film?.id||null,shot:active?.index??null,replay:!!active?.replay,reducedMotion:reduced,
+      speaker:active?.film?.shots[active.index]?.speaker||null,revealed:active?.reveal||0,total:active?.film?.shots[active.index]?.line.length||0,
+      actors:castPresentation(),camera:active?.worldStage?{...active.worldStage.camera,pan:active.pan||0}:null,layers:active?.worldStage?.layers.length||0,
+      prop:active?.worldStage?.propPosition?{kind:active.film.prop,...active.worldStage.propPosition}:active?.film&&active.film.prop!=='table'?{kind:active.film.prop,holder:active.film.cast[0]}:null})
   });
 })();
 
@@ -8771,7 +8950,7 @@ body.hud-game #legend{display:none !important;}
       choices:[decision('Comparar produção e cuidado no mesmo caderno.','Prepare um produto e abra a Visão da Pele. Quero registrar tanto a colheita quanto o cuidado de quem a fez. Não preciso de um herói exausto para validar uma anotação.','Lia acrescenta ao arquivo uma página sobre trabalho, pausa e contexto; a pesquisa passa a incluir quem cuida da horta.','Consigo carregar caixa e dúvida. Carregar tudo sem parar era a parte em que eu costumava me achar esperto.',[obj('produce','Recolha 1 produção nova da fazenda','produce'),obj('skin','Observe a Visão da Pele','skin')]),
         decision('Chamar Nico para testar uma pergunta pequena.','Converse com Nico e faça uma pausa protegida. Vou aceitar uma página imperfeita com passos claros. Posso ensinar o que sei sem fingir que já terminei de aprender.','Nico participa da pesquisa; Lia troca a cobrança de perfeição por uma experiência compartilhada.','A pergunta pequena é excelente. Cabe num dia e não exige uma placa maior que a casa.',[obj('nico','Combine a experiência com Nico','talk',1,{npcId:'nico'}),obj('rest','Faça uma pausa completa em sombra ou abrigo','rest',1,{safe:true})])],
       resolution:'A data fecha. A rede foi preparada antes do vento. Cada região recebeu uma pequena reserva para preservar outra tentativa se uma parte do vale tivesse problemas.\n\nO caderno não promete que toda semente vai dar certo. Promete que ninguém terá de descobrir tudo sozinho. Inês guardou uma fita na cabana. Acho que ela conhece a próxima linha desta história. Vou mandar a página assim mesmo, com a pergunta aberta no fim.',
-      inner:'Não era um caminho para o tesouro. Era gente tentando impedir que um telhado carregasse o futuro inteiro. Uma boa ideia, com péssima comunicação.',focus:{x:376,y:968},cut:[['lia','Alto, margem e areia. São destinos de amostras, não coordenadas.','thoughtful','explain'],['player','Tinha preparado um comentário brilhante sobre tesouros. Vou guardá-lo para outra ocasião.','warm','nod'],['lia','Talvez exista um tesouro. Só não é do tipo que cabe num baú.','joyful','explain'],['player','Então deixo as botas prontas. E rego antes de sair.','warm','nod']]},
+      inner:'Não era um caminho para o tesouro. Era gente tentando impedir que um telhado carregasse o futuro inteiro. Uma boa ideia, com péssima comunicação.',focus:{x:376,y:968},cut:[['lia','Alto, margem e areia. São destinos de amostras, não coordenadas.','thoughtful','explain'],['player','Tinha preparado um comentário brilhante sobre tesouros. Vou guardá-lo para outra ocasião.','warm','nod'],['lia','Há nomes nas três colunas. Quero conferir se essas pessoas ainda guardam as amostras.','thoughtful','explain'],['player','Então deixo as botas prontas. E rego antes de sair.','warm','nod']]},
     {id:'abrigo',title:'4 · A fita que esperou na neve',npcId:'ines',coins:26,
       description:'Inês protegeu uma reserva e perdeu a vontade de convidar alguém a acompanhá-la. A trilha da investigação exige preparo, pausas e uma conversa que ela vem evitando.',
       offer:'Não foi difícil guardar uma caixa na cabana. Difícil foi voltar aqui sozinha e achar que ninguém precisava ouvir o resto. Confundi silêncio com independência.\n\nA fita ainda está no abrigo. Vá preparado: visite a montanha, confira o recado e faça uma pausa protegida. Quero que esta viagem sirva à próxima, não vire uma competição com o frio. Como vamos registrar a rota?',
@@ -8842,6 +9021,68 @@ body.hud-game #legend{display:none !important;}
     caio:[obj('water','Colete uma reserva do oásis','collect',1,{item:'oasisWater'}),obj('produce','Recolha 1 produção nova para a troca','produce')],
     nico:[obj('plant','Plante 2 sementes para outra experiência','plant',2),obj('water','Regue 2 plantas novas','water',2)]
   };
+  // Falas derivadas do progresso existente: conversar nunca cria outra trilha
+  // de missões nem grava contadores de variação no save.
+  const voices={
+    rosa:{expression:'warm',gesture:'reassure',night:'Deixei o caderno marcado com uma colher. Um marcador muito competente; nunca esqueço onde pus o chá.',
+      early:['A caixa mais antiga emperra quando chove. Eu sei o jeito de abrir. Qualquer dia ensino esse grande segredo de família: levantar um pouco o canto esquerdo.','Achei uma semente no bolso do seu avental antigo. Não plantei. Queria que você soubesse que ainda tinha alguma coisa começada aqui.'],
+      middle:['Tomás trouxe uma pergunta e esqueceu de pedir a ferramenta que vinha buscar. Fingi que não reparei. Gosto dessas visitas sem encomenda.','Separei as caixas por origem. Agora a prateleira tem lugares em vez de números. Fico olhando mais para ela.'],
+      archive:['Abri a gaveta antes de procurar a chave no bolso. Ainda me estranho fazendo isso. Pode olhar o arquivo; me avise se eu começar a organizar por cima do seu ombro.','Pensei em pôr uma toalha nova na mesa. A velha tem a marca da caixa de Caio. Vou lavar e usar de novo.'],
+      settled:['Sua cadeira foi parar na outra ponta da mesa. Você andou sentado lá com Nico. Deixei onde estava.','Hoje alguém abriu a casa antes de mim. Cheguei com as chaves na mão e fiquei um instante sem serviço. Depois entrei. Foi bom.']},
+    lia:{expression:'thoughtful',gesture:'point',night:'Já apaguei a última linha duas vezes. Vou fechar o caderno antes de começar a apagar o dia inteiro.',
+      early:['Nico perguntou por que levo dois lápis. Disse que um é reserva. Ele quis saber qual dos dois sabe mais. Agora os dois me parecem ligeiramente ofendidos.','Tenho uma amostra, uma hipótese e um rótulo que descolou. Primeiro resolvo o rótulo; seria um começo péssimo investigar a amostra errada.'],
+      middle:['Comparei as datas de novo. Continuam anteriores à ventania. Hoje consegui conferir isso sem reescrever a página inteira.','Inês descreve a trilha pelas pausas. Caio, pelos recipientes que leva. Estou tentando desenhar um mapa em que os dois reconheçam o próprio caminho.'],
+      archive:['Deixei uma margem larga na cópia do acordo. Tomás perguntou se errei o tamanho do papel. É para as perguntas, eu disse. Ele já trouxe uma.','O arquivo tem nomes, datas e lacunas. Vou manter as três coisas na transcrição. Não sei o que aconteceu num dia só porque cabe entre duas datas.'],
+      settled:['Hoje alguém escreveu “não entendi” na minha página. Marcou a frase exata. Passei a manhã melhorando aquela frase. Foi uma boa visita.','Nico corrigiu uma seta do meu desenho. A seta ficou melhor. Demorei um pouquinho a admitir a segunda parte em voz alta.']},
+    tomas:{expression:'warm',gesture:'shrug',night:'O serrote está guardado. Se vim até aqui com ele na mão, eu teria inventado mais um serviço.',
+      early:['Tenho uma cadeira quase pronta. Falta parar de procurar defeito nela. Sente; se não reclamar, considero uma opinião a favor.','Nico pediu uma sobra de madeira. Perguntei o tamanho. Ele disse “depende do futuro”. Dei uma pequena.'],
+      middle:['Virei a placa três vezes para conferir o risco. Da quarta, percebi que estava conferindo minha lembrança. A madeira continua exatamente igual.','Separei pregos para a Casa e misturei com os meus. Vou contar de novo. Pode conversar enquanto isso; eu conto melhor quando não estou resmungando.'],
+      archive:['Li meu nome no acordo. A assinatura envelheceu melhor que certos encaixes meus. Esses, pelo menos, eu sei como corrigir.','Há uma cadeira que range. Sei qual é. Estou esperando ela ficar vazia para consertar, uma dificuldade nova e bastante aceitável.'],
+      settled:['Hoje a oficina fechou na hora combinada. Fiquei com tempo livre. Por sorte você apareceu antes que eu decidisse construir alguma coisa para ocupá-lo.','Alguém devolveu o martelo limpo e no lugar errado. Estou escolhendo qual parte da notícia contar primeiro.']},
+    ines:{expression:'thoughtful',gesture:'point',night:'Conferi quem desceu antes de guardar a fita. Agora minha rota é curta: daqui até uma cadeira.',
+      early:['A trilha da direita parece mais curta daqui. Depois da curva, a gente muda de opinião. Gosto de avisar antes da curva.','Vi uma pegada minha no retorno e achei que outro viajante tinha passado. Pelo menos uma pessoa seguiu o caminho que recomendei.'],
+      middle:['Revi a data na fita. Eu me lembrava do frio daquele dia; tinha esquecido de quem recebeu a caixa lá embaixo. Preciso conversar com Caio.','Tenho o costume de contar quem vem atrás. Nesta ronda percebi que não tinha convidado ninguém. Levei algum tempo para rir disso.'],
+      archive:['Li meu nome no acordo. Ele estava mais perto do de Caio do que nossas conversas andavam. A distância no papel sempre foi pequena.','A descida termina perto de uma mesa ocupada agora. Eu continuo conferindo a rota; só comecei a reparar no fim dela.'],
+      settled:['Passei pela casa para avisar que ia subir. Rosa perguntou se eu tinha esquecido alguma coisa. “Não”, eu disse. “Desta vez estou lembrando.”','Ainda estou aprendendo a deixar alguém andar na frente sem dar três instruções por curva. Hoje consegui uma curva inteira.']},
+    caio:{expression:'warm',gesture:'nod',night:'Os recipientes já estão conferidos. A conta de amanhã pode ficar para amanhã; a areia não costuma mudar os números enquanto durmo.',
+      early:['Rosa sempre prende o barbante com um nó que dá para abrir de novo. Eu guardo o barbante. Ela provavelmente já percebeu.','Achei areia numa caixa fechada. Inês diz que encontra neve onde não deveria. Estamos comparando a competência dos nossos fechamentos.'],
+      middle:['Lia perguntou como confiro os recipientes. Eu tinha preparado uma explicação comprida. Ela perguntou se podia acompanhar primeiro. Pedido bastante razoável.','Tenho uma caixa que fez a viagem de ida e volta. A madeira é a mesma. Eu ainda chamo de “a caixa de Rosa”. Preciso perguntar como ela chama.'],
+      archive:['No acordo antigo não há uma coluna de dívidas. Conferi. A coluna que eu vinha preenchendo estava em outro lugar.','Deixei espaço no recipiente para o caminho de volta. Não sei o que vou trazer. Faz tempo que essa parte de uma viagem não me animava.'],
+      settled:['A caixa voltou mais leve. Tomás mandou um bilhete explicando o encaixe. Guardei o bilhete na caixa para não fingir que aprendi sozinho.','Hoje levei uma pergunta para a mesa. Só uma. Rosa pôs uma xícara na minha frente como em qualquer outra visita.']},
+    nico:{expression:'joyful',gesture:'point',night:'Prometi guardar o lápis. Estou cumprindo: a pergunta nova vai ficar na cabeça até amanhã. Se eu esquecer, talvez você lembre.',
+      early:['Fiz uma legenda para o mapa. A legenda precisa de uma legenda. Ainda não mostrei essa parte a Tomás.','Rosa deixou eu escolher o nome de um canteiro. Ela não estipulou limite de letras. Estou sendo extremamente responsável com esse poder.'],
+      middle:['Os riscos combinam! Eu ia desenhar um círculo enorme em volta. Lia disse que uma seta pequena também serve. Está difícil, mas estou tentando.','Tomás me deixou virar a placa. Pesava mais que minha teoria. A parte de segurar firme foi muito importante para a investigação.'],
+      archive:['Minha assinatura ficou diferente da do rascunho. Perguntei se precisava refazer. Rosa disse que seria preocupante se a minha letra nunca mudasse.','Guardei o primeiro mapa, com a árvore em cima da seta. No novo, a árvore ficou ao lado. Ela não perdeu o lugar; só parou de atrapalhar o caminho.'],
+      settled:['Terminei um desenho antes de começar outro. Estou contando para todo mundo. Inclusive para quem acabou de me ouvir contar.','Tomás me pediu uma medida. Pedi que esperasse eu conferir. Ele esperou. Estou tentando não parecer impressionado demais com isso.']}
+  };
+  const investigationBeats=[
+    {active:['O envelope está na mesa. Quando voltar de conversar com Tomás e Nico, sente aqui; quero ouvir se viram o mesmo risco que eu.','Separei uma folha limpa para comparar com Lia. Não escrevi “resolvido” no alto. Foi uma manhã de muita contenção da minha parte.'],ready:'Voltou com terra nas mãos. Assim eu gosto de encontrar você: depois do trabalho, com tempo para me contar. Vamos abrir o envelope de novo?'},
+    {active:['A caixa de encomendas está no canto. A bancada fica livre até concluirmos. Não, você não precisa se desculpar por ocupar uma oficina com trabalho.','Deixei a tinta quieta, como combinamos. Rosa lembra dessa placa de outro jeito. Quero ouvir a versão dela antes de pegar a lixa.'],ready:'Ficou firme. Testei duas vezes, admito. Agora quero virar a placa com você; a lembrança finalmente está encaixando.'},
+    {active:['Reservei duas colunas: o que foi produzido e em que condições trabalhamos. Se uma não explicar a outra, vamos registrar isso também.','Separei uma página para a pergunta de Nico. Não escrevi a conclusão antes de ele chegar. Parece óbvio; precisei me vigiar.'],ready:'Temos a comparação e o registro da investigação. Trouxe o caderno aberto. Pode me mostrar por onde começou; hoje não vou arrumar sua explicação antes de ouvir.'},
+    {active:['Tomás vai querer saber onde a marca faz falta. Prefiro mostrar no caminho a desenhar uma trilha perfeita de memória.','O recado está preso pela fita. Confira seu preparo e reserve tempo para a volta; eu quero ouvir o que você reparou no trajeto.'],ready:'Você voltou. Antes de olhar a fita, eu quis conferir isso. Agora podemos comparar a data com o resto do caderno.'},
+    {active:['Deixei lugar para as duas produções. A caixa não está com meu nome nem com o seu; estou esperando decidirmos a etiqueta juntos.','O recipiente está aqui. Vamos conferir o reparo e a reserva no seu tempo. Eu cuido desta margem; você pode me dizer se alguma coisa não funcionou.'],ready:'Conferimos a caixa e a reserva. Tenho uma coisa curta para admitir sobre a segunda etiqueta. Curta no papel, pelo menos.'},
+    {active:['Escrevi meu nome no desenho. Ainda pequeno, mas com tinta. Vou tentar não cobrir com outra árvore antes de você voltar.','A página espera as colheitas e a conversa com Lia. Hoje a parte difícil foi não desenhar o resultado que eu queria.'],ready:'Terminei esta parte! Posso mostrar antes de explicar todas as ideias que tive enquanto terminava? Está bem: essa também foi uma explicação.'},
+    {active:['A chave está ao lado do arquivo. Deixei ali de propósito. Se ouvir eu perguntando quem a tirou do meu bolso, pode me lembrar disso.','Separei uma folha para cada rota. Inês conhece as distâncias; eu conheço a minha mania de decidir que a distância é pequena. Vamos ouvi-la.'],ready:'As pessoas foram ouvidas e o trabalho está pronto. Agora o acordo pode sair da minha gaveta. Sente comigo para conferir os nomes?'},
+    {active:['Separei pratos para o encontro. Ainda não contei quantos vão ocupar a mesa. Quero deixar um lugar que não dependa de uma promessa.','O quadro tem espaço para as próximas trocas. Tomás já perguntou pelos prazos. Caio quer conferir as regras. É um bom começo de conversa.'],ready:'O pessoal foi ouvido. A mesa está esperando a nossa resposta. Fique um instante, Alex; essa parte eu quero escutar de você.'}
+  ];
+  const clueReactions={
+    'carta-perdida':{rosa:'Você abriu o envelope. A dobra está gasta onde alguém segurou com os dedos; passei tanto tempo olhando os três riscos que não tinha reparado nisso.',tomas:'Vi que examinou o envelope. Se comparar com a placa, olhe também o verso. Uma madeira reaproveitada costuma ter mais de uma história.',nico:'Então você leu os três riscos! Eu teria feito uma seta. Talvez seja por isso que Rosa pede para eu escutar antes de desenhar.'},
+    'ponte-marca':{tomas:'A marca sob a tinta continua lá. Gostei que você olhou antes de tentar deixá-la bonita.',rosa:'Tomás reconheceu o encaixe? Ele lembra primeiro do que fez com as mãos. Às vezes a conversa precisa começar por aí.'},
+    'horta-caderno':{lia:'Você viu as colunas. Guarde a diferença entre uma data escrita e uma lembrança: as duas ajudam, mas não são a mesma evidência.',ines:'Alto, margem, areia. Eu conheço um desses nomes pelo caminho que fiz. Devo conhecer os outros pelas pessoas que passaram por eles.'},
+    'cabana-fita':{ines:'Você leu o recado. Eu o escrevi para outra pessoa encontrar, depois me acostumei a ser a única que o conferia.',caio:'A fita tem a data da entrega? Quero comparar com a minha etiqueta. Devia ter feito essa pergunta a Inês há bastante tempo.'},
+    'oasis-caixa':{caio:'As duas etiquetas ainda seguram. Se eu trocar a caixa, vou guardar as duas. Gosto menos da minha letra do que do que finalmente estamos fazendo com ela.',rosa:'Caio deixou você ler a etiqueta dele. Obrigada por me contar. Eu queria perguntar pela caixa sem parecer que estava cobrando a volta.'},
+    'mapa-nico':{nico:'Você encontrou sua assinatura. Agora não dá para fingir que só eu desenho letras apertadas no canto.',tomas:'O desenho de Nico tem uma árvore em cima da seta. Já tive projetos menos claros assinados por gente muito mais velha. Alguns eram meus.'},
+    'arquivo-casa':{rosa:'Você leu os encontros riscados. Passei a mão por cima antes de abrir o arquivo, como se o lápis pudesse sair assim. Ficou. Precisava ficar.',lia:'Vamos separar o acordo antigo do que cada pessoa aceita hoje. Uma assinatura de antes da ventania não responde à pergunta de agora.',caio:'Não havia cobrança no acordo. Li devagar para não inventar uma entre as linhas.'}
+  };
+  const voiceClues={rosa:'carta-perdida',tomas:'ponte-marca',lia:'horta-caderno',ines:'cabana-fita',caio:'oasis-caixa',nico:'mapa-nico'};
+  const personalEchoes={
+    rosa:[['Nico veio ver a caixa de primeira tentativa. Perguntou se a própria tentativa dele cabia. Perguntei se precisava de um embrulho.','Deixei só a referência na gaveta. O resto foi plantar. Ainda abro para conferir; agora fecho mais depressa.'],['Nico mudou a ordem das etiquetas. Eu comecei a explicar a antiga. Parei e pedi que mostrasse a dele.','Caio escolheu o lugar da prateleira. Não é o lugar que eu escolheria. Consigo alcançar todas as caixas; estou ficando sem argumentos.']],
+    lia:[['A página saiu com a pergunta em aberto. Hoje alguém respondeu à pergunta, em vez de perguntar por que eu ainda não tinha mostrado a página.','Nico sublinhou uma frase inteira. Perguntei qual palavra confundia. “A inteira”, ele disse. Estou trabalhando nela.'],['Levei duas perguntas minhas à roda. A segunda ocupou mais tempo que minha apresentação. Mantive a apresentação curta.','Há três letras diferentes nesta página. Consigo reconhecer quem estava observando antes de olhar a assinatura. Gosto disso.']],
+    tomas:[['Deixei sua marca na peça. Alguém perguntou quem fez. A resposta ficou bem mais fácil.','Você explicou o encaixe para mim. Esperei acabar antes de apontar a borda. É um exercício exigente para os dois.'],['O prazo está no quadro. Quando pedem antes, aponto. Descobri uma utilidade excelente para uma seta.','Nico ocupou a bancada no horário combinado. Escondi um serviço meu para não começar por cima do dele. Funcionou.']],
+    ines:[['A marca de retorno ficou legível dos dois lados. Conferi também olhando para trás, desta vez de propósito.','Hoje alguém me perguntou por que eu tinha escolhido uma curva. Precisei explicar em vez de só seguir andando. A ronda rendeu.'],['Meu aviso está na Casa. Rosa leu sem me perguntar o que eu estava tentando provar. Ainda bem.','Trouxe uma observação da trilha para a mesa. Caio fez uma pergunta que eu não teria feito. Vou olhar de novo na próxima ronda.']],
+    caio:[['Discordei de uma proposta e a troca continuou. Achei que você gostaria de saber. Eu gostei bastante de descobrir.','Tomás aprendeu meu jeito de conferir a reserva. Eu aprendi o encaixe. Nenhum dos dois sabe fazer tão bem quanto o outro ainda.'],['Anotei a retirada. Parei antes de escrever o que a pessoa me devia. O espaço ficou em branco, como combinamos.','Hoje trouxeram trabalho no lugar de produto. Coube na mesa. Eu é que precisei mudar o tamanho da minha lista.']],
+    nico:[['A página tem meu nome e uma parte que deu errado. Estão perto. Ninguém achou que eu precisava apagar um dos dois.','Fiz uma pergunta só no alto da folha. Sobrou papel para a resposta. Uma descoberta terrível para minhas torres.'],['Contei do mapa sem pedir desculpa antes. Depois achei uma seta ruim. Corrigi a seta, só ela.','Alguém desenhou na margem do meu mapa e assinou. Primeiro deu um susto. Depois fui ver o que a seta mostrava.']]
+  };
   let adapter={},initialized=false,state,dialogue=null;
   const freshRecord=()=>({status:'offered',acceptedAt:null,choice:null,counts:{},paid:false});
   function context(value){const raw=plain(value)?value:typeof adapter.readState==='function'?adapter.readState():{};return{season:raw?.season==='cold'?'cold':'hot',region:['farm','mountain','desert'].includes(raw?.region)?raw.region:'farm',scene:text(raw?.scene,24)||'main',playerName:text(raw?.playerName||raw?.name,40)||'Alex Vale'};}
@@ -8850,7 +9091,11 @@ body.hud-game #legend{display:none !important;}
   const changed=()=>emit('onChange',snapshot());
   function journal(id,title,message,npcId='') {if(state.journal.some(x=>x.id===id))return;state.journal.push({id,title,text:message,npcId,sequence:state.sequence});state.journal=state.journal.slice(-64);}
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function show(npcId,message,kind='saga',choices=[],title){dialogue={npcId,speaker:NAMES[npcId]||'Alex Vale',role:arcs[npcId]?.title||'O que o vento guardou',title:title||'O que o vento guardou',text:message,kind,choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:false,expression:kind==='saga-final'?'joyful':'thoughtful',gesture:'explain'};emit('onDialogue',currentDialogue());return currentDialogue();}
+  function show(npcId,message,kind='saga',choices=[],title){const voice=voices[npcId]||voices.rosa;
+    const performance=kind==='saga-final'?{expression:'joyful',gesture:'invite'}:kind==='saga-response'?{expression:'warm',gesture:'nod'}:
+      kind==='saga-decision'?{expression:'thoughtful',gesture:'reassure'}:kind==='saga-journal'||kind==='saga-clues'?{expression:'thoughtful',gesture:'reflect'}:
+      {expression:voice.expression,gesture:voice.gesture};
+    dialogue={npcId,speaker:NAMES[npcId]||'Alex Vale',role:arcs[npcId]?.title||'O que o vento guardou',title:title||'O que o vento guardou',text:message,kind,choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:false,...performance};emit('onDialogue',currentDialogue());return currentDialogue();}
   function close(options={}){dialogue=null;if(!options?.silent)emit('onDialogue',null);return null;}
   function definition(type,key,step){if(type==='episode')return episodes[Number(key)];if(type==='arc')return arcs[key]?.stages[Number(step)];if(type==='recurring'&&IDS.includes(key))return{id:'recurring:'+state.cycleId+':'+key,npcId:key,title:'Uma próxima tentativa · '+NAMES[key],description:'Novo combinado desta estação: a vida do vale continua depois da investigação.',coins:10,objectives:recurringDefs[key],choices:[]};return null;}
   function dataFor(type,key,step){if(type==='episode')return state.episodes[Number(key)];if(type==='arc')return state.arcs[key]?.[Number(step)];if(type==='recurring')return state.recurring[key];return null;}
@@ -8865,10 +9110,12 @@ body.hud-game #legend{display:none !important;}
   function offer(npcId,type,key,step){if(!validTarget(type,key,step))return menu(npcId);const def=definition(type,key,step),data=dataFor(type,key,step)||freshRecord(),prefix='saga:'+targetId(type,key,step);
     const choices=data.status==='offered'?(def.choices?.length?def.choices.map((c,i)=>({id:prefix+':accept:'+i,label:c.label})):[{id:prefix+':accept:0',label:'Aceitar o próximo combinado'}]):data.status==='ready'?[{id:prefix+':deliver',label:def.finalChoice?'Voltar à mesa e firmar o acordo':'Concluir o combinado e contar o resultado'}]:[];
     choices.push({id:'saga:menu',label:'Voltar aos projetos deste morador'},{id:'saga:close',label:'Vou pensar; até depois'});
-    const message=data.status==='offered'?def.offer||def.description:data.status==='ready'?'O trabalho combinado está pronto. Quero ouvir o resultado antes de marcar a próxima etapa.\n\n'+objectiveLine(objectiveViews(def,data)):data.status==='completed'?def.resolution:((def.choices?.[data.choice]?.reply||'Nosso combinado está em andamento.')+'\n\n'+objectiveLine(objectiveViews(def,data)));
+    const message=data.status==='offered'?def.offer||def.description:data.status==='ready'?readyLine(npcId,type,key)+'\n\n'+objectiveLine(objectiveViews(def,data)):data.status==='completed'?def.resolution:((type==='episode'?investigationBeats[Number(key)]?.active[data.choice]:null)||def.choices?.[data.choice]?.reply||'Nosso combinado está em andamento.')+'\n\n'+objectiveLine(objectiveViews(def,data));
     return show(npcId,message,'saga-quest',choices,def.title);
   }
   function latestConsequence(npcId){for(let i=1;i>=0;i--){const r=state.arcs[npcId][i];if(r.status==='completed')return arcs[npcId].stages[i].choices[r.choice]?.consequence||'';}for(let i=Math.min(state.episodeIndex-1,7);i>=0;i--)if(episodes[i].npcId===npcId){const r=state.episodes[i];return episodes[i].choices[r.choice]?.consequence||'';}return'';}
+  function readyLine(npcId,type,key){if(type==='episode')return investigationBeats[Number(key)]?.ready.replace(/Alex/g,context().playerName)||'Vamos conferir o que encontramos.';
+    return{rosa:'Separei duas cadeiras. A caixa também veio; hoje ela espera enquanto você me conta.',lia:'Trouxe a página aberta. Mostre o que percebeu antes de eu começar a tomar notas.',tomas:'Terminado? Vamos conferir juntos. Guardei uma pergunta sobre como você fez.',ines:'Você voltou com o combinado pronto. Quero ouvir também como foi o caminho.',caio:'Aqui está nossa lista. Vamos conferir dos dois lados antes de guardar.',nico:'Terminamos essa parte! Vou deixar o lápis parado um instante para ouvir você. Um instante de verdade.'}[npcId];}
   function greeting(npcId,options={}){if(!IDS.includes(npcId))return'';const name=context().playerName;
     const welcome={rosa:name+'. Trouxe as mesmas botas e uma cara nova de quem ensaiou explicações na estrada. Deixe as duas na porta por um instante. Guardei sua cadeira; a Casa das Sementes ainda precisa de gente, e eu senti sua falta.',
       lia:'Eu lembro da sua letra naquele plano, '+name+'. Pequena, no canto da página, mas a ideia era boa. Podemos comparar o que guardamos sem fingir que já sabemos a história inteira. Eu trago o caderno; você traz uma pergunta que incomode.',
@@ -8876,24 +9123,64 @@ body.hud-game #legend{display:none !important;}
       ines:'Reconheci seus passos antes de ver o rosto. Não é um grande talento: você ainda pisa como quem tenta chegar antes da própria dúvida. Seja bem-vindo, '+name+'. Desta vez podemos combinar a ida e a volta com calma.',
       caio:'Rosa avisou que '+name+' tinha voltado. Ela falou com aquela cautela de quem não quer pedir muito e pede tudo com os olhos. Aqui o oásis continua tendo seu ritmo. Você pode trazer o seu; só precisa deixar espaço para ouvir o meu.',
       nico:'Então você é '+name+'! Seu nome aparece num rascunho antigo. Achei que alguém que fez aquela ideia seria mais... não sei, acompanhado de uma placa? Ainda bem que não. Posso mostrar meus desenhos sem carregar uma escada.'};
-    if(options.first)return welcome[npcId];const e=episodes[state.episodeIndex],r=state.episodes[state.episodeIndex];
-    if(e?.npcId===npcId&&r?.status==='ready')return'O trabalho da nossa investigação está pronto. Ainda quero ouvir o que você encontrou antes de passar para a próxima pista. '+e.title.slice(4)+' ganhou outra página.';
-    if(e?.npcId===npcId&&r?.status==='active')return(e.choices[r.choice]?.reply||'Nosso combinado continua.')+' Não precisa trazer uma resposta perfeita. Traga o resultado do que fez.';
-    for(let i=1;i>=0;i--)if(state.arcs[npcId][i].status==='completed')return arcs[npcId].stages[i].resolution;
-    const regular={rosa:'Deixei uma caixa na varanda. Passei duas vezes pensando em trazê-la para dentro de novo. Pareço muito ocupada quando estou só conferindo se o que guardei continua ali. Sente um instante, '+name+'. A caixa pode esperar.',
-      lia:'Abri o caderno numa página quase pronta. Corrigi uma palavra, depois outra. A pergunta continua sendo a mesma. Estou tentando decidir quando revisar deixa de ajudar e começa a impedir uma conversa.',
-      tomas:'Minha lista de hoje tinha oito serviços. O dia discorda, mas ainda estamos negociando. Pode rir, '+name+'. Eu sei medir uma tábua melhor que o tamanho de uma promessa.',
-      ines:'Estou conferindo a próxima rota. Costumo saber onde cada viajante está e esquecer de avisar alguém sobre meu próprio caminho. Não precisa guardar o comentário, '+name+'. Rosa já me fez a mesma pergunta.',
-      caio:'Conferi os recipientes e comecei outra conta de viagens. Gosto de saber o que tenho. Ainda estou aprendendo a não transformar o que alguém oferece num cálculo de quanto passei a dever.',
-      nico:'Hoje comecei uma ideia e tentei não começar as outras seis. Rosa pediu um canteiro; meu desenho já tinha uma torre. Tomás disse que dá para usar a torre como borracha e voltar ao canteiro.'};return regular[npcId];
+    if(options.first)return welcome[npcId];const e=episodes[state.episodeIndex],r=state.episodes[state.episodeIndex],visit=Math.max(1,num(options.visit)),voice=voices[npcId];
+    if(e?.npcId===npcId&&r?.status==='ready')return readyLine(npcId,'episode',state.episodeIndex);
+    if(e?.npcId===npcId&&r?.status==='active')return investigationBeats[state.episodeIndex].active[r.choice];
+    const step=arcStep(npcId);if(step>=0&&state.arcs[npcId][step].status==='ready')return readyLine(npcId,'arc',npcId);
+    // Reações só usam pistas realmente inspecionadas; uma fala não revela a
+    // conclusão de um capítulo futuro por o jogador ter voltado muitas vezes.
+    if(visit%3===0){for(let i=state.clues.length-1;i>=0;i--){const reaction=clueReactions[state.clues[i]]?.[npcId];if(reaction)return reaction;}}
+    if(visit%3===1){for(let i=1;i>=0;i--){const personal=state.arcs[npcId][i];if(personal.status==='completed')return personalEchoes[npcId][i][personal.choice];}}
+    if(options.night===true)return voice.night;
+    let band=state.episodeIndex>=8?'settled':state.episodeIndex>=7?'archive':state.episodeIndex>=3?'middle':'early';
+    if(band==='archive'&&!state.clues.includes('arquivo-casa'))band='middle';
+    if(band==='middle'&&!state.clues.includes(voiceClues[npcId]))band='early';
+    return voice[band][(visit-1)%voice[band].length];
+  }
+  function conversationTopic(npcId,topicId){if(!IDS.includes(npcId))return null;
+    const stage=state.episodeIndex,personal=state.arcs[npcId],known=id=>state.clues.includes(id);
+    let value;
+    if(npcId==='rosa'&&topicId==='return')value=stage>=7?
+      ['Ainda deixo a bolsa perto da porta.','Eu vi. Mudei a cadeira um pouco para não tropeçar. Você pode desfazer a bolsa quando quiser; não vou contar quantos dias levou. Só não use a bolsa para responder uma pergunta que eu fiz a você.','Rosa percebeu a bolsa junto à porta e deixou Alex escolher seu tempo de ficar.']:
+      ['Trouxe ferramentas. A parte de voltar eu não ensaiei direito.','Percebi pela quantidade de vezes que conferiu o fecho da bolsa. Pode deixá-la aí. A primeira coisa que quero de você não cabe nela: me conte como foi chegar.','Rosa pediu que Alex contasse do retorno antes de oferecer outro serviço.'];
+    if(npcId==='rosa'&&topicId==='seeds'&&known('arquivo-casa'))value=['E se outra ventania levar as caixas?',
+      'Vamos conferir onde cada amostra está e quem ficou de cuidar. O arquivo ajuda, mas quero ouvir as pessoas também. Da outra vez guardei o papel tão bem que quase esqueci essa parte.','Rosa quer acompanhar as pessoas e a distribuição das amostras, além de preservar o arquivo.'];
+    if(npcId==='lia'&&topicId==='observe'&&personal[0].status==='completed')value=['Posso trazer uma observação ainda meio torta?',
+      personal[0].choice===0?'Pode. Descreva o que fez e em que condições; depois separe o que observou do que está tentando explicar. A pergunta pode ficar aberta, como deixamos na página.':'Pode. Vamos mostrar a Nico a parte que não ficou clara. Ele tem um talento desagradavelmente útil para encontrar frases que eu achei óbvias. Depois comparamos com a Visão da Pele.',
+      'Lia convidou Alex a trazer observações incompletas com passos e dúvidas identificados.'];
+    if(npcId==='tomas'&&topicId==='rush')value=['Eu ia prometer hoje. Melhor você me dizer o prazo.',
+      personal[1].status==='completed'&&personal[1].choice===0?'Está no quadro. Deixei uma folga entre os serviços. Custa olhar para aquele espaço sem inventar outra encomenda, mas pretendo honrar a lista.':'Posso dizer depois de conferir a madeira. Você pode dizer depois de conferir seu dia. É uma conversa de duas pessoas; não precisa chegar com a promessa pronta.',
+      'Alex e Tomás combinaram conferir o trabalho e o tempo antes de prometer um prazo.'];
+    if(npcId==='tomas'&&topicId==='bench'&&personal[0].status==='completed')value=['Vai refazer o meu encaixe quando eu sair?',
+      personal[0].choice===0?'Não. Deixamos sua marca na peça, lembra? Se encontrar alguma coisa, chamo você. Já guardei a lixa para ajudar a minha palavra.':'Se precisar mudar, mostro onde. Você me explica seu passo de volta. Se eu não conseguir explicar o meu, provavelmente é hora de parar de resmungar e olhar de novo.',
+      'Tomás reafirmou que qualquer correção da peça será feita com Alex, sem refazer escondido.'];
+    if(npcId==='ines'&&topicId==='turn')value=['Passei anos chamando minha partida de uma rota curta.',
+      stage>=4?'Eu passei esses anos achando que conhecia o motivo. Quando você voltou, quase comecei a conversa por uma resposta minha. Podemos tentar uma pergunta sua desta vez.':'Então desta vez me diga onde pretende ir. Eu digo onde estarei. O resto a gente conversa na volta, sem pedir que o caminho resolva sozinho.',
+      'Alex falou de sua partida a Inês; os dois combinaram perguntar e avisar em vez de adivinhar.'];
+    if(npcId==='ines'&&topicId==='route'&&personal[1].status==='completed')value=['Você também avisa quando muda de caminho?',
+      personal[1].choice===0?'Agora deixo o aviso na Casa. Se precisar mudar a rota, procuro apoio e volto. Não foi por falta de saber escrever que demorei a começar.':'Levo a observação à mesa antes da próxima ronda. Caio já mudou uma pergunta minha. Não mudou a montanha; mudou o que eu precisava olhar.',
+      'Inês reconheceu que os próprios avisos e retornos também fazem parte de uma rota compartilhada.'];
+    if(npcId==='caio'&&topicId==='trade'&&known('oasis-caixa'))value=['A caixa de Rosa. Ela chama de caixa do Caio.',
+      'Então a caixa tem dois nomes e nenhuma dificuldade com isso. Eu é que compliquei. Na próxima etiqueta vou escrever o que tem dentro e para onde vai. Já vai dar bastante trabalho.',
+      'Caio ouviu que Rosa dá outro nome à mesma caixa e decidiu usar etiquetas para orientar a troca.'];
+    if(npcId==='caio'&&topicId==='stay')value=stage>=5?
+      ['Trouxe tempo. Dessa vez não vim propor um conserto.','Ótimo. Sente. Eu tinha uma coisa para perguntar sobre a fazenda antes de começar a falar das minhas reservas. Como está sendo ficar por lá?','Caio perguntou como Alex está vivendo o retorno à fazenda.']:
+      ['Posso ficar um pouco sem dizer para que vim?','Pode. Só afasto este recipiente. Rosa manda as pessoas sentarem antes de fazer perguntas; nesse assunto, admito que ela costuma ter razão.','Caio recebeu Alex sem exigir um motivo ou uma oferta em troca da visita.'];
+    if(npcId==='nico'&&topicId==='partner')value=personal[1].status==='completed'?
+      ['Posso assinar no canto do seu próximo desenho?',personal[1].choice===0?'Pode, se ajudar a desenhar. Eu apresento minha parte; você conta a sua. Se errar uma letra, Tomás sabe onde está a lixa.':'Pode! Tem margem. Mas assina de um tamanho que dê para ler, desta vez. Eu não quero precisar investigar outra assinatura sua.','Nico convidou Alex a assinar uma contribuição legível no próximo desenho.']:
+      ['Sua parte é sua. Eu ajudo quando você pedir.','Inclusive se minha ideia for pequena? Então vou mostrar a pequena primeiro. A grande está no verso, mas você pode fingir que não viu por enquanto.','Alex ofereceu ajuda sem tomar a autoria de Nico, que decidiu mostrar sua ideia pequena primeiro.'];
+    if(npcId==='nico'&&topicId==='idea'&&personal[0].status==='completed')value=['Qual ideia conseguiu terminar hoje?',
+      personal[0].choice===0?'A página do canteiro. Assinei, contei o que deu errado e não comecei uma página limpa para esconder. Agora posso tentar outra coisa. Estou escolhendo devagar.':'A pergunta do canteiro. Deixei uma seta só. Parece pouco até lembrar que dá para entender para onde ela aponta. Lia entendeu sem eu ficar explicando por cima.',
+      'Nico contou um resultado concreto da experiência antes de propor a próxima.'];
+    return value?{label:value[0],reply:value[1],memory:value[2]}:null;
   }
   function menuLabel(npcId){const e=episodes[state.episodeIndex],d=state.episodes[state.episodeIndex];if(e?.npcId===npcId)return d.status==='ready'?'Investigar: concluir '+e.title.slice(4):'Investigar: '+e.title.slice(4);const step=arcStep(npcId);if(step>=0&&state.episodeIndex>=arcs[npcId].unlock)return'Projeto pessoal: '+arcs[npcId].stages[step].title;return'O que o vento guardou · histórias e projetos';}
   function menu(npcId){if(!IDS.includes(npcId))return null;const e=episodes[state.episodeIndex],step=arcStep(npcId),choices=[];
-    let message=arcs[npcId].agenda+'\n\n'+(latestConsequence(npcId)||'A Casa das Sementes guarda uma pergunta que o vento não respondeu. Há trabalho real por trás de cada pista.');
+    let message=greeting(npcId)+(latestConsequence(npcId)?'\n\nNosso último combinado: '+latestConsequence(npcId):'');
     if(e?.npcId===npcId)choices.push({id:'saga:episode:'+state.episodeIndex+':offer',label:(state.episodes[state.episodeIndex].status==='ready'?'Concluir investigação: ':'Investigar: ')+e.title.slice(4)});
     else if(e)message+='\n\nA próxima pista está com '+NAMES[e.npcId]+': '+e.title.slice(4)+'.';
     if(step>=0&&state.episodeIndex>=arcs[npcId].unlock)choices.push({id:'saga:arc:'+npcId+':'+step+':offer',label:(state.arcs[npcId][step].status==='ready'?'Concluir projeto: ':'Projeto pessoal: ')+arcs[npcId].stages[step].title});
-    else if(step<0)message+='\n\n'+arcs[npcId].stages[1].resolution;
+    else if(step<0)message+='\n\nNossos dois projetos pessoais estão concluídos. Podemos acompanhar o que mudou e escolher o próximo trabalho da estação.';
     else message+='\n\nNosso projeto pessoal começa depois de mais um trecho da investigação.';
     if(state.episodeIndex===episodes.length)choices.push({id:'saga:recurring:'+npcId+':offer',label:state.recurring[npcId]?.status==='completed'?'Relembrar nosso combinado da estação':'Um novo combinado para esta estação'});
     choices.push({id:'saga:journal',label:'Ler minhas anotações sobre o vale'},{id:'saga:clues',label:'Reunir as pistas que encontramos'},{id:'saga:back',label:'Voltar à conversa comum'},{id:'saga:close',label:'Até depois'});
@@ -8986,7 +9273,7 @@ body.hud-game #legend{display:none !important;}
   function update(dt,value){if(!Number.isFinite(dt)||dt<0)return;const s=context(value);newSeason({season:s.season});if(s.scene==='main'&&s.region!==state.lastRegion){state.lastRegion=s.region;record('visit',{region:s.region});}}
   function cinematicScenes(){const props=['seed','sign','notebook','ribbon','crate','sign','notebook','table'];return episodes.map((def,index)=>({id:'saga-'+def.id,title:def.title,chapter:index,description:def.description,episodeIndex:index,cast:[...new Set([def.npcId,'player',...def.cut.map(s=>s[0])])],focusX:def.focus.x,focusY:def.focus.y,region:def.id==='abrigo'?'mountain':def.id==='oasis'?'desert':'farm',scene:'main',prop:props[index],shots:def.cut.map(([speaker,line,expression,gesture],i)=>({speaker,line,expression,gesture,focus:i===3?0:i%2?1:-1,duration:5.5}))}));}
   state=fresh({season:'hot'});
-  window.FarmValleySaga={init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh();initialized=true;}return snapshot();},interact:menu,choose,currentDialogue,close,isOpen:()=>!!dialogue,menuLabel,greeting,record,update,snapshot,worldState,cinematicScenes,clueCatalogue:()=>clone(clueDefs),serialize:()=>clone(state),restore,reset(value){state=fresh(value);close();changed();return snapshot();}};
+  window.FarmValleySaga={init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh();initialized=true;}return snapshot();},interact:menu,choose,currentDialogue,close,isOpen:()=>!!dialogue,menuLabel,greeting,conversationTopic,record,update,snapshot,worldState,cinematicScenes,clueCatalogue:()=>clone(clueDefs),serialize:()=>clone(state),restore,reset(value){state=fresh(value);close();changed();return snapshot();}};
 })();
 
 /* ===========================
@@ -20478,7 +20765,9 @@ function drawPlayer(){
   let y = _camRenderY + Math.round(restPose.y - _camFloatY);
   if(window.FarmCharacterArt){
     if(!A11Y.reduceMotion && isFrio() && player.temp<36.2) x+=Math.floor(Math.sin(performance.now()/35));
-    window.FarmCharacterArt.drawPlayer(ctx,player,{...restPose,x,y,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
+    const listening=window.FarmStoryIntegration?.conversationPose?.(player,true);
+    const actor=listening?{...player,moving:false,running:false,gaitBlend:0,actionTimer:0}:player;
+    window.FarmCharacterArt.drawPlayer(ctx,actor,{...restPose,x,y,...listening,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
     return;
   }
   const dir = player.dir ?? 0; // 0 baixo, 1 esquerda, 2 direita, 3 cima
@@ -21375,7 +21664,57 @@ function drawSunShadows(list){
   ctx.restore();
 }
 
-/* Recorte do cenário real para o palco. Executa somente ao trocar de plano;
+/* Marcação do elenco sobre o terreno real. É uma composição transitória:
+   nenhum personagem da partida é movido para gravar ou rever uma cena. */
+function cinematicCastLayout(cast,camera,visible){
+  const {left,top,zoom,width,height}=camera,placed=[];
+  const ids=[...new Set(cast)].slice(0,7),w=width/zoom,h=height/zoom;
+  // Reservas só de composição: objetos pequenos continuam com a colisão
+  // original do jogo, mas não podem atravessar os corpos durante uma fala.
+  const props=visible.flatMap(o=>{
+    const sizes={scarecrow:[-10,-10,20,28],well:[-20,-35,40,52],
+      woodpile:[-13,-20,26,32],loom:[-13,-17,26,31],bench:[-14,-3,28,14],
+      sellbox:[-19,-30,38,44],fireplace:[-14,-12,28,27]};
+    const b=sizes[o.type];
+    if(b)return[{x:o.x+b[0],y:o.y+b[1],w:b[2],h:b[3]}];
+    if(o.type==='bridge')return[{x:o.x-4,y:o.y-10,w:(o.w||48)+8,h:24}];
+    return [];
+  });
+  const covers=visible.map(o=>{
+    const depth=window.FarmWorldDepth?FarmWorldDepth.depth(o):o.y+(o.h||0);
+    if(['house','barn','story_seed_house'].includes(o.type))return {x:o.x-9,y:o.y-23,w:o.w+29,h:o.h+36,depth};
+    if(o.type==='mtn_cabin')return{x:o.x-42,y:o.y-86,w:106,h:100,depth};
+    if(['tree','fx_fruittree','mtn_pine','des_palm'].includes(o.type))return{x:o.x-27,y:o.y-68,w:54,h:78,depth};
+    return null;
+  }).filter(Boolean);
+  const points=[];
+  for(let y=Math.ceil(top+48);y<=top+h-23;y+=4)for(let x=Math.ceil(left+22);x<=left+w-22;x+=4){
+    if(window.FarmWorldDepth&&[[-6,0],[6,0],[0,0],[0,6]].some(([dx,dy])=>FarmWorldDepth.isBlocked(x+dx,y+dy)))continue;
+    const tile=map[Math.floor((y+10)/TS)]?.[Math.floor(x/TS)];
+    if([undefined,T.WATER,T.RIVER,T.OASIS,T.ICE,T.FIELD].includes(tile))continue;
+    if(visible.some(o=>o.type==='cinematic_table'&&Math.abs(x-o.x)<29&&Math.abs(y-o.y)<15))continue;
+    if(props.some(b=>x+10>b.x&&x-10<b.x+b.w&&y+10>b.y&&y-30<b.y+b.h))continue;
+    const cover=covers.filter(b=>b.depth>y+10&&x+10>b.x&&x-10<b.x+b.w&&y+10>b.y&&y-33<b.y+b.h).length;
+    points.push({x,y,cover});
+  }
+  for(let i=0;i<ids.length;i++){
+    const desiredX=left+w/2+(i-(ids.length-1)/2)*(ids.length>3?28:38);
+    const desiredY=top+h*(ids.length>3?(i%2?.64:.8):.74);
+    let best=null,bestScore=Infinity;
+    for(const p of points){
+      if(placed.some(a=>Math.hypot(a.worldX-p.x,a.worldY-p.y)<27))continue;
+      if(placed.length&&!placed.some(a=>Math.hypot(a.worldX-p.x,a.worldY-p.y)<=76))continue;
+      const score=(p.x-desiredX)**2+(p.y-desiredY)**2*1.5+p.cover*100000;
+      if(score<bestScore){best=p;bestScore=score;}
+    }
+    // Uma câmera sem chão suficiente não fabrica atores dentro de obstáculos.
+    if(!best)continue;
+    placed.push({id:ids[i],worldX:best.x,worldY:best.y,x:(best.x-left)*zoom,y:(best.y-top)*zoom,depth:best.y+10});
+  }
+  return placed.sort((a,b)=>a.depth-b.depth||a.worldX-b.worldX);
+}
+
+/* Recorte do cenário real para o palco. Executa somente ao abrir uma cena;
    não chama render/update nem altera jogador, clima, objetos ou recompensas.
    O contexto de desenho e as referências de cena são restaurados no finally. */
 function drawCinematicWorld(g,view={}){
@@ -21402,10 +21741,48 @@ function drawCinematicWorld(g,view={}){
     for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
     const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
     for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
+    if(view.stage?.prop==='table'){
+      let table=null,score=Infinity;
+      for(let y=Math.ceil(top+visibleH*.6);y<top+visibleH-23;y+=4)for(let x=Math.ceil(centerX-28);x<=centerX+28;x+=4){
+        if([[-24,-8],[24,-8],[-24,12],[24,12],[0,0]].some(([dx,dy])=>window.FarmWorldDepth?.isBlocked(x+dx,y+dy)||map[Math.floor((y+dy)/TS)]?.[Math.floor((x+dx)/TS)]===T.FIELD))continue;
+        const cost=(x-centerX)**2+(y-(top+visibleH*.75))**2;
+        if(cost<score){score=cost;table={type:'cinematic_table',x,y,h:12};}
+      }
+      if(table){visible.push(table);view.stage.propPosition={worldX:table.x,worldY:table.y};}
+      fallback.cinematic_table=o=>{
+        const x=o.x,y=o.y;
+        ctx.fillStyle='rgba(24,47,40,.22)';ctx.fillRect(x-23,y+10,48,4);
+        ctx.fillStyle='#57453c';ctx.fillRect(x-20,y+1,4,12);ctx.fillRect(x+16,y+1,4,12);ctx.fillRect(x-24,y-8,48,12);
+        ctx.fillStyle='#b99161';ctx.fillRect(x-23,y-10,46,10);ctx.fillStyle='#d0b98c';ctx.fillRect(x-23,y-10,46,2);
+        ctx.fillStyle='#886548';ctx.fillRect(x-23,y-4,46,1);ctx.fillRect(x-9,y-8,1,8);ctx.fillRect(x+11,y-8,1,8);
+        ctx.fillStyle='#eee2b8';ctx.fillRect(x-5,y-11,10,6);ctx.fillStyle='#66805a';ctx.fillRect(x-2,y-9,4,1);
+      };
+    }
     visible.sort((a,b)=>(window.FarmWorldDepth?FarmWorldDepth.depth(a)-FarmWorldDepth.depth(b):a.y-b.y));
     drawSunShadows(visible);
     window.FarmWorldDepth?.drawGroundShadows(g,visible,sunShadowVec());
-    for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
+    const stage=view.stage;
+    if(stage&&Array.isArray(stage.cast)){
+      stage.camera={left,top,width,height,zoom,focusX:centerX,focusY:centerY};
+      stage.actors=cinematicCastLayout(stage.cast,stage.camera,visible);stage.layers=[];
+      drawSunShadows(stage.actors.map(a=>({type:'player',x:a.worldX,y:a.worldY})));
+      let cursor=0;
+      // Cada faixa contém apenas objetos entre dois pés do elenco. O palco
+      // intercala estes canvases estáticos com os atores animados; árvores e
+      // fachadas mantêm a mesma oclusão do jogo sem repintar tiles por frame.
+      for(let i=0;i<=stage.actors.length;i++){
+        const layer=document.createElement('canvas');layer.width=width;layer.height=height;
+        const c=layer.getContext('2d');c.imageSmoothingEnabled=false;c.scale(zoom,zoom);c.translate(-left,-top);ctx=c;
+        const boundary=stage.actors[i]?.depth??Infinity;
+        while(cursor<visible.length){
+          const o=visible[cursor],depth=window.FarmWorldDepth?FarmWorldDepth.depth(o):o.y+(o.h||0);
+          if(depth>boundary)break;
+          if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,c);else fallback[o.type]?.(o);
+          cursor++;
+        }
+        stage.layers.push(layer);
+      }
+    }else for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
     return true;
   }finally{
     ({ctx,map,objects,crops,MW,MH,currentScene}=prior);g.restore();

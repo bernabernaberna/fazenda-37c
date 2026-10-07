@@ -87,6 +87,7 @@ fs.mkdirSync(out,{recursive:true});let browser;
   }finally{await context.close();}
  }
  report.checks.push({name:'Mesma build nos dezesseis cenários',pass:new Set(report.scenes.map(s=>s.sha256)).size===1&&report.scenes.length===16});
+ report.checks.push({name:'Render CPU p95 abaixo4ms nos16cenários do navegador de referência',pass:report.scenes.every(s=>s.render.p95Ms<4)});
  report.checks.push({name:'Cenas e mapa aberto correspondem ao roteiro',pass:report.scenes.every(s=>s.scene===s.expectedScene&&s.mapOpen===s.expectedMapOpen)});
  report.checks.push({name:'180 amostras após40 de aquecimento em cada cena',pass:report.scenes.every(s=>s.render.samples===SAMPLES&&s.loopCPU.samples===SAMPLES&&s.mapUpdate.samples===SAMPLES&&s.update.samples===(s.expectedPaused?0:SAMPLES))});
  report.checks.push({name:'CPU p95 do loop abaixo16,67ms neste navegador',pass:report.scenes.every(s=>s.loopCPU.p95Ms<16.67&&s.render.p95Ms<16.67&&(s.update.p95Ms??0)<16.67&&s.mapRefreshTicks.p95Ms<16.67)});

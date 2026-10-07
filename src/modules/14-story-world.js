@@ -290,9 +290,11 @@
   function log(kind,id){state.log.push({kind,id,cycleId:state.cycleId,sequence:state.sequence});state.log=state.log.slice(-48);}
   function changed(){emit('onChange',snapshot());}
   function show(npcId,message,kind='response',choices=[],title){
+    const acting={rosa:{expression:'warm',gesture:'reassure'},lia:{expression:'thoughtful',gesture:'point'},tomas:{expression:'warm',gesture:'shrug'},ines:{expression:'thoughtful',gesture:'point'},caio:{expression:'warm',gesture:'nod'},nico:{expression:'joyful',gesture:'point'}};
+    const performance=kind==='lore'||kind==='letter'?{expression:'thoughtful',gesture:'reflect'}:kind==='response'?{expression:'warm',gesture:'nod'}:acting[npcId]||acting.rosa;
     const c=byId[npcId];dialogue={npcId,speaker:c?c.name:'Rosa',role:c?c.role:'A carta que trouxe você ao vale',
       title:title||'Conversa com '+(c?c.name:'Rosa'),text:message,kind,
-      choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:kind==='response'};
+      choices:choices.map(c=>({id:c.id,label:c.label})),canAdvance:kind==='response',...performance};
     // Respostas com escolhas conservam avanço por API; a UI exibe só as respostas
     // explícitas para não duplicar "continuar" ao lado de "continuar a conversa".
     emit('onDialogue',currentDialogue());return currentDialogue();
@@ -311,7 +313,10 @@
     return{...def,...context,objectives};
   }
   function letterView(){return sagaStage()?{title:'A carta de Rosa · antes do retorno',text:'Esta é a carta que Rosa enviou antes do seu retorno. Ela permanece guardada como memória daquele começo.\n\n'+letter.text}:letter;}
-  function currentTopic(npcId,topic){if(sagaStage()<7)return topic;
+  function currentTopic(npcId,topic){
+    const current=window.FarmValleySaga?.conversationTopic?.(npcId,topic[0]);
+    if(current)return[topic[0],current.label,current.reply,current.memory];
+    if(sagaStage()<7)return topic;
     if(npcId==='tomas'&&topic[0]==='bench')return['bench','Como manter a Casa em atividade?',
       'A bancada e a mesa já estão em uso. Agora quero manter os encaixes firmes, cumprir os prazos e deixar espaço para quem aprende. Produção, venda e manutenção ajudam a Casa a continuar útil depois da investigação.',
       'Tomás lembrou que manter a Casa em atividade também exige cuidado, prazos e espaço para aprender.'];
@@ -440,7 +445,7 @@
       message=visit%3===1?after[npcId]:greetings[npcId][(visit-1)%greetings[npcId].length];
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
-    if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId);
+    if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
     const activity=text(s.activities[npcId],180);
     if(!preamble){
       const echo=decisionEcho(npcId),notice=noticeLines[npcId];

@@ -12955,7 +12955,9 @@ function drawPlayer(){
   let y = _camRenderY + Math.round(restPose.y - _camFloatY);
   if(window.FarmCharacterArt){
     if(!A11Y.reduceMotion && isFrio() && player.temp<36.2) x+=Math.floor(Math.sin(performance.now()/35));
-    window.FarmCharacterArt.drawPlayer(ctx,player,{...restPose,x,y,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
+    const listening=window.FarmStoryIntegration?.conversationPose?.(player,true);
+    const actor=listening?{...player,moving:false,running:false,gaitBlend:0,actionTimer:0}:player;
+    window.FarmCharacterArt.drawPlayer(ctx,actor,{...restPose,x,y,...listening,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
     return;
   }
   const dir = player.dir ?? 0; // 0 baixo, 1 esquerda, 2 direita, 3 cima
@@ -13852,7 +13854,57 @@ function drawSunShadows(list){
   ctx.restore();
 }
 
-/* Recorte do cenário real para o palco. Executa somente ao trocar de plano;
+/* Marcação do elenco sobre o terreno real. É uma composição transitória:
+   nenhum personagem da partida é movido para gravar ou rever uma cena. */
+function cinematicCastLayout(cast,camera,visible){
+  const {left,top,zoom,width,height}=camera,placed=[];
+  const ids=[...new Set(cast)].slice(0,7),w=width/zoom,h=height/zoom;
+  // Reservas só de composição: objetos pequenos continuam com a colisão
+  // original do jogo, mas não podem atravessar os corpos durante uma fala.
+  const props=visible.flatMap(o=>{
+    const sizes={scarecrow:[-10,-10,20,28],well:[-20,-35,40,52],
+      woodpile:[-13,-20,26,32],loom:[-13,-17,26,31],bench:[-14,-3,28,14],
+      sellbox:[-19,-30,38,44],fireplace:[-14,-12,28,27]};
+    const b=sizes[o.type];
+    if(b)return[{x:o.x+b[0],y:o.y+b[1],w:b[2],h:b[3]}];
+    if(o.type==='bridge')return[{x:o.x-4,y:o.y-10,w:(o.w||48)+8,h:24}];
+    return [];
+  });
+  const covers=visible.map(o=>{
+    const depth=window.FarmWorldDepth?FarmWorldDepth.depth(o):o.y+(o.h||0);
+    if(['house','barn','story_seed_house'].includes(o.type))return {x:o.x-9,y:o.y-23,w:o.w+29,h:o.h+36,depth};
+    if(o.type==='mtn_cabin')return{x:o.x-42,y:o.y-86,w:106,h:100,depth};
+    if(['tree','fx_fruittree','mtn_pine','des_palm'].includes(o.type))return{x:o.x-27,y:o.y-68,w:54,h:78,depth};
+    return null;
+  }).filter(Boolean);
+  const points=[];
+  for(let y=Math.ceil(top+48);y<=top+h-23;y+=4)for(let x=Math.ceil(left+22);x<=left+w-22;x+=4){
+    if(window.FarmWorldDepth&&[[-6,0],[6,0],[0,0],[0,6]].some(([dx,dy])=>FarmWorldDepth.isBlocked(x+dx,y+dy)))continue;
+    const tile=map[Math.floor((y+10)/TS)]?.[Math.floor(x/TS)];
+    if([undefined,T.WATER,T.RIVER,T.OASIS,T.ICE,T.FIELD].includes(tile))continue;
+    if(visible.some(o=>o.type==='cinematic_table'&&Math.abs(x-o.x)<29&&Math.abs(y-o.y)<15))continue;
+    if(props.some(b=>x+10>b.x&&x-10<b.x+b.w&&y+10>b.y&&y-30<b.y+b.h))continue;
+    const cover=covers.filter(b=>b.depth>y+10&&x+10>b.x&&x-10<b.x+b.w&&y+10>b.y&&y-33<b.y+b.h).length;
+    points.push({x,y,cover});
+  }
+  for(let i=0;i<ids.length;i++){
+    const desiredX=left+w/2+(i-(ids.length-1)/2)*(ids.length>3?28:38);
+    const desiredY=top+h*(ids.length>3?(i%2?.64:.8):.74);
+    let best=null,bestScore=Infinity;
+    for(const p of points){
+      if(placed.some(a=>Math.hypot(a.worldX-p.x,a.worldY-p.y)<27))continue;
+      if(placed.length&&!placed.some(a=>Math.hypot(a.worldX-p.x,a.worldY-p.y)<=76))continue;
+      const score=(p.x-desiredX)**2+(p.y-desiredY)**2*1.5+p.cover*100000;
+      if(score<bestScore){best=p;bestScore=score;}
+    }
+    // Uma câmera sem chão suficiente não fabrica atores dentro de obstáculos.
+    if(!best)continue;
+    placed.push({id:ids[i],worldX:best.x,worldY:best.y,x:(best.x-left)*zoom,y:(best.y-top)*zoom,depth:best.y+10});
+  }
+  return placed.sort((a,b)=>a.depth-b.depth||a.worldX-b.worldX);
+}
+
+/* Recorte do cenário real para o palco. Executa somente ao abrir uma cena;
    não chama render/update nem altera jogador, clima, objetos ou recompensas.
    O contexto de desenho e as referências de cena são restaurados no finally. */
 function drawCinematicWorld(g,view={}){
@@ -13879,10 +13931,48 @@ function drawCinematicWorld(g,view={}){
     for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
     const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
     for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
+    if(view.stage?.prop==='table'){
+      let table=null,score=Infinity;
+      for(let y=Math.ceil(top+visibleH*.6);y<top+visibleH-23;y+=4)for(let x=Math.ceil(centerX-28);x<=centerX+28;x+=4){
+        if([[-24,-8],[24,-8],[-24,12],[24,12],[0,0]].some(([dx,dy])=>window.FarmWorldDepth?.isBlocked(x+dx,y+dy)||map[Math.floor((y+dy)/TS)]?.[Math.floor((x+dx)/TS)]===T.FIELD))continue;
+        const cost=(x-centerX)**2+(y-(top+visibleH*.75))**2;
+        if(cost<score){score=cost;table={type:'cinematic_table',x,y,h:12};}
+      }
+      if(table){visible.push(table);view.stage.propPosition={worldX:table.x,worldY:table.y};}
+      fallback.cinematic_table=o=>{
+        const x=o.x,y=o.y;
+        ctx.fillStyle='rgba(24,47,40,.22)';ctx.fillRect(x-23,y+10,48,4);
+        ctx.fillStyle='#57453c';ctx.fillRect(x-20,y+1,4,12);ctx.fillRect(x+16,y+1,4,12);ctx.fillRect(x-24,y-8,48,12);
+        ctx.fillStyle='#b99161';ctx.fillRect(x-23,y-10,46,10);ctx.fillStyle='#d0b98c';ctx.fillRect(x-23,y-10,46,2);
+        ctx.fillStyle='#886548';ctx.fillRect(x-23,y-4,46,1);ctx.fillRect(x-9,y-8,1,8);ctx.fillRect(x+11,y-8,1,8);
+        ctx.fillStyle='#eee2b8';ctx.fillRect(x-5,y-11,10,6);ctx.fillStyle='#66805a';ctx.fillRect(x-2,y-9,4,1);
+      };
+    }
     visible.sort((a,b)=>(window.FarmWorldDepth?FarmWorldDepth.depth(a)-FarmWorldDepth.depth(b):a.y-b.y));
     drawSunShadows(visible);
     window.FarmWorldDepth?.drawGroundShadows(g,visible,sunShadowVec());
-    for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
+    const stage=view.stage;
+    if(stage&&Array.isArray(stage.cast)){
+      stage.camera={left,top,width,height,zoom,focusX:centerX,focusY:centerY};
+      stage.actors=cinematicCastLayout(stage.cast,stage.camera,visible);stage.layers=[];
+      drawSunShadows(stage.actors.map(a=>({type:'player',x:a.worldX,y:a.worldY})));
+      let cursor=0;
+      // Cada faixa contém apenas objetos entre dois pés do elenco. O palco
+      // intercala estes canvases estáticos com os atores animados; árvores e
+      // fachadas mantêm a mesma oclusão do jogo sem repintar tiles por frame.
+      for(let i=0;i<=stage.actors.length;i++){
+        const layer=document.createElement('canvas');layer.width=width;layer.height=height;
+        const c=layer.getContext('2d');c.imageSmoothingEnabled=false;c.scale(zoom,zoom);c.translate(-left,-top);ctx=c;
+        const boundary=stage.actors[i]?.depth??Infinity;
+        while(cursor<visible.length){
+          const o=visible[cursor],depth=window.FarmWorldDepth?FarmWorldDepth.depth(o):o.y+(o.h||0);
+          if(depth>boundary)break;
+          if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,c);else fallback[o.type]?.(o);
+          cursor++;
+        }
+        stage.layers.push(layer);
+      }
+    }else for(const o of visible){if(OBJECT_DRAWERS[o.type])OBJECT_DRAWERS[o.type](o,g);else fallback[o.type]?.(o);}
     return true;
   }finally{
     ({ctx,map,objects,crops,MW,MH,currentScene}=prior);g.restore();

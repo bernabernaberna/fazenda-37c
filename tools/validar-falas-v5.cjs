@@ -33,7 +33,7 @@ async function talk(id='rosa'){
   await page.keyboard.press('e');const revealed=await page.evaluate(()=>FarmStoryUI.presentation());
   check('E revela tudo sem escolher nem avançar a conversa',revealed.visible===revealed.total&&!revealed.speaking&&await page.locator('[data-vale-choice="main:accept"]').count()===1,revealed);
   await talk();await page.locator('[data-vale-choice="chat:return"]').focus();await page.keyboard.press('Enter');
-  check('Enter confirma a escolha focada mesmo durante apresentação',await page.evaluate(()=>FarmStoryWorld.currentDialogue().kind==='response'&&FarmStoryWorld.snapshot().memories.some(m=>m.text.includes('começar pequeno'))));
+  check('Enter confirma a escolha focada mesmo durante apresentação',await page.evaluate(()=>FarmStoryWorld.currentDialogue().kind==='response'&&FarmStoryWorld.snapshot().memories.some(m=>m.id==='topic:rosa:return'&&m.npcId==='rosa'&&m.text.length>0)));
   await page.keyboard.press('Enter');await page.locator('[data-vale-choice="main:accept"]').focus();await page.keyboard.press('Space');
   check('Espaço confirma escolha focada e aceite real segue íntegro',await page.evaluate(()=>FarmStoryWorld.snapshot().chapter.status==='active'));
   await page.evaluate(()=>{FarmStoryWorld.interact('letter');});
