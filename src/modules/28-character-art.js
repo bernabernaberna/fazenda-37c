@@ -86,14 +86,16 @@
     return{conversing,expression,gesture,mouth,speechPhase,speechBlink,gaze};
   }
   function state(actor,opts,hero){
-    const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
+    const restWalking=!!opts.restWalking&&!opts.reducedMotion&&!actor.dead;
+    const rest=!restWalking&&(!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0));
     const restMode=rest&&opts.restMode==='bed'?'bed':rest?'sit':'';
     const restElapsed=Math.max(0,Number.isFinite(opts.restElapsed)?opts.restElapsed:Number(hero?actor.restTimer:actor.activityPhase)||0);
     const restBlend=Number.isFinite(opts.restBlend)?Math.max(0,Math.min(1,opts.restBlend)):Math.min(1,restElapsed/.24);
-    const restStage=rest?(opts.reducedMotion?2:Math.round(restBlend*2)):0;
+    const restStages=restMode==='bed'?4:2;
+    const restStage=rest?(opts.reducedMotion?restStages:Math.round(restBlend*restStages)):0;
     // Respiração de 4,8s mexe apenas no tórax/tecido. Cabeça, mãos e pés ficam
     // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
-    const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
+    const restBreath=rest&&!opts.reducedMotion&&restStage===restStages&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
     const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
     const speech=conversation(opts,!actor.dead&&!rest,hero?'player':actor.npcId||actor.id);
     const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
@@ -102,9 +104,9 @@
     const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion&&!speech.conversing;
     // A simulação conserva a fase ao parar. A amplitude recolhe a passada até
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
-    const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
-    const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
-    return {dir:dirOf(opts.facing??actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
+    const gait=rest||actor.dead||opts.reducedMotion||action?0:restWalking?8:blend(actor.gaitBlend,actor.moving?1:0);
+    const moving=gait>0,runMix=moving&&!restWalking?blend(actor.gaitRunBlend,actor.running?1:0):0;
+    return {dir:dirOf(restWalking?opts.restWalkDir:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
       moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
       heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
@@ -322,7 +324,7 @@
     // sequência ao contrário serve para levantar, sem reiniciar a passada.
     if(s.restStage===0){paintBody(g,d,{...s,rest:false,restDoze:false,gait:0,runMix:0,action:'',blink:false});return;}
     g.save();g.translate(AX,AY);
-    const bed=s.restMode==='bed'&&s.restStage===2;
+    const bed=s.restMode==='bed'&&s.restStage>=3;
     if(!bed&&s.dir===1)g.scale(-1,1);
     const side=!bed&&(s.dir===1||s.dir===2),back=!bed&&s.dir===3;
     const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
@@ -337,10 +339,10 @@
       rect(g,P.edge,-8,-7,16,7);rect(g,quilt,-7,-7,14,6);rect(g,quiltHi,-7,-7-s.restBreath,14,2);
       for(let x=-5;x<=5;x+=5){rect(g,s.blanket?P.amber:'#bbccc0',x,-4,1,3);}
       rect(g,P.edge,-7,-1,14,1);
-      g.save();g.translate(0,6);paintHead(g,d,{...s,dir:0,hat:false});g.restore();
+      g.save();g.translate(0,s.restStage===3?3:6);paintHead(g,d,{...s,dir:0,hat:false,restDoze:s.restStage===4&&s.restDoze});g.restore();
       if(s.hat){rect(g,'#9b793d',9,-19,9,5);rect(g,P.amber,10,-20,7,4);rect(g,P.cream,10,-20,3,1);rect(g,P.edge,9,-16,9,1);}
     }else{
-      const drop=s.restStage===1?3:5;
+      const drop=s.restStage===1?(s.restMode==='bed'?2:3):5;
       // Apoio dobrado e compacto. Os pés permanecem no y=0 da mesma âncora de
       // colisão/profundidade; não deslizam com a respiração nem com o cochilo.
       if(side){

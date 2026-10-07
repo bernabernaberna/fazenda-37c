@@ -79,6 +79,7 @@ MODULE_ORDER = [
     "36-farm-life.js",        # projetos, produção, receitas e pistas
     "37-valley-panels.js",    # caderno de Alex e gestão das atividades
     "38-skin-learning.js",    # tecidos da pele e investigações de Lia
+    "39-valley-details.js",   # escolhas refletidas em superfícies já existentes
     "40-grass-sway.js",       # animated grass blades + wind streaks
     "50-window-glow.js",      # warm halos from house/barn windows at night
     "60-histology-annotations.js", # realtime science labels over the player

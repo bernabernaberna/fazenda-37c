@@ -10,8 +10,14 @@
   wool:'#f0e5c1',woolHi:'#fff3d2',woolSh:'#c3bea1',woolDeep:'#9fa98b',skin:'#cba78f',skinHi:'#e0bfa2',
   hen:'#d7af76',henHi:'#f1d3a0',henSh:'#a58056',wing:'#b79060',comb:'#b7654b',combHi:'#de8860',beak:'#daa950',leg:'#b2854b'};
  const KIND={cow:{speed:6,radius:12,cycle:16,wait:[2.6,6],name:'vaca'},sheep:{speed:8,radius:10,cycle:12,wait:[2,4.6],name:'ovelha'},chicken:{speed:12,radius:6,cycle:5.4,wait:[1,2.8],name:'galinha'}};
+ const CONTACT=Object.freeze({cow:16,sheep:14,chicken:10});
  const cache=new Map();let brains=new WeakMap();
  const kindOf=a=>a.kind==='cow'?'cow':a.kind==='sheep'?'sheep':'chicken';
+ function blocksPlayer(x,y,from,objects){
+  if(!Array.isArray(objects))return false;
+  return objects.some(a=>a.type==='animal'&&Math.hypot(x-a.x,y-a.y)<CONTACT[kindOf(a)]&&
+   (!from||Math.hypot(x-a.x,y-a.y)<Math.hypot(from.x-a.x,from.y-a.y)-1e-6));
+ }
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(w)),Math.max(1,Math.round(h)));};
  function poly(g,c,points){g.fillStyle=c;g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(Math.round(x),Math.round(y)):g.moveTo(Math.round(x),Math.round(y)));g.closePath();g.fill();}
@@ -31,7 +37,7 @@
   if(pen){a.penX=pen.x+8;a.penY=pen.y+8;a.penW=pen.w-16;a.penH=pen.h-16;}
   a.tx=a.x;a.ty=a.y;a.animalPhase=Number(a.animalPhase)||0;a.animalBlend=0;a.moving=false;a.dir=Number.isInteger(a.dir)?a.dir:2;
   b={random,bounds,kind,k,mode:kind==='chicken'?'peck':'graze',timer:1+random()*2,vx:0,vy:0,clock:random()*10,
-   previousWell:a.well??.85,blocked:0,lastX:a.x,lastY:a.y,feed:0};brains.set(a,b);return b;
+   previousWell:a.well??.85,blocked:0,lastX:a.x,lastY:a.y,feed:0,rest:0,graze:0,activityClock:0,lastMode:null,wake:0,yieldSide:0};brains.set(a,b);return b;
  }
  function chooseActivity(a,b){
   b.mode=b.random()<(b.kind==='chicken'?.8:.68)?(b.kind==='chicken'?'peck':'graze'):'look';
@@ -48,6 +54,21 @@
   if(!chosen){chooseActivity(a,b);return;}
   a.tx=chosen.x;a.ty=chosen.y;b.mode='walk';b.blocked=0;a.pauseT=0;
  }
+ function giveSpace(a,b,animals,visitor){
+  b.yielding=false;
+  if(!visitor||!visitor.moving){b.yieldSide=0;return false;}
+  const direction=[[0,1],[-1,0],[1,0],[0,-1]][visitor.dir]||[0,1],dx=a.x-visitor.x,dy=a.y-visitor.y;
+  const ahead=dx*direction[0]+dy*direction[1],across=dx*-direction[1]+dy*direction[0],clearance=b.k.radius+10;
+  if(ahead<-10||ahead>96||Math.abs(across)>clearance+2){b.yieldSide=0;return false;}
+  const candidates=[-1,1].map(sign=>{
+   const distance=sign*clearance-across,x=clamp(a.x-direction[1]*distance,b.bounds.left+1,b.bounds.right-1),y=clamp(a.y+direction[0]*distance,b.bounds.top+1,b.bounds.bottom-1);
+   const crowded=animals.some(other=>other!==a&&Math.hypot(other.x-x,other.y-y)<b.k.radius+KIND[kindOf(other)].radius);
+   const available=Math.abs((x-visitor.x)*-direction[1]+(y-visitor.y)*direction[0]);
+   return{x,y,sign,score:available-(crowded?100:0)+(b.yieldSide===sign?8:0)};
+  }).sort((a,b)=>b.score-a.score);
+  const target=candidates[0];if(!target||target.score<0)return false;
+  a.tx=target.x;a.ty=target.y;b.yieldSide=target.sign;b.yielding=true;b.mode='walk';b.wake=2.5;a.pauseT=0;return true;
+ }
  function update(dt,objects,context={}){
   if(!Array.isArray(objects)||!Number.isFinite(dt)||dt<=0)return;
   const animals=objects.filter(a=>a.type==='animal'),step=Math.min(dt,.1),night=Number(context.timeOfDay)>=20||Number(context.timeOfDay)<5;
@@ -55,16 +76,17 @@
    const a=animals[i],b=brain(a,objects,i),k=b.k,oldX=a.x,oldY=a.y;
    if(a.well===undefined)a.well=.85;
    const fed=a.well>b.previousWell+.035;a.well=Math.max(0,a.well-dt*(context.cold?.005:.003));b.previousWell=a.well;
-   b.clock+=step;b.feed=Math.max(0,b.feed-step);a.animalClock=b.clock;
+   b.clock+=step;b.feed=Math.max(0,b.feed-step);b.wake=Math.max(0,b.wake-step);a.animalClock=b.clock;
    if(Math.hypot(a.x-b.lastX,a.y-b.lastY)>8){b.vx=b.vy=0;a.tx=a.x;a.ty=a.y;chooseActivity(a,b);}
    if(fed){b.feed=1.8;b.mode=b.kind==='chicken'?'peck':'graze';b.timer=2.4;b.vx=b.vy=0;}
-   if(night&&b.mode!=='rest'){b.mode='rest';b.vx=b.vy=0;}
+   const yielding=!context.reducedMotion&&giveSpace(a,b,animals,context.player);
+   if(night&&!yielding&&b.wake===0&&b.mode!=='rest'){b.mode='rest';b.vx=b.vy=0;}
    else if(!night&&b.mode==='rest'){chooseActivity(a,b);}
    if(context.reducedMotion||b.mode==='rest'){
     a.moving=false;a.animalBlend=0;a.animalActivity=b.mode==='rest'?'rest':'look';a.pauseT=Math.max(0,b.timer);b.vx=b.vy=0;
-   }else if(b.mode!=='walk'){
+   }else if(b.mode!=='walk'||b.rest>.05){
     a.moving=false;b.vx*=Math.exp(-step/.10);b.vy*=Math.exp(-step/.10);b.timer-=step;a.pauseT=Math.max(0,b.timer);
-    if(b.timer<=0)chooseTarget(a,b,animals);
+    if(b.mode!=='walk'&&b.timer<=0)chooseTarget(a,b,animals);
    }else{
     const inside=a.x>=b.bounds.left&&a.x<=b.bounds.right&&a.y>=b.bounds.top&&a.y<=b.bounds.bottom;
     if(!inside){ // Dois pixels internos vencem a tolerância de chegada de1,6.
@@ -73,14 +95,18 @@
     const dx=a.tx-a.x,dy=a.ty-a.y,distance=Math.hypot(dx,dy);
     if(distance<1.6){b.vx=b.vy=0;chooseActivity(a,b);a.moving=false;}
     else{
-     const speed=k.speed*Math.min(1,distance/9);let vx=dx/distance*speed,vy=dy/distance*speed;
+     // Um passo lateral curto abre espaço a quem passa. A passada continua
+     // vinculada à distância, inclusive nessa reação mais rápida.
+     const maxSpeed=b.yielding?(b.kind==='chicken'?23:22):k.speed;
+     const speed=maxSpeed*Math.min(1,distance/(b.yielding?4:9));let vx=dx/distance*speed,vy=dy/distance*speed;
      for(const other of animals){if(other===a)continue;const ox=a.x-other.x,oy=a.y-other.y,gap=Math.hypot(ox,oy),wanted=k.radius+KIND[kindOf(other)].radius+6;
       if(gap<wanted&&gap>.01){const avoid=(wanted-gap)/wanted*k.speed*2.3;vx+=ox/gap*avoid;vy+=oy/gap*avoid;}}
-     const norm=Math.hypot(vx,vy);if(norm>k.speed){vx*=k.speed/norm;vy*=k.speed/norm;}
-     const ease=1-Math.exp(-step/.17);b.vx+=(vx-b.vx)*ease;b.vy+=(vy-b.vy)*ease;
+     const norm=Math.hypot(vx,vy);if(norm>maxSpeed){vx*=maxSpeed/norm;vy*=maxSpeed/norm;}
+     const ease=1-Math.exp(-step/(b.yielding?.10:.17));b.vx+=(vx-b.vx)*ease;b.vy+=(vy-b.vy)*ease;
      let nx=a.x+b.vx*step,ny=a.y+b.vy*step;
      if(inside){nx=clamp(nx,b.bounds.left,b.bounds.right);ny=clamp(ny,b.bounds.top,b.bounds.bottom);}
-     const obstructed=animals.some(other=>other!==a&&Math.hypot(nx-other.x,ny-other.y)<(k.radius+KIND[kindOf(other)].radius)*.88&&Math.hypot(nx-other.x,ny-other.y)<Math.hypot(a.x-other.x,a.y-other.y));
+     const visitor=context.player,nearVisitor=visitor&&Math.hypot(nx-visitor.x,ny-visitor.y)<CONTACT[b.kind]&&Math.hypot(nx-visitor.x,ny-visitor.y)<Math.hypot(a.x-visitor.x,a.y-visitor.y)-1e-6;
+     const obstructed=nearVisitor||animals.some(other=>other!==a&&Math.hypot(nx-other.x,ny-other.y)<(k.radius+KIND[kindOf(other)].radius)*.88&&Math.hypot(nx-other.x,ny-other.y)<Math.hypot(a.x-other.x,a.y-other.y));
      if(!obstructed){a.x=nx;a.y=ny;}
      const traveled=Math.hypot(a.x-oldX,a.y-oldY);a.moving=traveled>.0001;
      if(a.moving){
@@ -93,6 +119,14 @@
    }
    a.animalBlend+=(Number(a.moving)-Number(a.animalBlend||0))*(1-Math.exp(-step/(a.moving?.10:.16)));
    if(a.animalBlend<.015)a.animalBlend=0;
+   if(b.lastMode!==b.mode){b.activityClock=0;b.lastMode=b.mode;}else b.activityClock+=step;
+   const restTarget=b.mode==='rest'?1:0,restStep=step/(restTarget?.65:.42);
+   b.rest=context.reducedMotion?restTarget:Math.max(0,Math.min(1,b.rest+Math.sign(restTarget-b.rest)*Math.min(Math.abs(restTarget-b.rest),restStep)));
+   const eating=!a.moving&&!b.rest&&(b.mode==='graze'||b.mode==='peck');
+   const cycle=b.activityClock*(b.kind==='chicken'?4.4:2.2),idx=Math.floor(cycle)%8,poses=[0,2,5,8,10,8,4,1];
+   const grazeTarget=eating?poses[idx]+(poses[(idx+1)%8]-poses[idx])*(cycle%1):0;
+   b.graze=context.reducedMotion?0:b.graze+Math.sign(grazeTarget-b.graze)*Math.min(Math.abs(grazeTarget-b.graze),step*24);
+   a.animalRest=b.rest;a.animalGraze=b.graze;
    a.animalActivity=context.reducedMotion&&b.mode!=='rest'?'look':b.mode;a.animalFed=b.feed>0;b.lastX=a.x;b.lastY=a.y;
   }
  }
@@ -104,8 +138,8 @@
  function leg(g,x,top,phase,offset,far,species,side,blend,rest){
   const cow=species==='cow',f=foot(phase,offset,cow?5:species==='sheep'?3.5:2.7,species==='chicken'?3:2.5),ground=far?-3:0;
   const stride=f.x*blend,up=f.up*blend,width=species==='chicken'?1:cow?3:2;
-  const endX=x+(side?stride:Math.sin((phase+offset*TAU))*blend),endY=ground-up+(side?0:stride*.55);
-  if(rest){const settled=cow?4:3;R(g,far?P.shade:P.cream,x-2,-2-settled,5,2);R(g,species==='chicken'?P.leg:P.hoof,x+1,-1-settled,3,1);return;}
+  const endX=x+(side?stride:Math.sin((phase+offset*TAU))*blend),endY=ground-up+(side?0:stride*.55)-(cow?4:3)*rest;
+  if(rest>=.75){const settled=cow?4:3;R(g,far?P.shade:P.cream,x-2,-2-settled,5,2);R(g,species==='chicken'?P.leg:P.hoof,x+1,-settled,3,1);return;}
   const skin=species==='chicken'?P.leg:far?P.shade:P.cream;
   stroke(g,P.edge,[[x,top],[x+(side?stride*.35:0),top+(endY-top)*.55],[endX,endY]],width+1);
   stroke(g,skin,[[x,top],[x+(side?stride*.35:0),top+(endY-top)*.55],[endX,endY-1]],width);
@@ -132,7 +166,7 @@
   }
  }
  function paintCow(g,s){
-  const side=s.dir===2,drop=s.graze,rest=s.rest,lift=rest?4:0,phase=s.phase,b=s.blend;
+  const side=s.dir===2,drop=s.graze,rest=s.restAmount,lift=4*rest,phase=s.phase,b=s.blend;
   g.save();g.translate(0,lift);
   if(side){
    stroke(g,P.edge,[[-18,-23],[-21,-18],[-20+s.tail,-8]],2);R(g,P.patch,-21+s.tail,-7,3,4);
@@ -175,16 +209,16 @@
    if(dir===0){R(g,P.cream,x-3,y-2,1,closed?1:2);R(g,P.cream,x+3,y-2,1,closed?1:2);R(g,P.ink,x,y+3,1,1);}}
  }
  function paintSheep(g,s){
-  const side=s.dir===2;g.save();g.translate(0,s.rest?3:0);
+  const side=s.dir===2;g.save();g.translate(0,Math.round(s.restAmount*3));
   if(side){
-   leg(g,-8,-11,s.phase,.5,true,'sheep',true,s.blend,s.rest);leg(g,7,-11,s.phase,0,true,'sheep',true,s.blend,s.rest);
+   leg(g,-8,-11,s.phase,.5,true,'sheep',true,s.blend,s.restAmount);leg(g,7,-11,s.phase,0,true,'sheep',true,s.blend,s.restAmount);
    R(g,P.woolSh,-18,-11,4,3);wool(g,-16,-22,29,15,s.shorn);
-   leg(g,-9,-9,s.phase,.75,false,'sheep',true,s.blend,s.rest);leg(g,8,-9,s.phase,.25,false,'sheep',true,s.blend,s.rest);
+   leg(g,-9,-9,s.phase,.75,false,'sheep',true,s.blend,s.restAmount);leg(g,8,-9,s.phase,.25,false,'sheep',true,s.blend,s.restAmount);
    sheepHead(g,14,-16+s.graze*.8,2,s.closed);
   }else{
-   leg(g,-5,-13,s.phase,.5,true,'sheep',false,s.blend,s.rest);leg(g,5,-13,s.phase,0,true,'sheep',false,s.blend,s.rest);
+   leg(g,-5,-13,s.phase,.5,true,'sheep',false,s.blend,s.restAmount);leg(g,5,-13,s.phase,0,true,'sheep',false,s.blend,s.restAmount);
    if(s.dir===3)sheepHead(g,0,-23,3,s.closed);
-   wool(g,-10,-24,20,18,s.shorn);leg(g,-7,-8,s.phase,.75,false,'sheep',false,s.blend,s.rest);leg(g,7,-8,s.phase,.25,false,'sheep',false,s.blend,s.rest);
+   wool(g,-10,-24,20,18,s.shorn);leg(g,-7,-8,s.phase,.75,false,'sheep',false,s.blend,s.restAmount);leg(g,7,-8,s.phase,.25,false,'sheep',false,s.blend,s.restAmount);
    if(s.dir===0)sheepHead(g,0,-12+s.graze*.5,0,s.closed);else{R(g,P.woolSh,-2,-11,4,5);R(g,P.woolHi,-2,-11,3,3);}
   }g.restore();
  }
@@ -195,19 +229,19 @@
   else if(dir===0){R(g,P.ink,x-2,y-1,1,closed?1:2);R(g,P.ink,x+2,y-1,1,closed?1:2);poly(g,P.beak,[[x-2,y+1],[x+2,y+1],[x,y+4]]);}
  }
  function paintHen(g,s){
-  const side=s.dir===2,bob=s.blend*Math.abs(Math.sin(s.phase))*1;g.save();g.translate(0,s.rest?3:0);
+  const side=s.dir===2,bob=s.blend*Math.abs(Math.sin(s.phase))*1;g.save();g.translate(0,Math.round(s.restAmount*3));
   if(side){
-   leg(g,-3,-7,s.phase,.5,true,'chicken',true,s.blend,s.rest);
+   leg(g,-3,-7,s.phase,.5,true,'chicken',true,s.blend,s.restAmount);
    poly(g,P.edge,[[-8,-10],[-14,-20],[-12,-24],[-7,-17],[-10,-24],[-7,-25],[-3,-16]]);
    stroke(g,P.henHi,[[-11,-21],[-6,-15]],2);stroke(g,P.dark,[[-8,-23],[-4,-16]],2);
    poly(g,P.edge,[[-9,-17],[-4,-20-bob],[4,-20-bob],[9,-14],[7,-7],[2,-4],[-6,-5],[-10,-10]]);
    poly(g,P.hen,[[-8,-16],[-3,-19-bob],[3,-19-bob],[8,-13],[6,-7],[1,-5],[-5,-6],[-9,-10]]);
    poly(g,P.cream,[[-1,-19-bob],[4,-18-bob],[7,-13],[5,-9],[2,-9]]);R(g,P.henHi,-6,-16,7,3);
    poly(g,P.henSh,[[-6,-13],[1,-15],[5,-11],[2,-7],[-4,-8]]);stroke(g,P.wing,[[-5,-12],[0,-10],[3,-10]],1);R(g,P.henHi,-4,-13,4,2);
-   leg(g,3,-6,s.phase,0,false,'chicken',true,s.blend,s.rest);
+   leg(g,3,-6,s.phase,0,false,'chicken',true,s.blend,s.restAmount);
    const drop=s.graze*2;poly(g,P.cream,[[3,-15],[7,-23+drop],[11,-22+drop],[8,-12]]);henHead(g,9,-23+drop,2,s.closed);
   }else{
-   leg(g,-3,-7,s.phase,.5,false,'chicken',false,s.blend,s.rest);leg(g,3,-7,s.phase,0,false,'chicken',false,s.blend,s.rest);
+   leg(g,-3,-7,s.phase,.5,false,'chicken',false,s.blend,s.restAmount);leg(g,3,-7,s.phase,0,false,'chicken',false,s.blend,s.restAmount);
    if(s.dir===3)henHead(g,0,-23,3,s.closed);
    poly(g,P.edge,[[-5,-20],[-9,-14],[-8,-7],[-4,-4],[4,-4],[8,-7],[9,-14],[5,-20]]);
    poly(g,P.hen,[[-4,-19],[-8,-14],[-7,-7],[-3,-5],[3,-5],[7,-7],[8,-14],[4,-19]]);
@@ -217,18 +251,19 @@
   }g.restore();
  }
  function visualState(a,reduced=false){
-  const kind=kindOf(a),phase=Number(a.animalPhase??a.animT)||0,rest=a.animalActivity==='rest'||a.sleeping||a.asleep||a.dormindo;
+  const kind=kindOf(a),phase=Number(a.animalPhase??a.animT)||0,wantsRest=a.animalActivity==='rest'||a.sleeping||a.asleep||a.dormindo;
+  const restAmount=reduced?Number(!!wantsRest):Math.round(clamp(Number.isFinite(a.animalRest)?a.animalRest:Number(!!wantsRest),0,1)*4)/4,rest=restAmount>0;
   const time=Number(a.animalClock)||0,activity=a.animalActivity||'look',moving=!reduced&&!rest&&(a.moving||a.animalBlend>.01);
   const blend=moving?Math.round(clamp(Number(a.animalBlend??1),0,1)*4)/4:0;
   const frame=moving?Math.floor(((phase%TAU+TAU)%TAU)/TAU*16)%16:0;
   const grazes=!reduced&&!moving&&!rest&&(activity==='graze'||activity==='peck');
-  const graze=grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
+  const graze=reduced?0:Number.isFinite(a.animalGraze)?Math.round(a.animalGraze):grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
   const dir=Number.isInteger(a.dir)?clamp(a.dir,0,3):(a.facing<0?1:2);
-  return{kind,dir,phase:frame*TAU/16,frame,blend,graze,rest:!!rest,shorn:!!a.shorn,
-   closed:!!rest||(!reduced&&Math.floor(time*5)%31===30),tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed};
+  return{kind,dir,phase:frame*TAU/16,frame,blend,graze,rest:!!rest,restAmount,shorn:!!a.shorn,
+   closed:restAmount===1||(!reduced&&Math.floor(time*5)%31===30),tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed};
  }
  function sprite(s){
-  const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.rest,s.shorn,s.closed,s.tail].join(':');if(cache.has(key))return cache.get(key);
+  const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.restAmount,s.shorn,s.closed,s.tail].join(':');if(cache.has(key))return cache.get(key);
   let c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.imageSmoothingEnabled=false;g.translate(AX,AY);
   if(s.dir===1)g.scale(-1,1);const canonical={...s,dir:s.dir===1?2:s.dir};
   if(s.kind==='cow')paintCow(g,canonical);else if(s.kind==='sheep')paintSheep(g,canonical);else paintHen(g,canonical);
@@ -247,7 +282,7 @@
   if(s.fed&&!reduced){const yy=y-(s.kind==='chicken'?30:35);R(g,P.comb,x-2,yy,2,2);R(g,P.comb,x+1,yy,2,2);R(g,P.comb,x-1,yy+2,3,2);R(g,P.comb,x,yy+4,1,1);}
   g.restore();
  }
- window.FarmAnimalLife={update,draw,reset(){brains=new WeakMap();},visualState,
+ window.FarmAnimalLife={update,draw,blocksPlayer,contactRadii:CONTACT,reset(){brains=new WeakMap();},visualState,
   info(){return{version:3,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
  };
  (window.__farmBiomes=window.__farmBiomes||[]).push(api=>{api.registerObjectDrawer('animal',(animal,g)=>draw(g,animal));});

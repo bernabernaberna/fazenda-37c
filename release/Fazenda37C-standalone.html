@@ -5182,6 +5182,8 @@ body.hud-game #legend{display:none !important;}
           caio:'Minha caixa está encostada na parede. Hoje vim para a conversa que não cabe dentro dela.',
           nico:'A placa ficou um pouco torta. Eu ia endireitar, mas todo mundo entrou sem problema. Posso sentar também?'}[o.npcId]};
     }
+    const lesson=window.FarmValleyDetails?.mentorDestination?.(o.npcId,timeOfDay);
+    if(lesson)return lesson;
     return {key:'routine:'+band,x:home.x+normal.dx,y:home.y+normal.dy,...normal};
   }
   function update(dt){
@@ -5214,6 +5216,15 @@ body.hud-game #legend{display:none !important;}
       const gaitTarget=o.moving?1:0;
       o.gaitBlend=(o.gaitBlend||0)+(gaitTarget-(o.gaitBlend||0))*(1-Math.exp(-dt/(gaitTarget ? .045 : .065)));
       o.region=o.y<42*TS?'mountain':o.y>=90*TS?'desert':'farm';
+    }
+    // Durante a aula, quem já chegou acompanha o outro morador com o olhar.
+    // As rotas continuam físicas; nenhuma chegada teleporta o elenco.
+    for(const o of actors)if(o._routineKey.startsWith('mentoria:')&&o.npcActivity!=='talk'&&!o.moving&&!o._route.length){
+      const partner=actors.find(a=>a.npcId===(o.npcId==='tomas'?'nico':'tomas'));
+      if(partner&&Math.hypot(partner.x-o.x,partner.y-o.y)<70){
+        const dx=partner.x-o.x,dy=partner.y-o.y;
+        o.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);
+      }
     }
   }
   function configureCommunity(point){
@@ -5467,27 +5478,75 @@ body.hud-game #legend{display:none !important;}
 /* =============================
    src/modules/19-rest-visual.js
    ============================= */
-/* Estado visual transitório; nunca faz parte de player nem de saves. */
+/* Encenação transitória do descanso; posições mecânicas e saves não mudam.
+   Na cama, só a passada transporta o corpo. Sentar, deitar e levantar acontecem
+   na mesma âncora, antes de devolver o controle ao deslocamento normal. */
 (()=>{
  let context=null,blend=0,elapsed=0;
- const ease=t=>t*t*(3-2*t);
+ const clamp=n=>Math.max(0,Math.min(1,n));
  function reset(){context=null;blend=0;elapsed=0;}
- function start(scene,bed=null){context={scene,bed};blend=0;elapsed=0;}
+ function start(scene,bed=null){
+  // R/E durante a saída retoma a encenação atual, sem saltar para o chão.
+  if(context?.scene===scene&&(!bed||context.bed===bed))return;
+  context={scene,bed,phase:bed?'approach':'sit',x:null,y:null,walkPhase:0};blend=0;elapsed=0;
+ }
+ function initialize(actor){
+  if(context.x!==null)return;
+  context.x=actor.x;context.y=actor.y;context.origin={x:actor.x,y:actor.y};
+  const bed=context.bed;
+  if(bed)context.target={x:bed.x+(bed.w||48)/2,y:bed.y+(bed.h||32)-15};
+ }
+ function travel(target,dt){
+  const dx=target.x-context.x,dy=target.y-context.y,d=Math.hypot(dx,dy),step=Math.min(d,42*dt);
+  if(d>.001){context.x+=dx/d*step;context.y+=dy/d*step;context.walkPhase+=step*Math.PI*2/24;
+   context.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);}
+  return d-step<.001;
+ }
  function update(dt,actor,scene,reducedMotion=false){
-  if(context&&context.scene!==scene)reset();
-  if(actor.resting&&!context)start(scene);
-  elapsed+=actor.resting?Math.max(0,dt):0;
-  blend=reducedMotion?(actor.resting?1:0):Math.max(0,Math.min(1,blend+(actor.resting?dt/.24:-dt/.18)));
-  if(!actor.resting&&blend===0)context=null;
+  if(context&&(context.scene!==scene||actor.dead))reset();
+  if(actor.resting&&!context&&!actor.dead)start(scene);
+  if(!context)return;
+  initialize(actor);dt=Math.max(0,Math.min(.1,dt));elapsed+=actor.resting?dt:0;
+  if(reducedMotion){
+   blend=actor.resting?1:0;
+   if(!actor.resting){reset();return;}
+   context.phase='rest';if(context.bed){context.x=context.target.x;context.y=context.target.y;}return;
+  }
+  if(!context.bed){
+   blend=clamp(blend+(actor.resting?dt/.24:-dt/.18));
+   if(!actor.resting&&blend===0)reset();return;
+  }
+  // Uma inversão durante a passagem inverte os passos; durante a pose,
+  // inverte a flexão. Nenhuma troca de intenção reposiciona o personagem.
+  if(actor.resting){
+   if(context.phase==='depart')context.phase='approach';
+   if(context.phase==='rise')context.phase='settle';
+   if(context.phase==='approach'){
+    blend=0;if(travel(context.target,dt)){context.phase='settle';context.dir=0;}
+   }else if(context.phase==='settle'){
+    blend=clamp(blend+dt/.36);if(blend===1)context.phase='rest';
+   }
+  }else{
+   if(context.phase==='approach')context.phase='depart';
+   if(context.phase==='rest'||context.phase==='settle')context.phase='rise';
+   if(context.phase==='rise'){
+    blend=clamp(blend-dt/.30);if(blend===0)context.phase='depart';
+   }else if(context.phase==='depart'&&travel(context.origin,dt))reset();
+  }
  }
  function pose(actor,scene){
-  const bed=context?.scene===scene?context.bed:null,amount=ease(blend);
+  const c=context?.scene===scene?context:null,bed=c?.bed;
+  const walking=!!bed&&['approach','depart'].includes(c.phase);
   return{restMode:bed?'bed':'sit',restElapsed:elapsed,restBlend:blend,
-   x:bed?actor.x+((bed.x+(bed.w||48)/2)-actor.x)*amount:actor.x,
-   y:bed?actor.y+((bed.y+(bed.h||32)-15)-actor.y)*amount:actor.y,
-   depth:bed&&blend>0?Math.max(actor.y+10,bed.y+(bed.h||32)+.5):actor.y+10};
+   restWalking:walking,restWalkPhase:c?.walkPhase||0,restWalkDir:c?.dir??actor.dir,
+   x:bed&&c.x!==null?c.x:actor.x,y:bed&&c.y!==null?c.y:actor.y,
+   depth:bed?Math.max((c.y??actor.y)+10,bed.y+(bed.h||32)+.5):actor.y+10};
  }
- window.FarmRestVisual={start,reset,update,pose,info:()=>({blend,elapsed,scene:context?.scene||null,bed:context?.bed?.type||null})};
+ function blocksMovement(actor,scene,reducedMotion=false){
+  return !reducedMotion&&!actor.dead&&!actor.resting&&context?.scene===scene&&(!!context.bed||blend>0);
+ }
+ window.FarmRestVisual={start,reset,update,pose,blocksMovement,
+  info:()=>({blend,elapsed,scene:context?.scene||null,bed:context?.bed?.type||null,phase:context?.phase||null})};
 })();
 
 /* =============================
@@ -6494,9 +6553,15 @@ body.hud-game #legend{display:none !important;}
         rect(g,cold?'#959d8e':P.soilLight,8+v%4,9,3,1);
         rect(g,P.pathLight,2,13-v%3,2,1);rect(g,P.soilLight,13,3+v%5,1,1);
       }else if(t===T.FIELD){
-        rect(g,P.soil,0,0,TS,TS);
-        for(let y=2;y<TS;y+=4){rect(g,P.woodDark,0,y,TS,1);rect(g,P.soilLight,0,y-1,TS,1);}
-        rect(g,P.soilLight,ox+2,oy+2,2,1);rect(g,P.woodDark,12,12,2,1);
+        // Sulcos de terra: contraste baixo e bordas partidas, sem o brilho
+        // contínuo que fazia o canteiro parecer um assoalho de madeira.
+        rect(g,'#634d39',0,0,TS,TS);
+        for(let y=3;y<TS;y+=5){
+          rect(g,'#53412f',0,y,TS,1);
+          rect(g,'#7a5e40',(v+y)%4,y-1,5+(v%3),1);
+          rect(g,'#73583d',10+(v%2),y-1,4,1);
+        }
+        rect(g,'#806346',ox+2,oy+2,2,1);rect(g,'#59432f',12,12,2,1);
         if(cold){rect(g,P.snow,1,0,5,1);rect(g,P.snow,10,15,4,1);}
       }else if(t===T.COBBLE){
         rect(g,P.stoneDark,0,0,TS,TS);
@@ -6614,8 +6679,9 @@ body.hud-game #legend{display:none !important;}
     const tileTypes=[T.GRASS,T.GRASS2,T.FLOWER,T.PATH,T.FIELD,T.WATER,T.RIVER,T.OASIS,
       T.SNOW,T.ICE,T.SAND,T.DUNE,T.CRACKED,T.STONE,T.SNOWROCK,T.COBBLE,T.FENCE];
     for(const t of tileTypes) API.registerTileDrawer(t,(g,px,py,x,y,cold)=>{
-      if(API.rawScene&&API.rawScene!=='main'){
-        // As salas continuam usando o piso próprio e as dimensões originais.
+      if(API.rawScene&&API.rawScene!=='main'&&API.rawScene!=='greenhouse'){
+        // Casa e celeiro têm pisos próprios. A estufa, que também contém
+        // jardim ao ar livre, compartilha os materiais naturais da fazenda.
         API.drawBaseTile(g,px,py,x,y,t,cold);return;
       }
       const kind=naturalKind(t);
@@ -7173,14 +7239,16 @@ body.hud-game #legend{display:none !important;}
     return{conversing,expression,gesture,mouth,speechPhase,speechBlink,gaze};
   }
   function state(actor,opts,hero){
-    const rest=!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0);
+    const restWalking=!!opts.restWalking&&!opts.reducedMotion&&!actor.dead;
+    const rest=!restWalking&&(!!actor.resting||(!hero&&actor.npcActivity==='rest')||(Number.isFinite(opts.restBlend)&&opts.restBlend>0));
     const restMode=rest&&opts.restMode==='bed'?'bed':rest?'sit':'';
     const restElapsed=Math.max(0,Number.isFinite(opts.restElapsed)?opts.restElapsed:Number(hero?actor.restTimer:actor.activityPhase)||0);
     const restBlend=Number.isFinite(opts.restBlend)?Math.max(0,Math.min(1,opts.restBlend)):Math.min(1,restElapsed/.24);
-    const restStage=rest?(opts.reducedMotion?2:Math.round(restBlend*2)):0;
+    const restStages=restMode==='bed'?4:2;
+    const restStage=rest?(opts.reducedMotion?restStages:Math.round(restBlend*restStages)):0;
     // Respiração de 4,8s mexe apenas no tórax/tecido. Cabeça, mãos e pés ficam
     // apoiados; os dois níveis ocupam uma família pequena no cache de sprites.
-    const restBreath=rest&&!opts.reducedMotion&&restStage===2&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
+    const restBreath=rest&&!opts.reducedMotion&&restStage===restStages&&[0,0,0,1,1,1,0,0][Math.floor(restElapsed/.6)%8]?1:0;
     const restDoze=rest&&(opts.reducedMotion||restElapsed>(restMode==='bed'?.35:3.2));
     const speech=conversation(opts,!actor.dead&&!rest,hero?'player':actor.npcId||actor.id);
     const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
@@ -7189,9 +7257,9 @@ body.hud-game #legend{display:none !important;}
     const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion&&!speech.conversing;
     // A simulação conserva a fase ao parar. A amplitude recolhe a passada até
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
-    const gait=rest||actor.dead||opts.reducedMotion||action?0:blend(actor.gaitBlend,actor.moving?1:0);
-    const moving=gait>0,runMix=moving?blend(actor.gaitRunBlend,actor.running?1:0):0;
-    return {dir:dirOf(opts.facing??actor.dir),frame:moving?((Math.floor((Number(actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
+    const gait=rest||actor.dead||opts.reducedMotion||action?0:restWalking?8:blend(actor.gaitBlend,actor.moving?1:0);
+    const moving=gait>0,runMix=moving&&!restWalking?blend(actor.gaitRunBlend,actor.running?1:0):0;
+    return {dir:dirOf(restWalking?opts.restWalkDir:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
       moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
       heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
       action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
@@ -7409,7 +7477,7 @@ body.hud-game #legend{display:none !important;}
     // sequência ao contrário serve para levantar, sem reiniciar a passada.
     if(s.restStage===0){paintBody(g,d,{...s,rest:false,restDoze:false,gait:0,runMix:0,action:'',blink:false});return;}
     g.save();g.translate(AX,AY);
-    const bed=s.restMode==='bed'&&s.restStage===2;
+    const bed=s.restMode==='bed'&&s.restStage>=3;
     if(!bed&&s.dir===1)g.scale(-1,1);
     const side=!bed&&(s.dir===1||s.dir===2),back=!bed&&s.dir===3;
     const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
@@ -7424,10 +7492,10 @@ body.hud-game #legend{display:none !important;}
       rect(g,P.edge,-8,-7,16,7);rect(g,quilt,-7,-7,14,6);rect(g,quiltHi,-7,-7-s.restBreath,14,2);
       for(let x=-5;x<=5;x+=5){rect(g,s.blanket?P.amber:'#bbccc0',x,-4,1,3);}
       rect(g,P.edge,-7,-1,14,1);
-      g.save();g.translate(0,6);paintHead(g,d,{...s,dir:0,hat:false});g.restore();
+      g.save();g.translate(0,s.restStage===3?3:6);paintHead(g,d,{...s,dir:0,hat:false,restDoze:s.restStage===4&&s.restDoze});g.restore();
       if(s.hat){rect(g,'#9b793d',9,-19,9,5);rect(g,P.amber,10,-20,7,4);rect(g,P.cream,10,-20,3,1);rect(g,P.edge,9,-16,9,1);}
     }else{
-      const drop=s.restStage===1?3:5;
+      const drop=s.restStage===1?(s.restMode==='bed'?2:3):5;
       // Apoio dobrado e compacto. Os pés permanecem no y=0 da mesma âncora de
       // colisão/profundidade; não deslizam com a respiração nem com o cochilo.
       if(side){
@@ -8084,6 +8152,8 @@ body.hud-game #legend{display:none !important;}
 (function(){
   const FIRE_TYPES = new Set(['fireplace','mtn_fire','i_fireplace','b_stove']);
   const _sparks = [];
+  let _scene = null;
+  const reduced = ()=>typeof A11Y!=='undefined'&&!!A11Y.reduceMotion;
 
   function _flicker(seed, t){
     // Stable per-source flicker — mixes two sin waves for warm jitter
@@ -8132,6 +8202,7 @@ body.hud-game #legend{display:none !important;}
 
   function _isLitFire(o){
     if(!FIRE_TYPES.has(o.type)) return false;
+    if(o.lit===false)return false;
     // i_fireplace / b_stove are always lit (interior); fireplace needs o.lit
     if(o.type === 'fireplace') return !!o.lit;
     return true;
@@ -8153,7 +8224,7 @@ body.hud-game #legend{display:none !important;}
     if(typeof isFrio === 'function' && isFrio()) intensity *= 0.55; // softer in winter
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    const t = performance.now()/4000;
+    const t = reduced()?0:performance.now()/4000;
     const beams = 5;
     for(let i=0; i<beams; i++){
       const phase = (i / beams) + (t * 0.05);
@@ -8216,21 +8287,30 @@ body.hud-game #legend{display:none !important;}
     // ----- Sparks rising from the fire -----
     // Spawn rate proportional to fire size; throttled by time
     const sparkChance = (o.type === 'fireplace' ? 0.25 : 0.18);
-    if(Math.random() < sparkChance){
+    if(!reduced()&&Math.random() < sparkChance){
       _spawnSpark(o.x + (Math.random()-0.5)*8, o.y - 6, seed);
     }
   }
 
   function drawDynamicLights(camX, camY, visW, visH){
     const nightAlpha = (typeof nightOverlayAlpha === 'function') ? nightOverlayAlpha() : 0;
-    const t = performance.now() / 1000;
+    const still=reduced(),scene=typeof currentScene==='string'?currentScene:'';
+    if(_scene!==scene||still){_sparks.length=0;_scene=scene;}
+    const t = still?0:performance.now() / 1000;
+    const indoor=typeof isIndoor==='function'&&isIndoor();
 
     // 1) Sun god-rays (outdoor only)
-    if(typeof isIndoor === 'function' && !isIndoor()){
+    if(!indoor){
       _drawSunRays(camX, camY, visW, visH);
     }
 
     // 2) Fire-source point lights
+    ctx.save();
+    // Uma sala é um recorte do prédio. O fogo pode iluminar a parede,
+    // mas o halo não atravessa a moldura para a área externa do mapa.
+    if(indoor&&typeof MW==='number'&&typeof MH==='number'){
+      ctx.beginPath();ctx.rect(3,0,MW*TS-6,MH*TS-4);ctx.clip();
+    }
     if(typeof objects !== 'undefined' && Array.isArray(objects)){
       for(const o of objects){
         if(_isLitFire(o)){
@@ -8238,14 +8318,25 @@ body.hud-game #legend{display:none !important;}
         }
       }
     }
+    ctx.restore();
 
     // 3) Update + draw sparks (after lights so they overlay)
-    _updateSparks();
-    _drawSparks(camX, camY, visW, visH);
+    if(!still){
+      _updateSparks();
+      ctx.save();
+      // As fagulhas do fogão ficam dentro da sala; não sobem através da
+      // parede norte nem sobrevivem à troca de cena.
+      if(indoor&&typeof MW==='number'&&typeof MH==='number'){
+        ctx.beginPath();ctx.rect(4,17,MW*TS-8,MH*TS-21);ctx.clip();
+      }
+      _drawSparks(camX, camY, visW, visH);
+      ctx.restore();
+    }
   }
 
   // Expose
   window.drawDynamicLights = drawDynamicLights;
+  window.FarmDynamicLighting={info:()=>({sparks:_sparks.length,scene:_scene,reducedMotion:reduced()})};
 })();
 
 /* ==============================
@@ -8263,6 +8354,22 @@ body.hud-game #legend{display:none !important;}
   function panel(g,x,y,w,h,c=P.wood){R(g,P.edge,x,y,w,h);R(g,c,x+1,y+1,w-2,h-2);R(g,P.light,x+1,y+1,w-2,1);R(g,P.dark,x+w-3,y+2,2,h-3);}
   function plank(g,x,y,w,h,c=P.wood){R(g,P.dark,x,y,w,h);R(g,c,x,y,w,h-1);R(g,P.light,x,y,w,1);}
   function stone(g,x,y,w,h){R(g,P.edge,x,y,w,h);for(let yy=1;yy<h-1;yy+=6)for(let xx=1;xx<w-1;xx+=8){const ww=Math.min(7,w-xx-1),hh=Math.min(5,h-yy-1);R(g,(xx+yy)%3?P.stone:'#9da190',x+xx,y+yy,ww,hh);R(g,'#b9baa2',x+xx,y+yy,ww,1);}}
+  function stoneFloor(g,x,y,w,h){
+   // Lajes desencontradas; juntas finas conservam a leitura do chão sob os
+   // móveis, sem a grade de alto contraste da antiga área do fogão.
+   R(g,'#7f8475',x,y,w,h);
+   for(let row=0,yy=0;yy<h;row++,yy+=13){
+    const offset=row%2?10:0;
+    for(let col=-1,xx=-offset;xx<w;col++,xx+=21){
+     const left=Math.max(0,xx),right=Math.min(w,xx+20),hh=Math.min(12,h-yy);
+     if(right<=left)continue;
+     R(g,['#9d9f89','#979b86','#a4a58f'][(row+col+6)%3],x+left,y+yy,right-left,hh);
+     R(g,'#b0b09a',x+left+1,y+yy,Math.max(0,right-left-2),1);
+     if((row+col)%3===0&&right-left>10)R(g,'#929783',x+left+5,y+yy+5,5,1);
+    }
+   }
+   R(g,'rgba(47,54,39,.13)',x,y+h-1,w,1);
+  }
   function rug(g,x,y,w,h){R(g,'#796755',x,y,w,h);R(g,'#a96854',x+1,y+1,w-2,h-2);R(g,'#d1a171',x+3,y+3,w-6,h-6);R(g,'#866f57',x+4,y+4,w-8,h-8);R(g,'#9f7659',x+6,y+6,w-12,h-12);
    for(let yy=9;yy<h-6;yy+=12)for(let xx=10;xx<w-8;xx+=14){R(g,'#c2aa79',x+xx,y+yy,4,1);R(g,'#c2aa79',x+xx+1,y+yy-1,2,3);}for(let xx=2;xx<w-2;xx+=3){R(g,P.linen,x+xx,y-1,1,2);R(g,P.linen,x+xx,y+h-1,1,2);}}
   function lamp(g,x,y){R(g,P.edge,x,y,3,5);R(g,P.gold,x+1,y+1,1,3);R(g,P.light,x-1,y-1,5,2);}
@@ -8271,20 +8378,28 @@ body.hud-game #legend{display:none !important;}
    const room=scenes[scene],w=room.MW*TS,h=room.MH*TS,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
    if(scene==='greenhouse'){
     // A estufa é um recinto de vidro dentro de uma cena ao ar livre.
-    for(let y=4;y<16;y++)for(let x=6;x<26;x++){
+    for(let y=4;y<16;y++)for(let x=5;x<26;x++){
      const t=room.map[y][x];if(t===T.FIELD)continue;
-     const path=t===T.STONE;R(g,path?'#899786':'#b4bb9d',x*TS,y*TS,TS,TS);
-     R(g,path?'#a6b29c':'#c6cdb1',x*TS+1,y*TS+1,TS-2,1);R(g,path?'#798b7e':'#a8b797',x*TS+TS-1,y*TS,1,TS);
-     if((x+y)%3===0)R(g,path?'#82927c':'#9caf99',x*TS+4,y*TS+9,7,1);
+     const path=t===T.STONE,left=x*TS+(x===5?4:0),width=x===5?12:TS;
+     R(g,path?'#879382':'#a7b196',left,y*TS,width,TS);
+     // Só algumas juntas recebem luz; não transforma o vidro em xadrez.
+     if(path){R(g,'#9ba690',left+1,y*TS+1,width-2,1);R(g,'#7e8b7b',left,y*TS+TS-1,width,1);}
+     else if((x+y)%4===0)R(g,'#b5bfa4',left+2,y*TS+5,Math.min(7,width-3),1);
+     if((x+y)%5===0)R(g,path?'#7b8b76':'#9eaa90',left+3,y*TS+11,Math.min(5,width-4),1);
     }
-    for(let x=112;x<412;x+=64){g.fillStyle='rgba(235,238,189,.10)';g.beginPath();g.moveTo(x,62);g.lineTo(x+15,62);g.lineTo(x-20,252);g.lineTo(x-35,252);g.fill();}
+    // Montantes existentes projetados sobre o piso, presos ao recinto.
+    // Esta camada nasce uma vez no cache e fica atrás de plantas e pessoas.
+    g.save();g.beginPath();g.rect(84,68,328,184);g.clip();
+    for(let x=112;x<412;x+=64){g.fillStyle='rgba(231,237,190,.08)';g.beginPath();g.moveTo(x,68);g.lineTo(x+15,68);g.lineTo(x-12,252);g.lineTo(x-27,252);g.fill();
+     g.fillStyle='rgba(46,66,49,.075)';g.beginPath();g.moveTo(x-4,68);g.lineTo(x-1,68);g.lineTo(x-28,252);g.lineTo(x-31,252);g.fill();}
+    R(g,'rgba(37,59,41,.12)',84,68,328,4);R(g,'rgba(37,59,41,.10)',84,68,3,184);R(g,'rgba(37,59,41,.08)',408,68,4,184);g.restore();
    }else{
     const barn=scene==='barn';R(g,barn?'#8c795b':'#ad926f',0,0,w,h);
     for(let y=16;y<h;y+=8)for(let x=-((y/8%2)*20);x<w;x+=40){const v=(Math.floor((x+80)/40)+y/8)%3;
      R(g,barn?['#8d7959','#937e5d','#887654'][v]:['#b19773','#b69b76','#ae936e'][v],x,y,39,7);R(g,barn?'#a28d66':'#c3aa82',x,y,39,1);R(g,'rgba(60,46,30,.12)',x+1,y+6,37,1);
      if((x+y)%3===0){R(g,barn?'#7c6a4e':'#a38a66',x+6,y+3,12,1);R(g,barn?'#ad9570':'#c2aa81',x+12,y+4,9,1);}}
-    if(!barn){rug(g,16,17,64,76);rug(g,32,110,160,35);stone(g,144,17,64,78);}
-    else{R(g,'#b4a06a',16,17,64,79);for(let i=0;i<85;i++){const x=18+(i*31)%60,y=19+(i*17)%73;R(g,i%3?'#c4b47c':'#95875d',x,y,3+i%4,1);}stone(g,176,17,64,79);}
+    if(!barn){rug(g,16,17,64,76);rug(g,32,110,160,35);stoneFloor(g,144,17,64,78);}
+    else{R(g,'#b4a06a',16,17,64,79);for(let i=0;i<85;i++){const x=18+(i*31)%60,y=19+(i*17)%73;R(g,i%3?'#c4b47c':'#95875d',x,y,3+i%4,1);}stoneFloor(g,176,17,64,79);}
     // Parede alta ao norte, rodapé e duas laterais com faces diferentes.
     R(g,barn?'#6f5b45':'#b7b7a0',0,0,w,16);R(g,barn?'#897456':'#d0cbb2',4,2,w-8,10);R(g,barn?'#a38b64':'#ddd4b8',4,2,w-8,2);
     if(barn)for(let x=6;x<w;x+=16){R(g,P.dark,x,1,2,12);R(g,P.light,x+2,1,1,12);}
@@ -8304,7 +8419,12 @@ body.hud-game #legend{display:none !important;}
    if(!['house','barn','greenhouse'].includes(currentScene))return;
    g.drawImage(roomSurface(currentScene),0,0);
    if(currentScene==='house'){
-    const night=typeof windowsLit==='function'&&windowsLit();g.fillStyle=night?'rgba(238,197,111,.035)':'rgba(239,228,168,.12)';g.beginPath();g.moveTo(98,16);g.lineTo(142,16);g.lineTo(161,89);g.lineTo(90,89);g.fill();
+    const night=typeof windowsLit==='function'&&windowsLit();
+    if(!night){
+     g.fillStyle='rgba(239,228,168,.10)';g.beginPath();g.moveTo(99,17);g.lineTo(141,17);g.lineTo(154,88);g.lineTo(90,88);g.fill();
+     // Sombra da divisão da janela acompanha o feixe, sem cobrir móveis.
+     g.fillStyle='rgba(82,83,56,.07)';g.beginPath();g.moveTo(119,17);g.lineTo(121,17);g.lineTo(123,88);g.lineTo(120,88);g.fill();
+    }
    }
   }
   function bed(o,g,cot=false){const{x,y,w=48,h=32}=o;shadow(g,x,y+h-2,w,4);R(g,P.edge,x,y+2,w,h-1);R(g,P.dark,x+2,y+h-5,w-4,7);
@@ -8384,8 +8504,14 @@ body.hud-game #legend{display:none !important;}
   wool:'#f0e5c1',woolHi:'#fff3d2',woolSh:'#c3bea1',woolDeep:'#9fa98b',skin:'#cba78f',skinHi:'#e0bfa2',
   hen:'#d7af76',henHi:'#f1d3a0',henSh:'#a58056',wing:'#b79060',comb:'#b7654b',combHi:'#de8860',beak:'#daa950',leg:'#b2854b'};
  const KIND={cow:{speed:6,radius:12,cycle:16,wait:[2.6,6],name:'vaca'},sheep:{speed:8,radius:10,cycle:12,wait:[2,4.6],name:'ovelha'},chicken:{speed:12,radius:6,cycle:5.4,wait:[1,2.8],name:'galinha'}};
+ const CONTACT=Object.freeze({cow:16,sheep:14,chicken:10});
  const cache=new Map();let brains=new WeakMap();
  const kindOf=a=>a.kind==='cow'?'cow':a.kind==='sheep'?'sheep':'chicken';
+ function blocksPlayer(x,y,from,objects){
+  if(!Array.isArray(objects))return false;
+  return objects.some(a=>a.type==='animal'&&Math.hypot(x-a.x,y-a.y)<CONTACT[kindOf(a)]&&
+   (!from||Math.hypot(x-a.x,y-a.y)<Math.hypot(from.x-a.x,from.y-a.y)-1e-6));
+ }
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(w)),Math.max(1,Math.round(h)));};
  function poly(g,c,points){g.fillStyle=c;g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(Math.round(x),Math.round(y)):g.moveTo(Math.round(x),Math.round(y)));g.closePath();g.fill();}
@@ -8405,7 +8531,7 @@ body.hud-game #legend{display:none !important;}
   if(pen){a.penX=pen.x+8;a.penY=pen.y+8;a.penW=pen.w-16;a.penH=pen.h-16;}
   a.tx=a.x;a.ty=a.y;a.animalPhase=Number(a.animalPhase)||0;a.animalBlend=0;a.moving=false;a.dir=Number.isInteger(a.dir)?a.dir:2;
   b={random,bounds,kind,k,mode:kind==='chicken'?'peck':'graze',timer:1+random()*2,vx:0,vy:0,clock:random()*10,
-   previousWell:a.well??.85,blocked:0,lastX:a.x,lastY:a.y,feed:0};brains.set(a,b);return b;
+   previousWell:a.well??.85,blocked:0,lastX:a.x,lastY:a.y,feed:0,rest:0,graze:0,activityClock:0,lastMode:null,wake:0,yieldSide:0};brains.set(a,b);return b;
  }
  function chooseActivity(a,b){
   b.mode=b.random()<(b.kind==='chicken'?.8:.68)?(b.kind==='chicken'?'peck':'graze'):'look';
@@ -8422,6 +8548,21 @@ body.hud-game #legend{display:none !important;}
   if(!chosen){chooseActivity(a,b);return;}
   a.tx=chosen.x;a.ty=chosen.y;b.mode='walk';b.blocked=0;a.pauseT=0;
  }
+ function giveSpace(a,b,animals,visitor){
+  b.yielding=false;
+  if(!visitor||!visitor.moving){b.yieldSide=0;return false;}
+  const direction=[[0,1],[-1,0],[1,0],[0,-1]][visitor.dir]||[0,1],dx=a.x-visitor.x,dy=a.y-visitor.y;
+  const ahead=dx*direction[0]+dy*direction[1],across=dx*-direction[1]+dy*direction[0],clearance=b.k.radius+10;
+  if(ahead<-10||ahead>96||Math.abs(across)>clearance+2){b.yieldSide=0;return false;}
+  const candidates=[-1,1].map(sign=>{
+   const distance=sign*clearance-across,x=clamp(a.x-direction[1]*distance,b.bounds.left+1,b.bounds.right-1),y=clamp(a.y+direction[0]*distance,b.bounds.top+1,b.bounds.bottom-1);
+   const crowded=animals.some(other=>other!==a&&Math.hypot(other.x-x,other.y-y)<b.k.radius+KIND[kindOf(other)].radius);
+   const available=Math.abs((x-visitor.x)*-direction[1]+(y-visitor.y)*direction[0]);
+   return{x,y,sign,score:available-(crowded?100:0)+(b.yieldSide===sign?8:0)};
+  }).sort((a,b)=>b.score-a.score);
+  const target=candidates[0];if(!target||target.score<0)return false;
+  a.tx=target.x;a.ty=target.y;b.yieldSide=target.sign;b.yielding=true;b.mode='walk';b.wake=2.5;a.pauseT=0;return true;
+ }
  function update(dt,objects,context={}){
   if(!Array.isArray(objects)||!Number.isFinite(dt)||dt<=0)return;
   const animals=objects.filter(a=>a.type==='animal'),step=Math.min(dt,.1),night=Number(context.timeOfDay)>=20||Number(context.timeOfDay)<5;
@@ -8429,16 +8570,17 @@ body.hud-game #legend{display:none !important;}
    const a=animals[i],b=brain(a,objects,i),k=b.k,oldX=a.x,oldY=a.y;
    if(a.well===undefined)a.well=.85;
    const fed=a.well>b.previousWell+.035;a.well=Math.max(0,a.well-dt*(context.cold?.005:.003));b.previousWell=a.well;
-   b.clock+=step;b.feed=Math.max(0,b.feed-step);a.animalClock=b.clock;
+   b.clock+=step;b.feed=Math.max(0,b.feed-step);b.wake=Math.max(0,b.wake-step);a.animalClock=b.clock;
    if(Math.hypot(a.x-b.lastX,a.y-b.lastY)>8){b.vx=b.vy=0;a.tx=a.x;a.ty=a.y;chooseActivity(a,b);}
    if(fed){b.feed=1.8;b.mode=b.kind==='chicken'?'peck':'graze';b.timer=2.4;b.vx=b.vy=0;}
-   if(night&&b.mode!=='rest'){b.mode='rest';b.vx=b.vy=0;}
+   const yielding=!context.reducedMotion&&giveSpace(a,b,animals,context.player);
+   if(night&&!yielding&&b.wake===0&&b.mode!=='rest'){b.mode='rest';b.vx=b.vy=0;}
    else if(!night&&b.mode==='rest'){chooseActivity(a,b);}
    if(context.reducedMotion||b.mode==='rest'){
     a.moving=false;a.animalBlend=0;a.animalActivity=b.mode==='rest'?'rest':'look';a.pauseT=Math.max(0,b.timer);b.vx=b.vy=0;
-   }else if(b.mode!=='walk'){
+   }else if(b.mode!=='walk'||b.rest>.05){
     a.moving=false;b.vx*=Math.exp(-step/.10);b.vy*=Math.exp(-step/.10);b.timer-=step;a.pauseT=Math.max(0,b.timer);
-    if(b.timer<=0)chooseTarget(a,b,animals);
+    if(b.mode!=='walk'&&b.timer<=0)chooseTarget(a,b,animals);
    }else{
     const inside=a.x>=b.bounds.left&&a.x<=b.bounds.right&&a.y>=b.bounds.top&&a.y<=b.bounds.bottom;
     if(!inside){ // Dois pixels internos vencem a tolerância de chegada de1,6.
@@ -8447,14 +8589,18 @@ body.hud-game #legend{display:none !important;}
     const dx=a.tx-a.x,dy=a.ty-a.y,distance=Math.hypot(dx,dy);
     if(distance<1.6){b.vx=b.vy=0;chooseActivity(a,b);a.moving=false;}
     else{
-     const speed=k.speed*Math.min(1,distance/9);let vx=dx/distance*speed,vy=dy/distance*speed;
+     // Um passo lateral curto abre espaço a quem passa. A passada continua
+     // vinculada à distância, inclusive nessa reação mais rápida.
+     const maxSpeed=b.yielding?(b.kind==='chicken'?23:22):k.speed;
+     const speed=maxSpeed*Math.min(1,distance/(b.yielding?4:9));let vx=dx/distance*speed,vy=dy/distance*speed;
      for(const other of animals){if(other===a)continue;const ox=a.x-other.x,oy=a.y-other.y,gap=Math.hypot(ox,oy),wanted=k.radius+KIND[kindOf(other)].radius+6;
       if(gap<wanted&&gap>.01){const avoid=(wanted-gap)/wanted*k.speed*2.3;vx+=ox/gap*avoid;vy+=oy/gap*avoid;}}
-     const norm=Math.hypot(vx,vy);if(norm>k.speed){vx*=k.speed/norm;vy*=k.speed/norm;}
-     const ease=1-Math.exp(-step/.17);b.vx+=(vx-b.vx)*ease;b.vy+=(vy-b.vy)*ease;
+     const norm=Math.hypot(vx,vy);if(norm>maxSpeed){vx*=maxSpeed/norm;vy*=maxSpeed/norm;}
+     const ease=1-Math.exp(-step/(b.yielding?.10:.17));b.vx+=(vx-b.vx)*ease;b.vy+=(vy-b.vy)*ease;
      let nx=a.x+b.vx*step,ny=a.y+b.vy*step;
      if(inside){nx=clamp(nx,b.bounds.left,b.bounds.right);ny=clamp(ny,b.bounds.top,b.bounds.bottom);}
-     const obstructed=animals.some(other=>other!==a&&Math.hypot(nx-other.x,ny-other.y)<(k.radius+KIND[kindOf(other)].radius)*.88&&Math.hypot(nx-other.x,ny-other.y)<Math.hypot(a.x-other.x,a.y-other.y));
+     const visitor=context.player,nearVisitor=visitor&&Math.hypot(nx-visitor.x,ny-visitor.y)<CONTACT[b.kind]&&Math.hypot(nx-visitor.x,ny-visitor.y)<Math.hypot(a.x-visitor.x,a.y-visitor.y)-1e-6;
+     const obstructed=nearVisitor||animals.some(other=>other!==a&&Math.hypot(nx-other.x,ny-other.y)<(k.radius+KIND[kindOf(other)].radius)*.88&&Math.hypot(nx-other.x,ny-other.y)<Math.hypot(a.x-other.x,a.y-other.y));
      if(!obstructed){a.x=nx;a.y=ny;}
      const traveled=Math.hypot(a.x-oldX,a.y-oldY);a.moving=traveled>.0001;
      if(a.moving){
@@ -8467,6 +8613,14 @@ body.hud-game #legend{display:none !important;}
    }
    a.animalBlend+=(Number(a.moving)-Number(a.animalBlend||0))*(1-Math.exp(-step/(a.moving?.10:.16)));
    if(a.animalBlend<.015)a.animalBlend=0;
+   if(b.lastMode!==b.mode){b.activityClock=0;b.lastMode=b.mode;}else b.activityClock+=step;
+   const restTarget=b.mode==='rest'?1:0,restStep=step/(restTarget?.65:.42);
+   b.rest=context.reducedMotion?restTarget:Math.max(0,Math.min(1,b.rest+Math.sign(restTarget-b.rest)*Math.min(Math.abs(restTarget-b.rest),restStep)));
+   const eating=!a.moving&&!b.rest&&(b.mode==='graze'||b.mode==='peck');
+   const cycle=b.activityClock*(b.kind==='chicken'?4.4:2.2),idx=Math.floor(cycle)%8,poses=[0,2,5,8,10,8,4,1];
+   const grazeTarget=eating?poses[idx]+(poses[(idx+1)%8]-poses[idx])*(cycle%1):0;
+   b.graze=context.reducedMotion?0:b.graze+Math.sign(grazeTarget-b.graze)*Math.min(Math.abs(grazeTarget-b.graze),step*24);
+   a.animalRest=b.rest;a.animalGraze=b.graze;
    a.animalActivity=context.reducedMotion&&b.mode!=='rest'?'look':b.mode;a.animalFed=b.feed>0;b.lastX=a.x;b.lastY=a.y;
   }
  }
@@ -8478,8 +8632,8 @@ body.hud-game #legend{display:none !important;}
  function leg(g,x,top,phase,offset,far,species,side,blend,rest){
   const cow=species==='cow',f=foot(phase,offset,cow?5:species==='sheep'?3.5:2.7,species==='chicken'?3:2.5),ground=far?-3:0;
   const stride=f.x*blend,up=f.up*blend,width=species==='chicken'?1:cow?3:2;
-  const endX=x+(side?stride:Math.sin((phase+offset*TAU))*blend),endY=ground-up+(side?0:stride*.55);
-  if(rest){const settled=cow?4:3;R(g,far?P.shade:P.cream,x-2,-2-settled,5,2);R(g,species==='chicken'?P.leg:P.hoof,x+1,-1-settled,3,1);return;}
+  const endX=x+(side?stride:Math.sin((phase+offset*TAU))*blend),endY=ground-up+(side?0:stride*.55)-(cow?4:3)*rest;
+  if(rest>=.75){const settled=cow?4:3;R(g,far?P.shade:P.cream,x-2,-2-settled,5,2);R(g,species==='chicken'?P.leg:P.hoof,x+1,-settled,3,1);return;}
   const skin=species==='chicken'?P.leg:far?P.shade:P.cream;
   stroke(g,P.edge,[[x,top],[x+(side?stride*.35:0),top+(endY-top)*.55],[endX,endY]],width+1);
   stroke(g,skin,[[x,top],[x+(side?stride*.35:0),top+(endY-top)*.55],[endX,endY-1]],width);
@@ -8506,7 +8660,7 @@ body.hud-game #legend{display:none !important;}
   }
  }
  function paintCow(g,s){
-  const side=s.dir===2,drop=s.graze,rest=s.rest,lift=rest?4:0,phase=s.phase,b=s.blend;
+  const side=s.dir===2,drop=s.graze,rest=s.restAmount,lift=4*rest,phase=s.phase,b=s.blend;
   g.save();g.translate(0,lift);
   if(side){
    stroke(g,P.edge,[[-18,-23],[-21,-18],[-20+s.tail,-8]],2);R(g,P.patch,-21+s.tail,-7,3,4);
@@ -8549,16 +8703,16 @@ body.hud-game #legend{display:none !important;}
    if(dir===0){R(g,P.cream,x-3,y-2,1,closed?1:2);R(g,P.cream,x+3,y-2,1,closed?1:2);R(g,P.ink,x,y+3,1,1);}}
  }
  function paintSheep(g,s){
-  const side=s.dir===2;g.save();g.translate(0,s.rest?3:0);
+  const side=s.dir===2;g.save();g.translate(0,Math.round(s.restAmount*3));
   if(side){
-   leg(g,-8,-11,s.phase,.5,true,'sheep',true,s.blend,s.rest);leg(g,7,-11,s.phase,0,true,'sheep',true,s.blend,s.rest);
+   leg(g,-8,-11,s.phase,.5,true,'sheep',true,s.blend,s.restAmount);leg(g,7,-11,s.phase,0,true,'sheep',true,s.blend,s.restAmount);
    R(g,P.woolSh,-18,-11,4,3);wool(g,-16,-22,29,15,s.shorn);
-   leg(g,-9,-9,s.phase,.75,false,'sheep',true,s.blend,s.rest);leg(g,8,-9,s.phase,.25,false,'sheep',true,s.blend,s.rest);
+   leg(g,-9,-9,s.phase,.75,false,'sheep',true,s.blend,s.restAmount);leg(g,8,-9,s.phase,.25,false,'sheep',true,s.blend,s.restAmount);
    sheepHead(g,14,-16+s.graze*.8,2,s.closed);
   }else{
-   leg(g,-5,-13,s.phase,.5,true,'sheep',false,s.blend,s.rest);leg(g,5,-13,s.phase,0,true,'sheep',false,s.blend,s.rest);
+   leg(g,-5,-13,s.phase,.5,true,'sheep',false,s.blend,s.restAmount);leg(g,5,-13,s.phase,0,true,'sheep',false,s.blend,s.restAmount);
    if(s.dir===3)sheepHead(g,0,-23,3,s.closed);
-   wool(g,-10,-24,20,18,s.shorn);leg(g,-7,-8,s.phase,.75,false,'sheep',false,s.blend,s.rest);leg(g,7,-8,s.phase,.25,false,'sheep',false,s.blend,s.rest);
+   wool(g,-10,-24,20,18,s.shorn);leg(g,-7,-8,s.phase,.75,false,'sheep',false,s.blend,s.restAmount);leg(g,7,-8,s.phase,.25,false,'sheep',false,s.blend,s.restAmount);
    if(s.dir===0)sheepHead(g,0,-12+s.graze*.5,0,s.closed);else{R(g,P.woolSh,-2,-11,4,5);R(g,P.woolHi,-2,-11,3,3);}
   }g.restore();
  }
@@ -8569,19 +8723,19 @@ body.hud-game #legend{display:none !important;}
   else if(dir===0){R(g,P.ink,x-2,y-1,1,closed?1:2);R(g,P.ink,x+2,y-1,1,closed?1:2);poly(g,P.beak,[[x-2,y+1],[x+2,y+1],[x,y+4]]);}
  }
  function paintHen(g,s){
-  const side=s.dir===2,bob=s.blend*Math.abs(Math.sin(s.phase))*1;g.save();g.translate(0,s.rest?3:0);
+  const side=s.dir===2,bob=s.blend*Math.abs(Math.sin(s.phase))*1;g.save();g.translate(0,Math.round(s.restAmount*3));
   if(side){
-   leg(g,-3,-7,s.phase,.5,true,'chicken',true,s.blend,s.rest);
+   leg(g,-3,-7,s.phase,.5,true,'chicken',true,s.blend,s.restAmount);
    poly(g,P.edge,[[-8,-10],[-14,-20],[-12,-24],[-7,-17],[-10,-24],[-7,-25],[-3,-16]]);
    stroke(g,P.henHi,[[-11,-21],[-6,-15]],2);stroke(g,P.dark,[[-8,-23],[-4,-16]],2);
    poly(g,P.edge,[[-9,-17],[-4,-20-bob],[4,-20-bob],[9,-14],[7,-7],[2,-4],[-6,-5],[-10,-10]]);
    poly(g,P.hen,[[-8,-16],[-3,-19-bob],[3,-19-bob],[8,-13],[6,-7],[1,-5],[-5,-6],[-9,-10]]);
    poly(g,P.cream,[[-1,-19-bob],[4,-18-bob],[7,-13],[5,-9],[2,-9]]);R(g,P.henHi,-6,-16,7,3);
    poly(g,P.henSh,[[-6,-13],[1,-15],[5,-11],[2,-7],[-4,-8]]);stroke(g,P.wing,[[-5,-12],[0,-10],[3,-10]],1);R(g,P.henHi,-4,-13,4,2);
-   leg(g,3,-6,s.phase,0,false,'chicken',true,s.blend,s.rest);
+   leg(g,3,-6,s.phase,0,false,'chicken',true,s.blend,s.restAmount);
    const drop=s.graze*2;poly(g,P.cream,[[3,-15],[7,-23+drop],[11,-22+drop],[8,-12]]);henHead(g,9,-23+drop,2,s.closed);
   }else{
-   leg(g,-3,-7,s.phase,.5,false,'chicken',false,s.blend,s.rest);leg(g,3,-7,s.phase,0,false,'chicken',false,s.blend,s.rest);
+   leg(g,-3,-7,s.phase,.5,false,'chicken',false,s.blend,s.restAmount);leg(g,3,-7,s.phase,0,false,'chicken',false,s.blend,s.restAmount);
    if(s.dir===3)henHead(g,0,-23,3,s.closed);
    poly(g,P.edge,[[-5,-20],[-9,-14],[-8,-7],[-4,-4],[4,-4],[8,-7],[9,-14],[5,-20]]);
    poly(g,P.hen,[[-4,-19],[-8,-14],[-7,-7],[-3,-5],[3,-5],[7,-7],[8,-14],[4,-19]]);
@@ -8591,18 +8745,19 @@ body.hud-game #legend{display:none !important;}
   }g.restore();
  }
  function visualState(a,reduced=false){
-  const kind=kindOf(a),phase=Number(a.animalPhase??a.animT)||0,rest=a.animalActivity==='rest'||a.sleeping||a.asleep||a.dormindo;
+  const kind=kindOf(a),phase=Number(a.animalPhase??a.animT)||0,wantsRest=a.animalActivity==='rest'||a.sleeping||a.asleep||a.dormindo;
+  const restAmount=reduced?Number(!!wantsRest):Math.round(clamp(Number.isFinite(a.animalRest)?a.animalRest:Number(!!wantsRest),0,1)*4)/4,rest=restAmount>0;
   const time=Number(a.animalClock)||0,activity=a.animalActivity||'look',moving=!reduced&&!rest&&(a.moving||a.animalBlend>.01);
   const blend=moving?Math.round(clamp(Number(a.animalBlend??1),0,1)*4)/4:0;
   const frame=moving?Math.floor(((phase%TAU+TAU)%TAU)/TAU*16)%16:0;
   const grazes=!reduced&&!moving&&!rest&&(activity==='graze'||activity==='peck');
-  const graze=grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
+  const graze=reduced?0:Number.isFinite(a.animalGraze)?Math.round(a.animalGraze):grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
   const dir=Number.isInteger(a.dir)?clamp(a.dir,0,3):(a.facing<0?1:2);
-  return{kind,dir,phase:frame*TAU/16,frame,blend,graze,rest:!!rest,shorn:!!a.shorn,
-   closed:!!rest||(!reduced&&Math.floor(time*5)%31===30),tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed};
+  return{kind,dir,phase:frame*TAU/16,frame,blend,graze,rest:!!rest,restAmount,shorn:!!a.shorn,
+   closed:restAmount===1||(!reduced&&Math.floor(time*5)%31===30),tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed};
  }
  function sprite(s){
-  const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.rest,s.shorn,s.closed,s.tail].join(':');if(cache.has(key))return cache.get(key);
+  const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.restAmount,s.shorn,s.closed,s.tail].join(':');if(cache.has(key))return cache.get(key);
   let c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.imageSmoothingEnabled=false;g.translate(AX,AY);
   if(s.dir===1)g.scale(-1,1);const canonical={...s,dir:s.dir===1?2:s.dir};
   if(s.kind==='cow')paintCow(g,canonical);else if(s.kind==='sheep')paintSheep(g,canonical);else paintHen(g,canonical);
@@ -8621,7 +8776,7 @@ body.hud-game #legend{display:none !important;}
   if(s.fed&&!reduced){const yy=y-(s.kind==='chicken'?30:35);R(g,P.comb,x-2,yy,2,2);R(g,P.comb,x+1,yy,2,2);R(g,P.comb,x-1,yy+2,3,2);R(g,P.comb,x,yy+4,1,1);}
   g.restore();
  }
- window.FarmAnimalLife={update,draw,reset(){brains=new WeakMap();},visualState,
+ window.FarmAnimalLife={update,draw,blocksPlayer,contactRadii:CONTACT,reset(){brains=new WeakMap();},visualState,
   info(){return{version:3,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
  };
  (window.__farmBiomes=window.__farmBiomes||[]).push(api=>{api.registerObjectDrawer('animal',(animal,g)=>draw(g,animal));});
@@ -8916,12 +9071,12 @@ body.hud-game #legend{display:none !important;}
   const text=(v,max=120)=>typeof v==='string'?v.slice(0,max):'';
   const obj=(id,label,event,goal=1,match={})=>({id,text:label,event,goal,match});
   const clueDefs=[
-    {id:'carta-perdida',npcId:'rosa',title:'O envelope de três riscos',text:'Dentro da caixa antiga há um envelope sem remetente: “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” A dobra guarda terra, não poeira. Alguém transportou o papel pela horta.'},
+    {id:'carta-perdida',npcId:'rosa',title:'O envelope de três riscos',text:'Dentro da caixa antiga há um envelope sem remetente: “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” A dobra guarda terra, não poeira. Um traço de grafite passa sobre a terra; o canto foi dobrado em triângulo. Alguém manuseou o papel na horta recentemente.'},
     {id:'ponte-marca',npcId:'tomas',title:'Marcas sob a tinta',text:'A velha placa tem três riscos sob a pintura. Tomás reconhece seu próprio encaixe, mas uma seta foi acrescentada depois. O risco continua no verso: o mapa foi feito para ser virado, não para indicar um atalho pela água.'},
     {id:'horta-caderno',npcId:'lia',title:'O caderno que mede esperas',text:'O caderno registra germinação, rega e origem de sementes. As três colunas não são coordenadas: “alto”, “margem” e “areia” indicam quem guardou cada amostra. A ventania espalhou papéis; as sementes já estavam distribuídas antes dela.'},
     {id:'cabana-fita',npcId:'ines',title:'Uma fita no abrigo',text:'Uma fita de lã prende um recado de Inês: “Reserva entregue. Se a neve fechar a rota, a próxima tentativa continua aqui.” A data antecede a ventania. Ninguém escondeu um tesouro na montanha; alguém preparou um lugar seguro para recomeçar.'},
     {id:'oasis-caixa',npcId:'caio',title:'A caixa que fez o caminho de volta',text:'Na caixa do oásis estão uma etiqueta de Rosa e uma segunda, escrita por Caio: “Esta reserva pertence ao vale. Não confundir troca com dívida.” Uma semente desenhada une as etiquetas. A rede era de cuidado, embora os moradores tenham parado de conversar sobre ela.'},
-    {id:'mapa-nico',npcId:'nico',title:'O desenho de antes da placa',text:'O mapa de Nico sobrepõe as três rotas e deixa um espaço no centro. A assinatura miúda de Alex aparece num rascunho: “Não guardar tudo no mesmo teto.” O ponto central é a Casa das Sementes, onde as pessoas comparam o que cada uma conseguiu preservar.'},
+    {id:'mapa-nico',npcId:'nico',title:'O desenho de antes da placa',text:'O mapa de Nico sobrepõe as três rotas e deixa um espaço no centro. A assinatura miúda de Alex aparece num rascunho: “Não guardar tudo no mesmo teto.” Na cópia recente, o lápis escapou junto a um canto dobrado em triângulo, como no envelope. O ponto central é a Casa das Sementes, onde as pessoas comparam o que cada uma conseguiu preservar.'},
     {id:'arquivo-casa',npcId:'rosa',title:'O acordo da primeira mesa',text:'O arquivo guarda seis assinaturas e a de Alex, ainda sem sobrenome. O acordo distribuía amostras pelos três biomas e pedia encontros para trocar as tentativas. O vento levou a placa; o silêncio desfez os encontros. A reserva existe. O que falta é um novo acordo entre pessoas, com regras que elas possam cumprir.'}
   ];
   const clueById=Object.fromEntries(clueDefs.map(c=>[c.id,c]));
@@ -8973,8 +9128,8 @@ body.hud-game #legend{display:none !important;}
       objectives:[obj('mapa','Leia o rascunho de Nico','inspect',1,{clueId:'mapa-nico'}),obj('plant','Plante 3 sementes para uma nova experiência','plant',3),obj('water','Regue 3 plantas novas','water',3)],
       choices:[decision('Fazer uma versão pública, com nomes dos participantes.','Fabrique algo na oficina e faça uma encomenda. Vou pendurar o desenho com uma legenda de verdade. Se alguém encontrar erro, pode mostrar: não precisa adivinhar o que quis dizer.','Nico recebe autoria no quadro; o mapa público mostra que a reserva é uma rede de pessoas.','Minha assinatura estava lá. Pequena, torta e antes de todas as desculpas. Vou aceitar essa parte também.',[obj('craft','Fabrique algo para apoiar o projeto','craft'),obj('order','Entregue 1 encomenda da fazenda','order')]),
         decision('Concluir a experiência antes de abrir a roda de perguntas.','Faça três colheitas e converse com Lia. Vou levar o resultado e a pergunta juntos. Não preciso montar uma invenção enorme para alguém me levar a sério.','Nico apresenta uma experiência concreta à comunidade; Lia passa a tratá-lo como parceiro de investigação.','Nico não precisa virar alguém como eu. Melhor que aprenda a cumprir a própria ideia sem perder a vontade da próxima.',[obj('harvest','Faça 3 colheitas maduras','harvest',3),obj('lia','Converse com Lia sobre a experiência','talk',1,{npcId:'lia'})])],
-      resolution:'Olha o centro do mapa: vazio de propósito. Cada lugar protege uma amostra; a casa reúne os resultados. Você escreveu isso! A gente ficou procurando uma caixa perdida porque uma caixa é mais fácil de imaginar que uma rede.\n\nRosa precisa abrir o arquivo da primeira mesa. E eu vou pedir para assinar a nova. Tenho letra horrível, mas já sou participante. Você vai dizer isso comigo, vai?',
-      inner:'Nico encontrou meu nome numa boa ideia. Não sei se consigo ser a pessoa que ele imagina. Posso ser a que volta para conferir o desenho.',focus:{x:376,y:968},cut:[['nico','Achei sua assinatura! Está quase escondida pela minha árvore.','joyful','explain'],['player','Reconheço. A árvore é melhor que a assinatura.','warm','nod'],['nico','Você escreveu: não guardar tudo no mesmo teto. Era isso!','joyful','explain'],['player','Então temos uma resposta. Falta perguntar se as pessoas ainda querem o mesmo combinado.','thoughtful','invite']]},
+      resolution:'Preciso contar uma parte que não desenhei. Fui eu que trouxe a caixa para a varanda de Rosa, antes de você chegar. Encontrei debaixo da bancada da horta. Abri o envelope, dobrei o canto e copiei os riscos sem limpar a terra das mãos. O lápis escapou. Eu queria levar uma resposta pronta; quando vi sua assinatura, achei melhor esperar você e fui adiando a conversa.\n\nOlha o centro do mapa: vazio de propósito. Cada lugar protege uma amostra; a casa reúne os resultados. Você escreveu isso! A caixa estava perto. Eu é que fiz a explicação dar a volta no vale. Vou contar a Rosa, mesmo sem ter um desenho perfeito para mostrar. Depois peço para assinar a nova mesa. Você vai comigo?',
+      inner:'O traço de grafite era de Nico. Ele trouxe a caixa e guardou a explicação esperando acertar tudo primeiro. Conheço essa espera. Posso ir com ele até Rosa sem escrever sua fala.',focus:{x:376,y:968},cut:[['nico','Fui eu que trouxe a caixa da horta. Dobrei o envelope para copiar os riscos, com terra nas mãos. Esperei ter uma resposta bonita para contar.','thoughtful','reflect'],['player','A dobra e o lápis. Você podia ter trazido só a pergunta. Tenho prática em adiar explicações; nunca ficam mais leves.','warm','reassure'],['nico','Vou contar a Rosa. E mostrar sua assinatura: não guardar tudo no mesmo teto. Posso levar a cópia com a parte que borrei?','thoughtful','invite'],['player','Pode. Eu vou com você. A conversa é sua; a minha começa admitindo que também reconheci essa ideia tarde demais.','warm','nod']]},
     {id:'arquivo',title:'7 · A mesa não decide sozinha',npcId:'rosa',coins:32,
       description:'O arquivo explica a reserva, mas não resolve o presente. Alex e os moradores escolhem regras para uma casa viva, com espaço para discordar e continuar trabalhando.',
       offer:'O arquivo está aberto. Aqui estão as assinaturas. Aqui estão também três encontros que não aconteceram, riscados a lápis. Eu guardava isso como se um papel quieto pudesse preservar as pessoas.\n\nLeia o acordo, prepare dois produtos e ouça Tomás, Lia e Caio. Quero assinar um novo combinado, mas não quero escolhê-lo por todos. Você me ajuda a trazer as opções à mesa?',
@@ -9083,12 +9238,12 @@ body.hud-game #legend{display:none !important;}
     caio:[['Discordei de uma proposta e a troca continuou. Achei que você gostaria de saber. Eu gostei bastante de descobrir.','Tomás aprendeu meu jeito de conferir a reserva. Eu aprendi o encaixe. Nenhum dos dois sabe fazer tão bem quanto o outro ainda.'],['Anotei a retirada. Parei antes de escrever o que a pessoa me devia. O espaço ficou em branco, como combinamos.','Hoje trouxeram trabalho no lugar de produto. Coube na mesa. Eu é que precisei mudar o tamanho da minha lista.']],
     nico:[['A página tem meu nome e uma parte que deu errado. Estão perto. Ninguém achou que eu precisava apagar um dos dois.','Fiz uma pergunta só no alto da folha. Sobrou papel para a resposta. Uma descoberta terrível para minhas torres.'],['Contei do mapa sem pedir desculpa antes. Depois achei uma seta ruim. Corrigi a seta, só ela.','Alguém desenhou na margem do meu mapa e assinou. Primeiro deu um susto. Depois fui ver o que a seta mostrava.']]
   };
-  let adapter={},initialized=false,state,dialogue=null;
+  let adapter={},initialized=false,state,dialogue=null,revision=0;
   const freshRecord=()=>({status:'offered',acceptedAt:null,choice:null,counts:{},paid:false});
   function context(value){const raw=plain(value)?value:typeof adapter.readState==='function'?adapter.readState():{};return{season:raw?.season==='cold'?'cold':'hot',region:['farm','mountain','desert'].includes(raw?.region)?raw.region:'farm',scene:text(raw?.scene,24)||'main',playerName:text(raw?.playerName||raw?.name,40)||'Alex Vale'};}
   function fresh(value){const s=context(value);return{version:VERSION,sequence:0,episodeIndex:0,episodes:episodes.map(freshRecord),arcs:Object.fromEntries(IDS.map(id=>[id,[freshRecord(),freshRecord()]])),trust:Object.fromEntries(IDS.map(id=>[id,0])),clues:[],journal:[],recentEventIds:[],coinsEarned:0,season:s.season,cycleId:1,recurring:{},lastRegion:s.region};}
   function emit(name,data){if(typeof adapter[name]==='function')try{adapter[name](data);}catch(e){console.warn('[saga] '+name,e);}}
-  const changed=()=>emit('onChange',snapshot());
+  const changed=()=>{revision++;emit('onChange',snapshot());};
   function journal(id,title,message,npcId='') {if(state.journal.some(x=>x.id===id))return;state.journal.push({id,title,text:message,npcId,sequence:state.sequence});state.journal=state.journal.slice(-64);}
   function currentDialogue(){return dialogue?clone(dialogue):null;}
   function show(npcId,message,kind='saga',choices=[],title){const voice=voices[npcId]||voices.rosa;
@@ -9116,7 +9271,17 @@ body.hud-game #legend{display:none !important;}
   function latestConsequence(npcId){for(let i=1;i>=0;i--){const r=state.arcs[npcId][i];if(r.status==='completed')return arcs[npcId].stages[i].choices[r.choice]?.consequence||'';}for(let i=Math.min(state.episodeIndex-1,7);i>=0;i--)if(episodes[i].npcId===npcId){const r=state.episodes[i];return episodes[i].choices[r.choice]?.consequence||'';}return'';}
   function readyLine(npcId,type,key){if(type==='episode')return investigationBeats[Number(key)]?.ready.replace(/Alex/g,context().playerName)||'Vamos conferir o que encontramos.';
     return{rosa:'Separei duas cadeiras. A caixa também veio; hoje ela espera enquanto você me conta.',lia:'Trouxe a página aberta. Mostre o que percebeu antes de eu começar a tomar notas.',tomas:'Terminado? Vamos conferir juntos. Guardei uma pergunta sobre como você fez.',ines:'Você voltou com o combinado pronto. Quero ouvir também como foi o caminho.',caio:'Aqui está nossa lista. Vamos conferir dos dois lados antes de guardar.',nico:'Terminamos essa parte! Vou deixar o lápis parado um instante para ouvir você. Um instante de verdade.'}[npcId];}
-  function greeting(npcId,options={}){if(!IDS.includes(npcId))return'';const name=context().playerName;
+  function greeting(npcId,options={}){
+    const base=baseGreeting(npcId,options);if(!base||options.first)return base;
+    const delivery=window.FarmLife?.deliveryMemory?.(npcId);if(!delivery)return base;
+    const episode=episodes[state.episodeIndex],record=state.episodes[state.episodeIndex],step=arcStep(npcId);
+    const pending=episode?.npcId===npcId&&['active','ready'].includes(record?.status)||step>=0&&state.arcs[npcId][step].status==='ready';
+    // A entrega recente é reconhecida sem esconder a orientação de um
+    // compromisso em andamento. Depois ela volta como lembrança ocasional.
+    if(delivery.recent)return delivery.line+(pending?'\n\n'+base:'');
+    return !pending&&!options.night&&Math.max(1,num(options.visit))%4===2?delivery.line:base;
+  }
+  function baseGreeting(npcId,options={}){if(!IDS.includes(npcId))return'';const name=context().playerName;
     const welcome={rosa:name+'. Trouxe as mesmas botas e uma cara nova de quem ensaiou explicações na estrada. Deixe as duas na porta por um instante. Guardei sua cadeira; a Casa das Sementes ainda precisa de gente, e eu senti sua falta.',
       lia:'Eu lembro da sua letra naquele plano, '+name+'. Pequena, no canto da página, mas a ideia era boa. Podemos comparar o que guardamos sem fingir que já sabemos a história inteira. Eu trago o caderno; você traz uma pergunta que incomode.',
       tomas:'Olha quem voltou. A bancada ficou aqui, '+name+'. Range menos que antes; reclama quase tanto quanto eu. Se quiser ajudar, tenho trabalho de verdade. Se quiser conversar, também tenho. Só prefiro saber qual dos dois combinamos.',
@@ -9237,6 +9402,18 @@ body.hud-game #legend{display:none !important;}
     return{stage:n,sharedSeedBank:n>=7&&state.episodes[6].choice===0,noticeBoardOpen:n>=2,mountainRoute:n>=4,oasisAgreement:n>=5,seedbedPlans:n>=6,archiveOpen:n>=7,festival:n===8,roles,
       decorationFlags:{seedShare:state.arcs.rosa[0].status==='completed',questionTable:state.arcs.lia[1].status==='completed',workshopCredits:state.arcs.tomas[0].status==='completed',routeNotices:state.arcs.ines[1].status==='completed',exchangeReserve:state.arcs.caio[1].status==='completed',signedMap:state.arcs.nico[1].status==='completed'}};
   }
+  const DECORATIONS=[
+    ['rosa',0,'seedbox','shared','reference'],['lia',1,'notebook','questions','collective'],
+    ['tomas',0,'workbench','signed','demonstration'],['ines',1,'routeboard','notices','observations'],
+    ['caio',1,'reserve','community','shared-work'],['nico',1,'mapboard','presentation','collective']
+  ];
+  function decorationState(){
+    // Somente o resultado entregue pode aparecer no cenário. O contrato
+    // deriva do save atual, não grava objetos nem depende da ordem dos drawers.
+    const result=[];for(const [npcId,step,surface,...variants]of DECORATIONS){const record=state.arcs[npcId][step];
+      if(record.status==='completed'&&record.paid&&Number.isInteger(record.choice)&&variants[record.choice])result.push({id:'arc:'+npcId+':'+step,npcId,surface,variant:variants[record.choice]});}
+    return result;
+  }
   function snapshot(){const episodeViews=episodes.map((def,i)=>view(def,state.episodes[i],{index:i,locked:i>state.episodeIndex}));
     const current=episodeViews[state.episodeIndex]||{id:'continuar',index:8,title:'A fazenda continua',description:'O mistério foi resolvido por um acordo entre os moradores. Projetos pessoais, produção, reparos e trocas continuam nas próximas estações.',npcId:'rosa',status:'completed',completed:true,objectives:[],progress:8,goal:8};current.cinematicId=state.episodeIndex<8?'saga-'+current.id:'saga-mesa';
     const arcViews=IDS.map(id=>{const step=arcStep(id),stages=arcs[id].stages.map((def,i)=>view(def,state.arcs[id][i],{id:'arc:'+id+':'+i,npcId:id,index:i,locked:state.episodeIndex<arcs[id].unlock||i>step&&step>=0}));const active=stages[step]||stages[1];return{npcId:id,title:arcs[id].title,agenda:arcs[id].agenda,flaw:arcs[id].flaw,step:step<0?2:step,total:2,locked:state.episodeIndex<arcs[id].unlock,status:step<0?'completed':active.status,objective:active.objective,objectives:active.objectives,stages};});
@@ -9273,7 +9450,7 @@ body.hud-game #legend{display:none !important;}
   function update(dt,value){if(!Number.isFinite(dt)||dt<0)return;const s=context(value);newSeason({season:s.season});if(s.scene==='main'&&s.region!==state.lastRegion){state.lastRegion=s.region;record('visit',{region:s.region});}}
   function cinematicScenes(){const props=['seed','sign','notebook','ribbon','crate','sign','notebook','table'];return episodes.map((def,index)=>({id:'saga-'+def.id,title:def.title,chapter:index,description:def.description,episodeIndex:index,cast:[...new Set([def.npcId,'player',...def.cut.map(s=>s[0])])],focusX:def.focus.x,focusY:def.focus.y,region:def.id==='abrigo'?'mountain':def.id==='oasis'?'desert':'farm',scene:'main',prop:props[index],shots:def.cut.map(([speaker,line,expression,gesture],i)=>({speaker,line,expression,gesture,focus:i===3?0:i%2?1:-1,duration:5.5}))}));}
   state=fresh({season:'hot'});
-  window.FarmValleySaga={init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh();initialized=true;}return snapshot();},interact:menu,choose,currentDialogue,close,isOpen:()=>!!dialogue,menuLabel,greeting,conversationTopic,record,update,snapshot,worldState,cinematicScenes,clueCatalogue:()=>clone(clueDefs),serialize:()=>clone(state),restore,reset(value){state=fresh(value);close();changed();return snapshot();}};
+  window.FarmValleySaga={init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh();initialized=true;}return snapshot();},interact:menu,choose,currentDialogue,close,isOpen:()=>!!dialogue,menuLabel,greeting,conversationTopic,record,update,snapshot,worldState,decorationState,revision:()=>revision,cinematicScenes,clueCatalogue:()=>clone(clueDefs),serialize:()=>clone(state),restore,reset(value){state=fresh(value);close();changed();return snapshot();}};
 })();
 
 /* ===========================
@@ -9323,13 +9500,41 @@ body.hud-game #legend{display:none !important;}
   {id:'mesa-lia',npcId:'lia',title:'Uma mesa para todos',description:'Lia organiza um lanche depois da caminhada do vale: leite e um pouco de mel.',cost:{items:{leite:2,mel:1}},reward:34},
   {id:'rota-caio',npcId:'caio',title:'Provisões de Caio',description:'Caio prepara provisões para os visitantes do oásis; ninguém precisa caminhar de estômago vazio.',cost:{items:{fruta:2,mel:1}},reward:30}
  ];
+ // A lembrança vem da entrega efetiva já salva. Ler uma fala não consome a
+ // lembrança, não reinicia o prazo e não cria uma segunda recompensa.
+ const DELIVERY_LINES={
+  rosa:[
+   'Recebi seus vegetais e a fruta. Vou separar a cesta para quem ainda não consegue vir à feira. Obrigada por lembrar de quem fica em casa.',
+   'Outra cesta pronta. Dessa vez não precisei escolher quem ia esperar. Deixe que eu faça as visitas; você já cuidou da sua parte.',
+   'A cesta que você trouxe me deu um bom motivo para bater em algumas portas. Na próxima quero trazer notícias, além da cesta vazia.'],
+  lia:[
+   'O leite e o mel chegaram. Separei o lanche para depois da caminhada. Fica mais fácil ouvir as observações quando ninguém está pensando só no estômago.',
+   'Recebi o lanche de novo. Vou dividir as porções antes de abrir o caderno, senão começo a explicar e esqueço a colher na mão.',
+   'Obrigada pelo leite e pelo mel que trouxe. O lanche faz parte da caminhada; custei um pouco a incluir essa linha no meu planejamento.'],
+  tomas:[
+   'Conferi o feno e a fruta da sua entrega. Um vai para a criação dos vizinhos, a outra para quem me ajuda. Não precisamos conferir duas vezes. Estou praticando.',
+   'Mais uma entrega certa. Já separei a parte dos vizinhos. A fruta eu guardo longe da serragem: essa organização aprendi por experiência.',
+   'Aquela entrega ajudou a dividir o serviço da horta. Feno para os animais, fruta para a pausa. Um combinado que coube no dia.'],
+  ines:[
+   'A lã e o mel chegaram. Vou levar o cobertor e o chá para a cabana. Gosto de preparar a chegada antes de contar as pegadas.',
+   'Conferi sua nova entrega. A reserva da cabana ganhou mais uma tentativa. Agora me cabe levar tudo sem transformar a subida numa corrida.',
+   'Lembro da lã e do mel que você separou. Quando confiro o apoio da cabana, confiro também esse trabalho de quem ficou lá embaixo.'],
+  caio:[
+   'Recebi as frutas e o mel. Vou separar as provisões para quem vier ao oásis. Sua parte está feita; escolher como receber as pessoas fica comigo.',
+   'Outra entrega conferida. Obrigado por manter o combinado sem decidir por mim o que precisa mudar por aqui. As caixas cabem na reserva.',
+   'As provisões que você trouxe entraram no preparo das visitas. A conta era simples; receber companhia era a parte que eu precisava praticar.'],
+  nico:[
+   'A compota e os ovos chegaram! Lanche para dois, como prometi. Agora falta perguntar quem quer ir comigo, antes de desenhar nós dois na expedição.',
+   'Já conferi a nova provisão. Comida para dois, outra vez. Estou ficando muito bom em não planejar uma expedição de doze pessoas com dois ovos.',
+   'Ainda lembro da sua entrega: compota, ovos e uma boa desculpa para convidar alguém. Planejar o lanche ajudou a diminuir o tamanho impossível da expedição.']
+ };
  const CLUES=[
-  {id:'carta-perdida',title:'Uma dobra na carta',x:208,y:896,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Uma dobra guarda terra fresca da horta.'},
+  {id:'carta-perdida',title:'Uma dobra na carta',x:208,y:896,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Um traço de grafite atravessa a terra fresca da dobra; o canto foi dobrado em triângulo.'},
   {id:'ponte-marca',title:'Marcas sob a ponte',x:720,y:936,text:'O verso da placa tem uma seta feita para virar. Tomás reconhece o encaixe: estas marcas orientavam as trocas antes da ventania.'},
   {id:'horta-caderno',title:'O caderno da horta',x:332,y:976,text:'Três colunas dizem “alto, margem, areia”. São os lugares de quem guardou as amostras antes da ventania, não coordenadas de um tesouro.'},
   {id:'cabana-fita',title:'Uma fita na cabana',x:520,y:272,text:'Uma fita de lã prende um recado de Inês, datado de antes da ventania: “Reserva entregue; se a neve fechar a rota, a próxima tentativa continua aqui.”'},
   {id:'oasis-caixa',title:'A caixa do oásis',x:640,y:1812,text:'A etiqueta tem as assinaturas de Rosa e Caio: “Esta reserva pertence ao vale. Não confundir troca com dívida.” A rede também alcançava o oásis.'},
-  {id:'mapa-nico',title:'O mapa de Nico',x:624,y:1064,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Você já conhecia esta ideia.'},
+  {id:'mapa-nico',title:'O mapa de Nico',x:624,y:1064,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Na cópia recente, o lápis escapou junto ao canto dobrado em triângulo, como no envelope.'},
   {id:'arquivo-casa',title:'O arquivo da Casa',x:650,y:1264,text:'O acordo distribuía amostras entre os três biomas e previa encontros para comparar o que crescia. Os papéis voaram; o silêncio desfez os encontros. As sementes já estavam protegidas pela rede.'}
  ];
  let callbacks={},API=null,state=fresh(),animalCache={objects:null,length:0,list:[]};
@@ -9372,7 +9577,8 @@ body.hud-game #legend{display:none !important;}
  function healthy(kind,value){return animals(value).some(a=>(kind==='chicken'?['chick','chicken'].includes(a.kind):a.kind===kind)&&Number(a.well??.85)>=.45);}
  function productionReason(d,value){if(d.projectId&&!built(d.projectId))return'Primeiro recupere '+project(d.projectId).name+'.';if(d.kind&&!healthy(d.kind,value))return d.kind==='cow'?'Alimente as vacas do curral para produzir leite.':'Alimente as galinhas do curral para produzir ovos.';return'';}
  function collect(id){const d=PRODUCTION.find(p=>p.id===id);if(!d)return answer(false,'Produção desconhecida.');const p=player(),row=state.production[id],why=pointReason(d)||(!row.ready?'Ainda está crescendo: '+Math.ceil(d.cycleSeconds-row.elapsed)+' segundos de jogo ativo.':'')||(state.stock[d.item]>=LIMIT?'O depósito está cheio.':'');if(why)return answer(false,why);const n=Math.min(row.ready,LIMIT-state.stock[d.item]);row.ready-=n;state.stock[d.item]+=n;state.totals.produced=Math.min(MAX_COUNT,state.totals.produced+n);return announce('produce',{productionId:id,item:d.item,amount:n},'Colhido: '+n+' '+ITEMS[d.item].name.toLowerCase()+'.');}
- function deliverOrder(id){const d=ORDERS.find(o=>o.id===id);if(!d)return answer(false,'Encomenda desconhecida.');const p=player(),row=state.orders[id],why=pointReason(BOARD)||(row.cooldown>0?'Esta encomenda volta em '+Math.ceil(row.cooldown)+' segundos de jogo ativo.':'')||costReason(d.cost,p)||(count(p?.coins,MAX_COUNT)+d.reward>MAX_COUNT?'A bolsa de moedas está cheia.':'');if(why)return answer(false,why);pay(d.cost,p);row.deliveries=Math.min(MAX_COUNT,row.deliveries+1);row.cooldown=180;p.coins=count(p.coins,MAX_COUNT)+d.reward;state.totals.orders=Math.min(MAX_COUNT,state.totals.orders+1);return announce('order',{orderId:id,npcId:d.npcId,coins:d.reward,amount:1,delivery:row.deliveries},'Encomenda entregue: +'+d.reward+' moedas. O morador agradece o seu trabalho.');}
+ function deliveryMemory(npcId){const d=ORDERS.find(o=>o.npcId===npcId);if(!d)return null;const row=state.orders[d.id];if(!row?.deliveries)return null;const recent=row.cooldown>0;return{orderId:d.id,deliveries:row.deliveries,recent,line:DELIVERY_LINES[npcId][recent?(row.deliveries===1?0:1):2]};}
+ function deliverOrder(id){const d=ORDERS.find(o=>o.id===id);if(!d)return answer(false,'Encomenda desconhecida.');const p=player(),row=state.orders[id],why=pointReason(BOARD)||(row.cooldown>0?'Esta encomenda volta em '+Math.ceil(row.cooldown)+' segundos de jogo ativo.':'')||costReason(d.cost,p)||(count(p?.coins,MAX_COUNT)+d.reward>MAX_COUNT?'A bolsa de moedas está cheia.':'');if(why)return answer(false,why);pay(d.cost,p);row.deliveries=Math.min(MAX_COUNT,row.deliveries+1);row.cooldown=180;p.coins=count(p.coins,MAX_COUNT)+d.reward;state.totals.orders=Math.min(MAX_COUNT,state.totals.orders+1);return announce('order',{orderId:id,npcId:d.npcId,coins:d.reward,amount:1,delivery:row.deliveries},'Encomenda entregue: +'+d.reward+' moedas. '+deliveryMemory(d.npcId).line);}
  function inspect(id){const def=CLUES.find(c=>c.id===id);if(!def)return answer(false,'Pista desconhecida.');const d=clue(def),why=pointReason(d,38);if(why)return answer(false,why);const row=state.clues[id],first=!row.found;row.found=true;row.reads=Math.min(MAX_COUNT,row.reads+1);return announce('inspect',{clueId:id,first,text:d.text,title:d.title},d.text);}
  function consume(id){if(id!=='compota')return answer(false,'Este produto deve ser usado numa receita ou encomenda.');const p=player();if(!p||p.dead)return answer(false,'Comece uma partida para consumir o lanche.');if(!state.stock.compota)return answer(false,'Prepare compota na cozinha primeiro.');if(!Number.isFinite(p.en)||!Number.isFinite(p.hyd))return answer(false,'O estado do jogador ainda não está disponível.');const energy=Math.max(0,Math.min(22,100-p.en)),water=Math.max(0,Math.min(8,100-p.hyd));if(!energy&&!water)return answer(false,'Você já está com energia e hidratação completas. Guarde o lanche.');state.stock.compota--;p.en=Math.min(100,p.en+energy);p.hyd=Math.min(100,p.hyd+water);return announce('use',{item:'compota',amount:1,energy,hydration:water},'Compota: +'+Math.round(energy)+' energia e +'+Math.round(water)+' hidratação.');}
  const CORRAL={id:'curral',name:'Curral',x:548,y:918};
@@ -9515,7 +9721,7 @@ body.hud-game #legend{display:none !important;}
   api.registerInteraction('farm_life_station',o=>open(o.stationId==='quadro'?'orders':'production',o.stationId));
   api.registerInteraction('farm_life_clue',o=>{const result=inspect(o.clueId);if(result.ok){window.FarmValleyPanels?.openFarm('clues',o.clueId);api.playSfx?.('click');}else api.showToast?.(result.message,'info',3600);return true;});
  }
- window.FarmLife=Object.freeze({init(options={}){callbacks=options;return snapshot();},snapshot,serialize,restore,reset,update,build,maintain,craft,collect,deliverOrder,inspect,consume,care,refillIrrigation,footprint,
+ window.FarmLife=Object.freeze({init(options={}){callbacks=options;return snapshot();},snapshot,serialize,restore,reset,update,build,maintain,craft,collect,deliverOrder,deliveryMemory,inspect,consume,care,refillIrrigation,footprint,
   navigationVersion:()=>PROJECTS.reduce((mask,d,i)=>mask|(built(d.id)?1<<i:0),0),cacheInfo:()=>({sprites:sprites.size}),catalogue:()=>JSON.parse(JSON.stringify({projects:PROJECTS,recipes:RECIPES,clues:CLUES}))});
  (window.__farmBiomes=window.__farmBiomes||[]).push(register);
 })();
@@ -9779,6 +9985,97 @@ body.hud-game #legend{display:none !important;}
   function serialize(){return {version:1,studies:Array.from(learned),observations:observations.map(o=>({...o}))};}
   function restore(data){learned=new Set(Array.isArray(data?.studies)?data.studies.filter(id=>studies.some(s=>s.id===id)):[]);observations=[];if(Array.isArray(data?.observations))for(const o of data.observations.slice(-12)){if(!o||!Number.isFinite(o.temp)||!Number.isFinite(o.hyd))continue;observations.push({label:['Durante o descanso','Após esforço','Observação do vale'].includes(o.label)?o.label:'Observação do vale',temp:clamp(o.temp,32,43),hyd:clamp(o.hyd,0,1),vascular:['Dilatação favorecida','Constrição favorecida','Próximo ao basal'].includes(o.vascular)?o.vascular:'Próximo ao basal',structureId:byId(o.structureId).id,region:String(o.region||'farm').slice(0,24)});}mode='live';lastUi='';refreshStudy();renderJournal();}
   window.FarmSkinLearning={init,draw,onOpen,onClose,select,setMode,answer,observe,serialize,restore,reset(){restore(null);selected='glandula';studyId='evaporacao';refreshDetail();updateButtons();},snapshot(){const c=context();return {selected,mode,studyId,answered,studies:Array.from(learned),observations:observations.map(o=>({...o})),response:{temp:c.temp,hyd:c.hyd,vascular:c.vascular,heat:c.heat,cold:c.cold,sweat:c.sweat},structures:structures.map(s=>({...s}))};}};
+})();
+
+/* ================================
+   src/modules/39-valley-details.js
+   ================================ */
+/* Consequências visíveis, apoiadas em móveis que já existem.
+   Não cria objetos, colisões, interações, moedas nem campos de save. */
+(()=>{
+ 'use strict';
+ const P={ink:'#354d3e',dark:'#66513b',wood:'#aa8659',paper:'#e5d4a9',light:'#f0e4bc',green:'#7b9664',blue:'#6a9993',clay:'#bc8063'};
+ let revision=-1,saga=null,details=new Map(),seedBank=null,mentor=false,refreshes=0,workObjects=null,workshop=null;
+ const sprites=new Map(),MAX_SPRITES=16;
+ const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
+ function refresh(){
+  const api=window.FarmValleySaga,now=api?.revision?.()??0;
+  if(saga===api&&revision===now)return;
+  saga=api;revision=now;refreshes++;
+  details=new Map((api?.decorationState?.()||[]).map(d=>[d.surface,d]));
+  const world=api?.worldState?.();
+  seedBank=world?.archiveOpen?(world.sharedSeedBank?'shared':'catalogued'):null;
+  mentor=world?.roles?.tomas?.completed===true&&world.roles.tomas.variant===1;
+ }
+ function paint(g,surface,variant){
+  const x=16,y=26;
+  if(surface==='seedbox'){
+   if(variant==='shared'){
+    R(g,P.dark,x-10,y-14,20,6);R(g,P.wood,x-9,y-13,18,4);
+    R(g,P.dark,x-9,y-8,18,3);
+    for(let i=0;i<3;i++){R(g,[P.paper,P.green,P.clay][i],x-7+i*5,y-10,4,5);R(g,P.light,x-6+i*5,y-10,2,1);}
+   }else{R(g,P.paper,x-8,y-10,6,4);R(g,P.light,x+1,y-10,6,4);R(g,P.ink,x-7,y-8,3,1);R(g,P.ink,x+2,y-8,3,1);R(g,P.clay,x-1,y-9,2,4);}
+  }else if(surface==='notebook'){
+   R(g,P.dark,x-7,y-13,15,7);R(g,P.paper,x-6,y-13,13,6);R(g,P.light,x,y-13,1,6);
+   if(variant==='questions'){R(g,P.blue,x-5,y-12,4,1);R(g,P.ink,x-4,y-10,2,1);R(g,P.ink,x-4,y-8,1,1);R(g,P.clay,x+3,y-14,3,2);}
+   else for(let i=0;i<3;i++){R(g,[P.green,P.blue,P.clay][i],x-5,y-12+i*2,4,1);R(g,[P.clay,P.green,P.blue][i],x+2,y-12+i*2,4,1);}
+  }else if(surface==='workbench'){
+   if(variant==='signed'){R(g,P.dark,x-8,y-12,16,5);R(g,P.paper,x-7,y-11,14,3);R(g,P.ink,x-6,y-10,4,1);R(g,P.clay,x+1,y-10,5,1);}
+   else{R(g,P.dark,x-8,y-18,7,3);R(g,P.wood,x-8,y-19,6,2);R(g,P.paper,x-2,y-18,4,2);R(g,P.wood,x+2,y-20,6,4);R(g,P.light,x+2,y-20,5,1);}
+  }else if(surface==='routeboard'){
+   R(g,P.dark,x-5,y-12,11,10);R(g,P.paper,x-4,y-11,9,8);
+   if(variant==='notices'){R(g,P.blue,x-3,y-10,7,1);R(g,P.ink,x-3,y-7,5,1);R(g,P.clay,x+3,y-6,1,2);}
+   else{R(g,P.green,x-3,y-9,3,1);R(g,P.green,x-1,y-8,3,1);R(g,P.green,x+1,y-7,3,1);R(g,P.clay,x+3,y-6,1,1);}
+  }else if(surface==='reserve'){
+   R(g,P.paper,x-9,y-10,18,4);
+   if(variant==='community'){for(let i=0;i<3;i++)R(g,[P.green,P.blue,P.clay][i],x-7+i*5,y-9,3,2);}
+   else{R(g,P.green,x-6,y-9,5,2);R(g,P.clay,x+1,y-9,5,2);R(g,P.dark,x-1,y-7,2,3);}
+  }else if(surface==='mapboard'){
+   R(g,P.paper,x-8,y-5,16,5);R(g,P.light,x-3,y-5,1,5);
+   R(g,P.green,x-6,y-4,5,1);R(g,P.green,x-2,y-3,6,1);
+   if(variant==='presentation'){R(g,P.clay,x+4,y-2,3,1);R(g,P.ink,x+5,y-3,1,1);}
+   else{for(let i=0;i<3;i++)R(g,[P.clay,P.blue,P.green][i],x-6+i*5,y-1,3,1);}
+  }else if(surface==='archive'){
+   R(g,P.dark,x-9,y-10,18,4);R(g,P.paper,x-8,y-10,16,2);
+   if(variant==='shared'){for(let i=0;i<3;i++){R(g,[P.green,P.blue,P.clay][i],x-7+i*5,y-8,3,3);R(g,P.light,x-6+i*5,y-9,2,1);}}
+   else{R(g,P.paper,x-6,y-9,12,6);R(g,P.ink,x-4,y-8,7,1);R(g,P.ink,x-4,y-6,5,1);R(g,P.clay,x+4,y-9,2,5);}
+  }
+ }
+ function stamp(g,o,surface,variant){
+  const key=surface+':'+variant;let c=sprites.get(key);
+  if(!c){c=document.createElement('canvas');c.width=32;c.height=32;paint(c.getContext('2d'),surface,variant);
+   if(sprites.size>=MAX_SPRITES)sprites.delete(sprites.keys().next().value);sprites.set(key,c);}
+  g.drawImage(c,Math.round(o.x)-16,Math.round(o.y)-26);
+ }
+ function draw(g,o){
+  refresh();
+  const surface=o.type==='farm_life_project'&&o.projectId==='oficina'?'workbench':
+   o.type==='farm_life_clue'?({'carta-perdida':'seedbox','horta-caderno':'notebook','cabana-fita':'routeboard','oasis-caixa':'reserve','mapa-nico':'mapboard','arquivo-casa':'archive'})[o.clueId]:null;
+  if(!surface)return;
+  if(surface==='workbench'&&!(window.FarmLife?.navigationVersion?.()&1))return;
+  const variant=surface==='archive'?seedBank:details.get(surface)?.variant;
+  if(variant)stamp(g,o,surface,variant);
+ }
+ function mentorDestination(id,hour){
+  refresh();
+  if(!mentor||hour<11||hour>=15||!['tomas','nico'].includes(id)||!(window.FarmLife?.navigationVersion?.()&1))return null;
+  const objects=window.FarmBiomes?.scenes?.main?.objects;
+  if(objects!==workObjects){workObjects=objects;workshop=objects?.find(o=>o.type==='farm_life_project'&&o.projectId==='oficina');}
+  const work=workshop;
+  if(!work)return null;
+  return{key:'mentoria:'+id,x:work.x-24,y:work.y+(id==='tomas'?0:32),activity:id==='tomas'?'work':'observe',
+   label:id==='tomas'?'Ensinando Nico na oficina':'Praticando com Tomás',
+   line:id==='tomas'?'Hoje o martelo fica com Nico. Eu seguro a madeira e espero ele explicar o encaixe.':
+    'Tomás me deixou errar numa sobra de madeira. Já entendi por que ele guarda até os pedaços pequenos.'};
+ }
+ (window.__farmBiomes=window.__farmBiomes||[]).push(API=>{
+  for(const type of ['farm_life_project','farm_life_clue']){
+   const original=OBJECT_DRAWERS[type];if(!original)continue;
+   API.registerObjectDrawer(type,(o,g)=>{original(o,g);draw(g,o);});
+  }
+ });
+ window.FarmValleyDetails=Object.freeze({draw,mentorDestination,
+  info(){refresh();return{revision,refreshes,details:[...details.values()].map(d=>({...d})),seedBank,mentor,sprites:sprites.size,maxSprites:MAX_SPRITES};}});
 })();
 
 /* ============================
@@ -16010,7 +16307,7 @@ function windowsLit(){ return nightOverlayAlpha() > 0.10; }
 
 
 function updateAnimals(dt){
-  if(window.FarmAnimalLife){FarmAnimalLife.update(dt,objects,{cold:isFrio(),timeOfDay,reducedMotion:!!A11Y.reduceMotion});return;}
+  if(window.FarmAnimalLife){FarmAnimalLife.update(dt,objects,{cold:isFrio(),timeOfDay,reducedMotion:!!A11Y.reduceMotion,player:currentScene==='main'?player:null});return;}
   // Wander AI: each animal walks toward target, picks new target after pause
   for(const a of objects){
     if(a.type !== 'animal') continue;
@@ -16357,7 +16654,7 @@ function update(dt){
   if(player.temp>36.4) stats.coldFlag=false;
   player.moving = false;
   if(player.resting&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].some(key=>keys[key]))player.resting=false;
-  if(!player.resting){
+  if(!player.resting&&!window.FarmRestVisual?.blocksMovement?.(player,currentScene,!!A11Y.reduceMotion)){
     let dx=0,dy=0;
     if(keys['w']||keys['arrowup']) dy-=1;
     if(keys['s']||keys['arrowdown']) dy+=1;
@@ -16379,7 +16676,10 @@ function update(dt){
       if(player.hyd<20) speed *= 0.85;
       const oldX=player.x,oldY=player.y;
       const collides=(x,y,from)=>{
-        if(currentScene==='main'&&window.FarmWorldDepth)return FarmWorldDepth.isBlocked(x,y,from);
+        if(currentScene==='main'){
+          if(window.FarmAnimalLife?.blocksPlayer?.(x,y,from,objects))return true;
+          if(window.FarmWorldDepth)return FarmWorldDepth.isBlocked(x,y,from);
+        }
         const t=map[Math.floor(y/TS)]?.[Math.floor(x/TS)];
         if([undefined,T.WATER,T.RIVER,T.OASIS].includes(t)||furnitureCollides(x,y))return true;
         for(const o of objects)if(o.type==='gh_frame'){
@@ -17485,25 +17785,26 @@ function drawCrop(tx,ty,c){
   const px=tx*TS, py=ty*TS;
   const type = c.type || 'tomato';
   const winter = isFrio();
-  const t = performance.now()/700;
+  const reduced=!!A11Y.reduceMotion,t = reduced?0:performance.now()/700;
   // Subtle wind sway for tall plants (stage 2 and 3) — intensidade pelo vento global
   const _cwind = (typeof windStrength === 'number') ? windStrength : 1;
-  const sway = c.stage >= 2 ? Math.round(Math.sin(t + tx*0.3 + ty*0.2) * Math.min(1.6, _cwind)) : 0;
+  const sway = !reduced&&c.stage >= 2 ? Math.round(Math.sin(t + tx*0.3 + ty*0.2) * Math.min(1, _cwind)) : 0;
 
   // ===== Watered soil patch (darker = wet) =====
   if(c.water>0){
-    ctx.fillStyle = winter ? '#5e463a' : '#4a2e18';
-    ctx.fillRect(px+1, py+1, TS-2, TS-2);
-    // Wet soil shine
+    // A terra úmida conserva o sulco e tem borda recortada; não vira um
+    // quadrado preto sobre a textura do canteiro.
+    ctx.fillStyle = winter ? '#675847' : '#554532';
+    ctx.fillRect(px+4,py+2,8,12);ctx.fillRect(px+2,py+4,12,8);
+    ctx.fillStyle = winter ? '#796750' : '#73583d';
+    ctx.fillRect(px+3,py+5,9,1);ctx.fillRect(px+4,py+10,10,1);
+    // Umidade aparece em poucos reflexos, sem placa azul pulsante.
     if(c.water > 1){
-      ctx.fillStyle = `rgba(120,180,220,${0.18 + Math.sin(t*2)*0.06})`;
-      ctx.fillRect(px+2, py+2, TS-4, TS-4);
-      // Water droplet sparkles
-      ctx.fillStyle='rgba(180,220,250,0.7)';
-      ctx.fillRect(px+4, py+5, 1, 1); ctx.fillRect(px+10, py+9, 1, 1);
+      ctx.fillStyle='#93a998';
+      ctx.fillRect(px+4,py+6,2,1);ctx.fillRect(px+10,py+11,2,1);
     }
     // Soil texture (small clumps)
-    ctx.fillStyle = winter ? '#3e2a1c' : '#2e1a0c';
+    ctx.fillStyle = winter ? '#5d5145' : '#574730';
     ctx.fillRect(px+3, py+13, 1, 1); ctx.fillRect(px+11, py+3, 1, 1); ctx.fillRect(px+6, py+14, 1, 1);
   } else if(c.stage > 0) {
     // Slightly cracked dry soil ring around plant
@@ -17514,46 +17815,46 @@ function drawCrop(tx,ty,c){
   if(c.stage===1){
     // ===== Stage 1 — sprout (tiny seedling with cotyledons) =====
     // Stem
-    ctx.fillStyle = winter ? '#607a57' : '#3e8636';
+    ctx.fillStyle = winter ? '#607a57' : '#526c42';
     ctx.fillRect(px+7, py+11, 1, 3);
     // Cotyledons (two opposite leaves)
-    ctx.fillStyle = winter ? '#8aab7d' : '#7ad07b';
+    ctx.fillStyle = winter ? '#8aab7d' : '#8aa369';
     ctx.fillRect(px+5, py+10, 2, 2);
     ctx.fillRect(px+8, py+10, 2, 2);
     // Highlight on leaves
-    ctx.fillStyle = winter ? '#a8c595' : '#9be090';
+    ctx.fillStyle = winter ? '#a8c595' : '#b4c68d';
     ctx.fillRect(px+5, py+10, 1, 1); ctx.fillRect(px+8, py+10, 1, 1);
     // Tiny center bud
-    ctx.fillStyle = winter ? '#b8d4a8' : '#8be068';
+    ctx.fillStyle = winter ? '#b8d4a8' : '#a0b477';
     ctx.fillRect(px+7, py+9, 1, 1);
   }
   else if(c.stage===2){
     // ===== Stage 2 — growing (taller, more leaves) =====
     // Main stem
-    ctx.fillStyle = winter ? '#56755c' : '#2f6b2d';
+    ctx.fillStyle = winter ? '#56755c' : '#48613e';
     ctx.fillRect(px+7+sway, py+5, 2, 9);
-    ctx.fillStyle = winter ? '#3e5a44' : '#1f4f1f';
+    ctx.fillStyle = winter ? '#3e5a44' : '#354d37';
     ctx.fillRect(px+7+sway, py+5, 1, 9);  // shadow side
 
     // Leaves (multi-layer)
-    ctx.fillStyle = winter ? '#5a8060' : '#3a8b3a';
+    ctx.fillStyle = winter ? '#5a8060' : '#587447';
     ctx.fillRect(px+4+sway, py+7, 4, 2);
     ctx.fillRect(px+8+sway, py+9, 4, 2);
-    ctx.fillStyle = winter ? '#88a98a' : '#56b85a';
+    ctx.fillStyle = winter ? '#88a98a' : '#81965e';
     ctx.fillRect(px+4+sway, py+7, 4, 1);
     ctx.fillRect(px+8+sway, py+9, 4, 1);
     // Leaf veins
-    ctx.fillStyle = winter ? '#3e5a44' : '#2a6020';
+    ctx.fillStyle = winter ? '#3e5a44' : '#425d3b';
     ctx.fillRect(px+6+sway, py+7, 1, 2);
     ctx.fillRect(px+10+sway, py+9, 1, 2);
     // Leaf tip highlights
-    ctx.fillStyle = winter ? '#b0d0b0' : '#86d068';
+    ctx.fillStyle = winter ? '#b0d0b0' : '#acbf7c';
     ctx.fillRect(px+4+sway, py+7, 1, 1); ctx.fillRect(px+11+sway, py+9, 1, 1);
 
     if(type==='corn'){
       // Forming corn (yellow-green sheath)
-      ctx.fillStyle='#c0d048'; ctx.fillRect(px+7+sway, py+5, 2, 5);
-      ctx.fillStyle='#a0b830'; ctx.fillRect(px+7+sway, py+9, 2, 1);
+      ctx.fillStyle='#b9ba6e'; ctx.fillRect(px+7+sway, py+5, 2, 5);
+      ctx.fillStyle='#8f9b52'; ctx.fillRect(px+7+sway, py+9, 2, 1);
       // First silk
       ctx.fillStyle='#fff5a0'; ctx.fillRect(px+8+sway, py+4, 1, 2);
     } else if(type==='carrot'){
@@ -17562,26 +17863,26 @@ function drawCrop(tx,ty,c){
       ctx.fillStyle='#ffb15a'; ctx.fillRect(px+7+sway, py+11, 1, 1);
     } else if(type==='lettuce'){
       // Loose lettuce leaves forming
-      ctx.fillStyle='#5fa84a'; ctx.fillRect(px+5+sway, py+8, 6, 4);
-      ctx.fillStyle='#7bd167'; ctx.fillRect(px+5+sway, py+8, 6, 2);
-      ctx.fillStyle='#a8e890'; ctx.fillRect(px+5+sway, py+8, 1, 1); ctx.fillRect(px+9+sway, py+8, 1, 1);
+      ctx.fillStyle='#6e8850'; ctx.fillRect(px+5+sway, py+8, 6, 4);
+      ctx.fillStyle='#99b175'; ctx.fillRect(px+5+sway, py+8, 6, 2);
+      ctx.fillStyle='#c0cf97'; ctx.fillRect(px+5+sway, py+8, 1, 1); ctx.fillRect(px+9+sway, py+8, 1, 1);
     } else if(type==='sweetpotato'){
       // Sweet potato vine (long sprawling leaves)
-      ctx.fillStyle='#3a8b3a'; ctx.fillRect(px+4+sway, py+9, 8, 3);
-      ctx.fillStyle='#56b85a'; ctx.fillRect(px+4+sway, py+9, 8, 1);
+      ctx.fillStyle='#587447'; ctx.fillRect(px+4+sway, py+9, 8, 3);
+      ctx.fillStyle='#81965e'; ctx.fillRect(px+4+sway, py+9, 8, 1);
       // Heart-shaped leaves
-      ctx.fillStyle='#7bd167'; ctx.fillRect(px+4+sway, py+8, 2, 2); ctx.fillRect(px+10+sway, py+8, 2, 2);
+      ctx.fillStyle='#99b175'; ctx.fillRect(px+4+sway, py+8, 2, 2); ctx.fillRect(px+10+sway, py+8, 2, 2);
     } else if(type==='pumpkin'){
       // Big sprawling vine with first orange fruit forming
-      ctx.fillStyle='#3a8b3a'; ctx.fillRect(px+3+sway, py+10, 10, 3);
-      ctx.fillStyle='#56b85a'; ctx.fillRect(px+3+sway, py+8, 4, 2); ctx.fillRect(px+9+sway, py+8, 4, 2);
-      ctx.fillStyle='#7bd167'; ctx.fillRect(px+3+sway, py+8, 1, 1); ctx.fillRect(px+12+sway, py+8, 1, 1);
+      ctx.fillStyle='#587447'; ctx.fillRect(px+3+sway, py+10, 10, 3);
+      ctx.fillStyle='#81965e'; ctx.fillRect(px+3+sway, py+8, 4, 2); ctx.fillRect(px+9+sway, py+8, 4, 2);
+      ctx.fillStyle='#99b175'; ctx.fillRect(px+3+sway, py+8, 1, 1); ctx.fillRect(px+12+sway, py+8, 1, 1);
       // Tiny orange flower
       ctx.fillStyle='#ee7a1f'; ctx.fillRect(px+7+sway, py+7, 2, 2);
       ctx.fillStyle='#ffb15a'; ctx.fillRect(px+7+sway, py+7, 1, 1);
     } else if(type==='forage'){
       // Multiple stalks
-      ctx.fillStyle = winter ? '#82b23f' : '#8fcf45';
+      ctx.fillStyle = winter ? '#889c65' : '#91a765';
       ctx.fillRect(px+4+sway, py+7, 2, 6);
       ctx.fillRect(px+7+sway, py+5, 2, 8);
       ctx.fillRect(px+10+sway, py+8, 2, 5);
@@ -17593,8 +17894,8 @@ function drawCrop(tx,ty,c){
       ctx.fillRect(px+5+sway, py+5, 1, 1); ctx.fillRect(px+9+sway, py+6, 1, 1);
     } else {
       // Tomato — small green tomatoes forming
-      ctx.fillStyle='#7ad07b'; ctx.fillRect(px+6+sway, py+8, 2, 2);
-      ctx.fillStyle='#a8e890'; ctx.fillRect(px+6+sway, py+8, 1, 1);
+      ctx.fillStyle='#8aa369'; ctx.fillRect(px+6+sway, py+8, 2, 2);
+      ctx.fillStyle='#c0cf97'; ctx.fillRect(px+6+sway, py+8, 1, 1);
       // Yellow flower (will become tomato)
       ctx.fillStyle='#ffd85a'; ctx.fillRect(px+9+sway, py+6, 1, 1);
       ctx.fillStyle='#fff5b8'; ctx.fillRect(px+9+sway, py+6, 1, 1);
@@ -17606,19 +17907,19 @@ function drawCrop(tx,ty,c){
     const ripePulse = 0.5 + Math.sin(t*2)*0.5;
 
     // Stem
-    ctx.fillStyle = winter ? '#56755c' : '#2f6b2d';
+    ctx.fillStyle = winter ? '#56755c' : '#48613e';
     ctx.fillRect(px+7+sway, py+8, 2, 6);
-    ctx.fillStyle = winter ? '#87a987' : '#56b85a';
+    ctx.fillStyle = winter ? '#87a987' : '#81965e';
     ctx.fillRect(px+4+sway, py+10, 3, 2);
     ctx.fillRect(px+9+sway, py+10, 3, 2);
     // Lower leaf shadow
-    ctx.fillStyle = winter ? '#3e5a44' : '#1f4f1f';
+    ctx.fillStyle = winter ? '#3e5a44' : '#354d37';
     ctx.fillRect(px+4+sway, py+12, 3, 1); ctx.fillRect(px+9+sway, py+12, 3, 1);
 
     if(type==='corn'){
       // Corn cob with kernels
-      ctx.fillStyle='#1f4f1f'; ctx.fillRect(px+5+sway, py+4, 6, 10);  // outer husk leaves
-      ctx.fillStyle='#2e7a36'; ctx.fillRect(px+6+sway, py+4, 4, 9);
+      ctx.fillStyle='#354d37'; ctx.fillRect(px+5+sway, py+4, 6, 10);  // outer husk leaves
+      ctx.fillStyle='#5c7445'; ctx.fillRect(px+6+sway, py+4, 4, 9);
       // Kernels (yellow)
       ctx.fillStyle='#ffd34a'; ctx.fillRect(px+7+sway, py+5, 3, 6);
       // Kernel grid
@@ -17636,12 +17937,12 @@ function drawCrop(tx,ty,c){
       ctx.fillRect(px+9+sway, py+4, 1, 1);
     } else if(type==='carrot'){
       // Lush green tops
-      ctx.fillStyle = winter ? '#7c986d' : '#2f6b2d';
+      ctx.fillStyle = winter ? '#7c986d' : '#48613e';
       ctx.fillRect(px+4+sway, py+3, 1, 4); ctx.fillRect(px+6+sway, py+2, 1, 5);
       ctx.fillRect(px+8+sway, py+3, 1, 4); ctx.fillRect(px+10+sway, py+3, 1, 4);
-      ctx.fillStyle = winter ? '#a8c595' : '#56b85a';
+      ctx.fillStyle = winter ? '#a8c595' : '#81965e';
       ctx.fillRect(px+5+sway, py+4, 1, 3); ctx.fillRect(px+7+sway, py+3, 1, 4); ctx.fillRect(px+9+sway, py+4, 1, 3);
-      ctx.fillStyle = '#86d068';
+      ctx.fillStyle = '#acbf7c';
       ctx.fillRect(px+6+sway, py+2, 1, 1); ctx.fillRect(px+8+sway, py+3, 1, 1);
       // Carrot body (orange)
       ctx.fillStyle='#ee7a1f'; ctx.fillRect(px+6+sway, py+7, 4, 6);
@@ -17654,32 +17955,32 @@ function drawCrop(tx,ty,c){
       ctx.fillStyle='#c8500c';
       ctx.fillRect(px+6+sway, py+9, 4, 1); ctx.fillRect(px+6+sway, py+11, 4, 1);
     } else if(type==='lettuce'){
-      // Big lettuce head — concentric leaf rings
-      ctx.fillStyle='#2f6b2d';
-      ctx.beginPath(); ctx.ellipse(px+8+sway, py+10, 6, 5, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='#3a8b3a';
-      ctx.beginPath(); ctx.ellipse(px+8+sway, py+10, 5, 4, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='#5fa84a';
-      ctx.beginPath(); ctx.ellipse(px+8+sway, py+10, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='#7bd167';
-      ctx.beginPath(); ctx.ellipse(px+8+sway, py+9, 3, 2, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='#a8e890';
+      // Folhas sobrepostas com recortes inteiros, na mesma grade dos cultivos.
+      ctx.fillStyle='#48613e';
+      ctx.fillRect(px+5+sway,py+5,6,10);ctx.fillRect(px+3+sway,py+7,10,6);ctx.fillRect(px+2+sway,py+9,12,3);
+      ctx.fillStyle='#587447';
+      ctx.fillRect(px+5+sway,py+6,6,8);ctx.fillRect(px+4+sway,py+8,8,5);
+      ctx.fillStyle='#6e8850';
+      ctx.fillRect(px+5+sway,py+8,6,5);ctx.fillRect(px+4+sway,py+9,8,2);
+      ctx.fillStyle='#99b175';
+      ctx.fillRect(px+6+sway,py+7,4,4);ctx.fillRect(px+5+sway,py+8,6,2);
+      ctx.fillStyle='#c0cf97';
       ctx.fillRect(px+7+sway, py+9, 2, 1);
       // Outer leaf veins
-      ctx.fillStyle='#1f4f1f';
+      ctx.fillStyle='#354d37';
       ctx.fillRect(px+3+sway, py+10, 1, 2); ctx.fillRect(px+12+sway, py+10, 1, 2);
       // Ripe sparkle
       ctx.fillStyle = `rgba(180,255,150,${ripePulse})`;
       ctx.fillRect(px+8+sway, py+5, 1, 1);
     } else if(type==='sweetpotato'){
       // Sweet potato — purple-red tubers with vine on top
-      ctx.fillStyle = winter ? '#7c986d' : '#3a8b3a';
+      ctx.fillStyle = winter ? '#7c986d' : '#587447';
       ctx.fillRect(px+3+sway, py+5, 2, 5); ctx.fillRect(px+11+sway, py+5, 2, 5);
-      ctx.fillStyle = winter ? '#a8c595' : '#56b85a';
+      ctx.fillStyle = winter ? '#a8c595' : '#81965e';
       ctx.fillRect(px+3+sway, py+5, 1, 5); ctx.fillRect(px+11+sway, py+5, 1, 5);
       // Heart leaves
-      ctx.fillStyle='#56b85a'; ctx.fillRect(px+4+sway, py+4, 3, 2); ctx.fillRect(px+9+sway, py+4, 3, 2);
-      ctx.fillStyle='#7bd167'; ctx.fillRect(px+4+sway, py+4, 1, 1); ctx.fillRect(px+9+sway, py+4, 1, 1);
+      ctx.fillStyle='#81965e'; ctx.fillRect(px+4+sway, py+4, 3, 2); ctx.fillRect(px+9+sway, py+4, 3, 2);
+      ctx.fillStyle='#99b175'; ctx.fillRect(px+4+sway, py+4, 1, 1); ctx.fillRect(px+9+sway, py+4, 1, 1);
       // Tubers (purple-red oval)
       ctx.fillStyle='#7c281e'; ctx.fillRect(px+5+sway, py+9, 6, 5);
       ctx.fillStyle='#a04030'; ctx.fillRect(px+5+sway, py+9, 6, 4);
@@ -17693,15 +17994,15 @@ function drawCrop(tx,ty,c){
       ctx.fillRect(px+5+sway, py+9, 1, 1);
     } else if(type==='pumpkin'){
       // Mature pumpkin — big orange ridged round
-      ctx.fillStyle='#3a8b3a';
+      ctx.fillStyle='#587447';
       ctx.fillRect(px+2+sway, py+12, 12, 1);  // ground vine
-      ctx.fillStyle='#56b85a';
+      ctx.fillStyle='#81965e';
       ctx.fillRect(px+1+sway, py+11, 3, 1); ctx.fillRect(px+12+sway, py+11, 3, 1);
       // Pumpkin body — round ellipse
       ctx.fillStyle='#a04010';
-      ctx.beginPath(); ctx.ellipse(px+8+sway, py+9, 6, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillRect(px+4+sway,py+4,8,10);ctx.fillRect(px+2+sway,py+6,12,6);
       ctx.fillStyle='#ee7a1f';
-      ctx.beginPath(); ctx.ellipse(px+8+sway, py+9, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillRect(px+4+sway,py+5,8,8);ctx.fillRect(px+3+sway,py+7,10,4);
       // Vertical ridges (the iconic pumpkin grooves)
       ctx.fillStyle='#c85a18';
       ctx.fillRect(px+5+sway, py+5, 1, 8);
@@ -17711,22 +18012,22 @@ function drawCrop(tx,ty,c){
       ctx.fillStyle='#ffb15a';
       ctx.fillRect(px+3+sway, py+8, 1, 3);
       // Stem (green-brown)
-      ctx.fillStyle='#3e6b1f'; ctx.fillRect(px+7+sway, py+3, 2, 3);
-      ctx.fillStyle='#56932a'; ctx.fillRect(px+7+sway, py+3, 1, 3);
+      ctx.fillStyle='#526b3b'; ctx.fillRect(px+7+sway, py+3, 2, 3);
+      ctx.fillStyle='#789452'; ctx.fillRect(px+7+sway, py+3, 1, 3);
       // Curly tendril
-      ctx.fillStyle='#56b85a'; ctx.fillRect(px+9+sway, py+3, 1, 1); ctx.fillRect(px+10+sway, py+2, 1, 1);
+      ctx.fillStyle='#81965e'; ctx.fillRect(px+9+sway, py+3, 1, 1); ctx.fillRect(px+10+sway, py+2, 1, 1);
       // Ripe sparkle
       ctx.fillStyle = `rgba(255,180,80,${ripePulse})`;
       ctx.fillRect(px+5+sway, py+5, 1, 1); ctx.fillRect(px+11+sway, py+6, 1, 1);
     } else if(type==='forage'){
       // Tall mature forage (multiple golden stalks with seed heads)
-      ctx.fillStyle = winter ? '#6f9545' : '#4f9b36';
+      ctx.fillStyle = winter ? '#6f9545' : '#6a834b';
       ctx.fillRect(px+3+sway, py+7, 2, 7);
       ctx.fillRect(px+6+sway, py+4, 2, 10);
       ctx.fillRect(px+9+sway, py+5, 2, 9);
       ctx.fillRect(px+12+sway, py+8, 1, 6);
       // Stem highlight
-      ctx.fillStyle = winter ? '#a0c875' : '#7bd167';
+      ctx.fillStyle = winter ? '#b3c184' : '#99b175';
       ctx.fillRect(px+3+sway, py+7, 1, 7); ctx.fillRect(px+6+sway, py+4, 1, 10);
       // Seed heads (golden)
       ctx.fillStyle='#d9c27a';
@@ -17742,7 +18043,7 @@ function drawCrop(tx,ty,c){
     } else {
       // Tomato cluster — multiple round red tomatoes
       // Vine support
-      ctx.fillStyle='#3e8636'; ctx.fillRect(px+6+sway, py+3, 1, 5); ctx.fillRect(px+10+sway, py+3, 1, 5);
+      ctx.fillStyle='#526c42'; ctx.fillRect(px+6+sway, py+3, 1, 5); ctx.fillRect(px+10+sway, py+3, 1, 5);
       // Tomato 1 (big, center)
       ctx.fillStyle='#a82a1c'; ctx.fillRect(px+5+sway, py+4, 6, 5);
       ctx.fillStyle='#e84a2a'; ctx.fillRect(px+5+sway, py+4, 5, 4);
@@ -17753,10 +18054,10 @@ function drawCrop(tx,ty,c){
       ctx.fillStyle='#ee5e3a'; ctx.fillRect(px+11+sway, py+5, 2, 2);
       ctx.fillStyle='#fff5e0'; ctx.fillRect(px+11+sway, py+5, 1, 1);
       // Stem cap (green)
-      ctx.fillStyle='#3e8636';
+      ctx.fillStyle='#526c42';
       ctx.fillRect(px+7+sway, py+3, 2, 2);
       ctx.fillRect(px+6+sway, py+3, 1, 1); ctx.fillRect(px+9+sway, py+3, 1, 1);
-      ctx.fillStyle='#56b85a'; ctx.fillRect(px+7+sway, py+3, 1, 1);
+      ctx.fillStyle='#81965e'; ctx.fillRect(px+7+sway, py+3, 1, 1);
       // Ripe sparkle
       ctx.fillStyle = `rgba(255,180,150,${ripePulse})`;
       ctx.fillRect(px+5+sway, py+4, 1, 1);

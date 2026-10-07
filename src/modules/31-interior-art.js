@@ -10,6 +10,22 @@
   function panel(g,x,y,w,h,c=P.wood){R(g,P.edge,x,y,w,h);R(g,c,x+1,y+1,w-2,h-2);R(g,P.light,x+1,y+1,w-2,1);R(g,P.dark,x+w-3,y+2,2,h-3);}
   function plank(g,x,y,w,h,c=P.wood){R(g,P.dark,x,y,w,h);R(g,c,x,y,w,h-1);R(g,P.light,x,y,w,1);}
   function stone(g,x,y,w,h){R(g,P.edge,x,y,w,h);for(let yy=1;yy<h-1;yy+=6)for(let xx=1;xx<w-1;xx+=8){const ww=Math.min(7,w-xx-1),hh=Math.min(5,h-yy-1);R(g,(xx+yy)%3?P.stone:'#9da190',x+xx,y+yy,ww,hh);R(g,'#b9baa2',x+xx,y+yy,ww,1);}}
+  function stoneFloor(g,x,y,w,h){
+   // Lajes desencontradas; juntas finas conservam a leitura do chão sob os
+   // móveis, sem a grade de alto contraste da antiga área do fogão.
+   R(g,'#7f8475',x,y,w,h);
+   for(let row=0,yy=0;yy<h;row++,yy+=13){
+    const offset=row%2?10:0;
+    for(let col=-1,xx=-offset;xx<w;col++,xx+=21){
+     const left=Math.max(0,xx),right=Math.min(w,xx+20),hh=Math.min(12,h-yy);
+     if(right<=left)continue;
+     R(g,['#9d9f89','#979b86','#a4a58f'][(row+col+6)%3],x+left,y+yy,right-left,hh);
+     R(g,'#b0b09a',x+left+1,y+yy,Math.max(0,right-left-2),1);
+     if((row+col)%3===0&&right-left>10)R(g,'#929783',x+left+5,y+yy+5,5,1);
+    }
+   }
+   R(g,'rgba(47,54,39,.13)',x,y+h-1,w,1);
+  }
   function rug(g,x,y,w,h){R(g,'#796755',x,y,w,h);R(g,'#a96854',x+1,y+1,w-2,h-2);R(g,'#d1a171',x+3,y+3,w-6,h-6);R(g,'#866f57',x+4,y+4,w-8,h-8);R(g,'#9f7659',x+6,y+6,w-12,h-12);
    for(let yy=9;yy<h-6;yy+=12)for(let xx=10;xx<w-8;xx+=14){R(g,'#c2aa79',x+xx,y+yy,4,1);R(g,'#c2aa79',x+xx+1,y+yy-1,2,3);}for(let xx=2;xx<w-2;xx+=3){R(g,P.linen,x+xx,y-1,1,2);R(g,P.linen,x+xx,y+h-1,1,2);}}
   function lamp(g,x,y){R(g,P.edge,x,y,3,5);R(g,P.gold,x+1,y+1,1,3);R(g,P.light,x-1,y-1,5,2);}
@@ -18,20 +34,28 @@
    const room=scenes[scene],w=room.MW*TS,h=room.MH*TS,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
    if(scene==='greenhouse'){
     // A estufa é um recinto de vidro dentro de uma cena ao ar livre.
-    for(let y=4;y<16;y++)for(let x=6;x<26;x++){
+    for(let y=4;y<16;y++)for(let x=5;x<26;x++){
      const t=room.map[y][x];if(t===T.FIELD)continue;
-     const path=t===T.STONE;R(g,path?'#899786':'#b4bb9d',x*TS,y*TS,TS,TS);
-     R(g,path?'#a6b29c':'#c6cdb1',x*TS+1,y*TS+1,TS-2,1);R(g,path?'#798b7e':'#a8b797',x*TS+TS-1,y*TS,1,TS);
-     if((x+y)%3===0)R(g,path?'#82927c':'#9caf99',x*TS+4,y*TS+9,7,1);
+     const path=t===T.STONE,left=x*TS+(x===5?4:0),width=x===5?12:TS;
+     R(g,path?'#879382':'#a7b196',left,y*TS,width,TS);
+     // Só algumas juntas recebem luz; não transforma o vidro em xadrez.
+     if(path){R(g,'#9ba690',left+1,y*TS+1,width-2,1);R(g,'#7e8b7b',left,y*TS+TS-1,width,1);}
+     else if((x+y)%4===0)R(g,'#b5bfa4',left+2,y*TS+5,Math.min(7,width-3),1);
+     if((x+y)%5===0)R(g,path?'#7b8b76':'#9eaa90',left+3,y*TS+11,Math.min(5,width-4),1);
     }
-    for(let x=112;x<412;x+=64){g.fillStyle='rgba(235,238,189,.10)';g.beginPath();g.moveTo(x,62);g.lineTo(x+15,62);g.lineTo(x-20,252);g.lineTo(x-35,252);g.fill();}
+    // Montantes existentes projetados sobre o piso, presos ao recinto.
+    // Esta camada nasce uma vez no cache e fica atrás de plantas e pessoas.
+    g.save();g.beginPath();g.rect(84,68,328,184);g.clip();
+    for(let x=112;x<412;x+=64){g.fillStyle='rgba(231,237,190,.08)';g.beginPath();g.moveTo(x,68);g.lineTo(x+15,68);g.lineTo(x-12,252);g.lineTo(x-27,252);g.fill();
+     g.fillStyle='rgba(46,66,49,.075)';g.beginPath();g.moveTo(x-4,68);g.lineTo(x-1,68);g.lineTo(x-28,252);g.lineTo(x-31,252);g.fill();}
+    R(g,'rgba(37,59,41,.12)',84,68,328,4);R(g,'rgba(37,59,41,.10)',84,68,3,184);R(g,'rgba(37,59,41,.08)',408,68,4,184);g.restore();
    }else{
     const barn=scene==='barn';R(g,barn?'#8c795b':'#ad926f',0,0,w,h);
     for(let y=16;y<h;y+=8)for(let x=-((y/8%2)*20);x<w;x+=40){const v=(Math.floor((x+80)/40)+y/8)%3;
      R(g,barn?['#8d7959','#937e5d','#887654'][v]:['#b19773','#b69b76','#ae936e'][v],x,y,39,7);R(g,barn?'#a28d66':'#c3aa82',x,y,39,1);R(g,'rgba(60,46,30,.12)',x+1,y+6,37,1);
      if((x+y)%3===0){R(g,barn?'#7c6a4e':'#a38a66',x+6,y+3,12,1);R(g,barn?'#ad9570':'#c2aa81',x+12,y+4,9,1);}}
-    if(!barn){rug(g,16,17,64,76);rug(g,32,110,160,35);stone(g,144,17,64,78);}
-    else{R(g,'#b4a06a',16,17,64,79);for(let i=0;i<85;i++){const x=18+(i*31)%60,y=19+(i*17)%73;R(g,i%3?'#c4b47c':'#95875d',x,y,3+i%4,1);}stone(g,176,17,64,79);}
+    if(!barn){rug(g,16,17,64,76);rug(g,32,110,160,35);stoneFloor(g,144,17,64,78);}
+    else{R(g,'#b4a06a',16,17,64,79);for(let i=0;i<85;i++){const x=18+(i*31)%60,y=19+(i*17)%73;R(g,i%3?'#c4b47c':'#95875d',x,y,3+i%4,1);}stoneFloor(g,176,17,64,79);}
     // Parede alta ao norte, rodapé e duas laterais com faces diferentes.
     R(g,barn?'#6f5b45':'#b7b7a0',0,0,w,16);R(g,barn?'#897456':'#d0cbb2',4,2,w-8,10);R(g,barn?'#a38b64':'#ddd4b8',4,2,w-8,2);
     if(barn)for(let x=6;x<w;x+=16){R(g,P.dark,x,1,2,12);R(g,P.light,x+2,1,1,12);}
@@ -51,7 +75,12 @@
    if(!['house','barn','greenhouse'].includes(currentScene))return;
    g.drawImage(roomSurface(currentScene),0,0);
    if(currentScene==='house'){
-    const night=typeof windowsLit==='function'&&windowsLit();g.fillStyle=night?'rgba(238,197,111,.035)':'rgba(239,228,168,.12)';g.beginPath();g.moveTo(98,16);g.lineTo(142,16);g.lineTo(161,89);g.lineTo(90,89);g.fill();
+    const night=typeof windowsLit==='function'&&windowsLit();
+    if(!night){
+     g.fillStyle='rgba(239,228,168,.10)';g.beginPath();g.moveTo(99,17);g.lineTo(141,17);g.lineTo(154,88);g.lineTo(90,88);g.fill();
+     // Sombra da divisão da janela acompanha o feixe, sem cobrir móveis.
+     g.fillStyle='rgba(82,83,56,.07)';g.beginPath();g.moveTo(119,17);g.lineTo(121,17);g.lineTo(123,88);g.lineTo(120,88);g.fill();
+    }
    }
   }
   function bed(o,g,cot=false){const{x,y,w=48,h=32}=o;shadow(g,x,y+h-2,w,4);R(g,P.edge,x,y+2,w,h-1);R(g,P.dark,x+2,y+h-5,w-4,7);

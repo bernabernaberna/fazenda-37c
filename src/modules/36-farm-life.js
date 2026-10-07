@@ -42,13 +42,41 @@
   {id:'mesa-lia',npcId:'lia',title:'Uma mesa para todos',description:'Lia organiza um lanche depois da caminhada do vale: leite e um pouco de mel.',cost:{items:{leite:2,mel:1}},reward:34},
   {id:'rota-caio',npcId:'caio',title:'Provisões de Caio',description:'Caio prepara provisões para os visitantes do oásis; ninguém precisa caminhar de estômago vazio.',cost:{items:{fruta:2,mel:1}},reward:30}
  ];
+ // A lembrança vem da entrega efetiva já salva. Ler uma fala não consome a
+ // lembrança, não reinicia o prazo e não cria uma segunda recompensa.
+ const DELIVERY_LINES={
+  rosa:[
+   'Recebi seus vegetais e a fruta. Vou separar a cesta para quem ainda não consegue vir à feira. Obrigada por lembrar de quem fica em casa.',
+   'Outra cesta pronta. Dessa vez não precisei escolher quem ia esperar. Deixe que eu faça as visitas; você já cuidou da sua parte.',
+   'A cesta que você trouxe me deu um bom motivo para bater em algumas portas. Na próxima quero trazer notícias, além da cesta vazia.'],
+  lia:[
+   'O leite e o mel chegaram. Separei o lanche para depois da caminhada. Fica mais fácil ouvir as observações quando ninguém está pensando só no estômago.',
+   'Recebi o lanche de novo. Vou dividir as porções antes de abrir o caderno, senão começo a explicar e esqueço a colher na mão.',
+   'Obrigada pelo leite e pelo mel que trouxe. O lanche faz parte da caminhada; custei um pouco a incluir essa linha no meu planejamento.'],
+  tomas:[
+   'Conferi o feno e a fruta da sua entrega. Um vai para a criação dos vizinhos, a outra para quem me ajuda. Não precisamos conferir duas vezes. Estou praticando.',
+   'Mais uma entrega certa. Já separei a parte dos vizinhos. A fruta eu guardo longe da serragem: essa organização aprendi por experiência.',
+   'Aquela entrega ajudou a dividir o serviço da horta. Feno para os animais, fruta para a pausa. Um combinado que coube no dia.'],
+  ines:[
+   'A lã e o mel chegaram. Vou levar o cobertor e o chá para a cabana. Gosto de preparar a chegada antes de contar as pegadas.',
+   'Conferi sua nova entrega. A reserva da cabana ganhou mais uma tentativa. Agora me cabe levar tudo sem transformar a subida numa corrida.',
+   'Lembro da lã e do mel que você separou. Quando confiro o apoio da cabana, confiro também esse trabalho de quem ficou lá embaixo.'],
+  caio:[
+   'Recebi as frutas e o mel. Vou separar as provisões para quem vier ao oásis. Sua parte está feita; escolher como receber as pessoas fica comigo.',
+   'Outra entrega conferida. Obrigado por manter o combinado sem decidir por mim o que precisa mudar por aqui. As caixas cabem na reserva.',
+   'As provisões que você trouxe entraram no preparo das visitas. A conta era simples; receber companhia era a parte que eu precisava praticar.'],
+  nico:[
+   'A compota e os ovos chegaram! Lanche para dois, como prometi. Agora falta perguntar quem quer ir comigo, antes de desenhar nós dois na expedição.',
+   'Já conferi a nova provisão. Comida para dois, outra vez. Estou ficando muito bom em não planejar uma expedição de doze pessoas com dois ovos.',
+   'Ainda lembro da sua entrega: compota, ovos e uma boa desculpa para convidar alguém. Planejar o lanche ajudou a diminuir o tamanho impossível da expedição.']
+ };
  const CLUES=[
-  {id:'carta-perdida',title:'Uma dobra na carta',x:208,y:896,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Uma dobra guarda terra fresca da horta.'},
+  {id:'carta-perdida',title:'Uma dobra na carta',x:208,y:896,text:'O envelope tem três riscos e nenhum remetente. “Quando a casa voltar a ouvir gente, procure onde os três caminhos se encontram.” Um traço de grafite atravessa a terra fresca da dobra; o canto foi dobrado em triângulo.'},
   {id:'ponte-marca',title:'Marcas sob a ponte',x:720,y:936,text:'O verso da placa tem uma seta feita para virar. Tomás reconhece o encaixe: estas marcas orientavam as trocas antes da ventania.'},
   {id:'horta-caderno',title:'O caderno da horta',x:332,y:976,text:'Três colunas dizem “alto, margem, areia”. São os lugares de quem guardou as amostras antes da ventania, não coordenadas de um tesouro.'},
   {id:'cabana-fita',title:'Uma fita na cabana',x:520,y:272,text:'Uma fita de lã prende um recado de Inês, datado de antes da ventania: “Reserva entregue; se a neve fechar a rota, a próxima tentativa continua aqui.”'},
   {id:'oasis-caixa',title:'A caixa do oásis',x:640,y:1812,text:'A etiqueta tem as assinaturas de Rosa e Caio: “Esta reserva pertence ao vale. Não confundir troca com dívida.” A rede também alcançava o oásis.'},
-  {id:'mapa-nico',title:'O mapa de Nico',x:624,y:1064,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Você já conhecia esta ideia.'},
+  {id:'mapa-nico',title:'O mapa de Nico',x:624,y:1064,text:'As rotas se sobrepõem e deixam a Casa no centro. Um rascunho tem a assinatura de Alex: “Não guardar tudo no mesmo teto.” Na cópia recente, o lápis escapou junto ao canto dobrado em triângulo, como no envelope.'},
   {id:'arquivo-casa',title:'O arquivo da Casa',x:650,y:1264,text:'O acordo distribuía amostras entre os três biomas e previa encontros para comparar o que crescia. Os papéis voaram; o silêncio desfez os encontros. As sementes já estavam protegidas pela rede.'}
  ];
  let callbacks={},API=null,state=fresh(),animalCache={objects:null,length:0,list:[]};
@@ -91,7 +119,8 @@
  function healthy(kind,value){return animals(value).some(a=>(kind==='chicken'?['chick','chicken'].includes(a.kind):a.kind===kind)&&Number(a.well??.85)>=.45);}
  function productionReason(d,value){if(d.projectId&&!built(d.projectId))return'Primeiro recupere '+project(d.projectId).name+'.';if(d.kind&&!healthy(d.kind,value))return d.kind==='cow'?'Alimente as vacas do curral para produzir leite.':'Alimente as galinhas do curral para produzir ovos.';return'';}
  function collect(id){const d=PRODUCTION.find(p=>p.id===id);if(!d)return answer(false,'Produção desconhecida.');const p=player(),row=state.production[id],why=pointReason(d)||(!row.ready?'Ainda está crescendo: '+Math.ceil(d.cycleSeconds-row.elapsed)+' segundos de jogo ativo.':'')||(state.stock[d.item]>=LIMIT?'O depósito está cheio.':'');if(why)return answer(false,why);const n=Math.min(row.ready,LIMIT-state.stock[d.item]);row.ready-=n;state.stock[d.item]+=n;state.totals.produced=Math.min(MAX_COUNT,state.totals.produced+n);return announce('produce',{productionId:id,item:d.item,amount:n},'Colhido: '+n+' '+ITEMS[d.item].name.toLowerCase()+'.');}
- function deliverOrder(id){const d=ORDERS.find(o=>o.id===id);if(!d)return answer(false,'Encomenda desconhecida.');const p=player(),row=state.orders[id],why=pointReason(BOARD)||(row.cooldown>0?'Esta encomenda volta em '+Math.ceil(row.cooldown)+' segundos de jogo ativo.':'')||costReason(d.cost,p)||(count(p?.coins,MAX_COUNT)+d.reward>MAX_COUNT?'A bolsa de moedas está cheia.':'');if(why)return answer(false,why);pay(d.cost,p);row.deliveries=Math.min(MAX_COUNT,row.deliveries+1);row.cooldown=180;p.coins=count(p.coins,MAX_COUNT)+d.reward;state.totals.orders=Math.min(MAX_COUNT,state.totals.orders+1);return announce('order',{orderId:id,npcId:d.npcId,coins:d.reward,amount:1,delivery:row.deliveries},'Encomenda entregue: +'+d.reward+' moedas. O morador agradece o seu trabalho.');}
+ function deliveryMemory(npcId){const d=ORDERS.find(o=>o.npcId===npcId);if(!d)return null;const row=state.orders[d.id];if(!row?.deliveries)return null;const recent=row.cooldown>0;return{orderId:d.id,deliveries:row.deliveries,recent,line:DELIVERY_LINES[npcId][recent?(row.deliveries===1?0:1):2]};}
+ function deliverOrder(id){const d=ORDERS.find(o=>o.id===id);if(!d)return answer(false,'Encomenda desconhecida.');const p=player(),row=state.orders[id],why=pointReason(BOARD)||(row.cooldown>0?'Esta encomenda volta em '+Math.ceil(row.cooldown)+' segundos de jogo ativo.':'')||costReason(d.cost,p)||(count(p?.coins,MAX_COUNT)+d.reward>MAX_COUNT?'A bolsa de moedas está cheia.':'');if(why)return answer(false,why);pay(d.cost,p);row.deliveries=Math.min(MAX_COUNT,row.deliveries+1);row.cooldown=180;p.coins=count(p.coins,MAX_COUNT)+d.reward;state.totals.orders=Math.min(MAX_COUNT,state.totals.orders+1);return announce('order',{orderId:id,npcId:d.npcId,coins:d.reward,amount:1,delivery:row.deliveries},'Encomenda entregue: +'+d.reward+' moedas. '+deliveryMemory(d.npcId).line);}
  function inspect(id){const def=CLUES.find(c=>c.id===id);if(!def)return answer(false,'Pista desconhecida.');const d=clue(def),why=pointReason(d,38);if(why)return answer(false,why);const row=state.clues[id],first=!row.found;row.found=true;row.reads=Math.min(MAX_COUNT,row.reads+1);return announce('inspect',{clueId:id,first,text:d.text,title:d.title},d.text);}
  function consume(id){if(id!=='compota')return answer(false,'Este produto deve ser usado numa receita ou encomenda.');const p=player();if(!p||p.dead)return answer(false,'Comece uma partida para consumir o lanche.');if(!state.stock.compota)return answer(false,'Prepare compota na cozinha primeiro.');if(!Number.isFinite(p.en)||!Number.isFinite(p.hyd))return answer(false,'O estado do jogador ainda não está disponível.');const energy=Math.max(0,Math.min(22,100-p.en)),water=Math.max(0,Math.min(8,100-p.hyd));if(!energy&&!water)return answer(false,'Você já está com energia e hidratação completas. Guarde o lanche.');state.stock.compota--;p.en=Math.min(100,p.en+energy);p.hyd=Math.min(100,p.hyd+water);return announce('use',{item:'compota',amount:1,energy,hydration:water},'Compota: +'+Math.round(energy)+' energia e +'+Math.round(water)+' hidratação.');}
  const CORRAL={id:'curral',name:'Curral',x:548,y:918};
@@ -234,7 +263,7 @@
   api.registerInteraction('farm_life_station',o=>open(o.stationId==='quadro'?'orders':'production',o.stationId));
   api.registerInteraction('farm_life_clue',o=>{const result=inspect(o.clueId);if(result.ok){window.FarmValleyPanels?.openFarm('clues',o.clueId);api.playSfx?.('click');}else api.showToast?.(result.message,'info',3600);return true;});
  }
- window.FarmLife=Object.freeze({init(options={}){callbacks=options;return snapshot();},snapshot,serialize,restore,reset,update,build,maintain,craft,collect,deliverOrder,inspect,consume,care,refillIrrigation,footprint,
+ window.FarmLife=Object.freeze({init(options={}){callbacks=options;return snapshot();},snapshot,serialize,restore,reset,update,build,maintain,craft,collect,deliverOrder,deliveryMemory,inspect,consume,care,refillIrrigation,footprint,
   navigationVersion:()=>PROJECTS.reduce((mask,d,i)=>mask|(built(d.id)?1<<i:0),0),cacheInfo:()=>({sprites:sprites.size}),catalogue:()=>JSON.parse(JSON.stringify({projects:PROJECTS,recipes:RECIPES,clues:CLUES}))});
  (window.__farmBiomes=window.__farmBiomes||[]).push(register);
 })();

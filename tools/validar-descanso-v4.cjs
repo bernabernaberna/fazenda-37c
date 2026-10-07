@@ -45,7 +45,7 @@ const shot=async name=>{const file=name+'-'+label+'.png';await page.screenshot({
  for(const name of ['house','barn']){
   const prepared=await page.evaluate(name=>{setSceneTo(name);const bed=objects.find(o=>['i_bed','b_cot'].includes(o.type));if(!bed)throw Error('Cama ausente');player.x=bed.x+bed.w+1;player.y=bed.y+bed.h/2;player.resting=false;player.restTimer=0;player.gaitBlend=0;player.actionTimer=0;player.temp=37;player.hyd=100;player.en=75;_camSnap=true;render();return{bed:{x:bed.x,y:bed.y,w:bed.w,h:bed.h},x:player.x,y:player.y,free:!furnitureCollides(player.x,player.y)};},name);
   check('Posição de interação acessível ao lado da cama de '+name,prepared.free,prepared);
-  await page.keyboard.press('e');await step(20);const entered=await read();check('E inicia repouso ancorado na cama de '+name,entered.resting&&entered.context?.type===(name==='house'?'i_bed':'b_cot')&&entered.blend>.95&&entered.x===prepared.x&&entered.y===prepared.y,{prepared,entered});
+  await page.keyboard.press('e');await page.evaluate(()=>{for(let i=0;i<180&&((FarmRestVisual.info().blend||0)<1||FarmRestVisual.pose(player,currentScene).restWalking);i++)update(1/60);render();});const entered=await read();check('E inicia repouso ancorado na cama de '+name,entered.resting&&entered.context?.type===(name==='house'?'i_bed':'b_cot')&&entered.blend>.95&&entered.x===prepared.x&&entered.y===prepared.y,{prepared,entered});
   await step(200);
   const anchor=await page.evaluate(()=>{
    const bed=objects.find(o=>o.type===window.FarmRestVisual?.info().bed);if(!bed)return{pass:false,reason:'Contexto de cama ausente'};
@@ -58,7 +58,7 @@ const shot=async name=>{const file=name+'-'+label+'.png';await page.screenshot({
    return{pass:options?.restMode==='bed'&&Math.abs(options.x-target.x)<=1&&Math.abs(options.y-target.y)<=1&&order.indexOf('bed')<order.indexOf('player'),target,options,order};
   });
   check('Colchão recebe pose na âncora e depois do móvel de '+name,anchor.pass,anchor);
-  await shot('cama-'+name);await page.keyboard.down('d');await step();const exitStart=await read();await step(20);await page.keyboard.up('d');const exited=await read();check('WASD levanta e retoma passagem de '+name,!exitStart.resting&&exitStart.blend>0&&exitStart.blend<1&&!exited.resting&&exited.context===null&&Math.hypot(exited.x-entered.x,exited.y-entered.y)>1,{exitStart,exited});
+  await shot('cama-'+name);await page.keyboard.down('d');await step();const exitStart=await read();await page.evaluate(()=>{for(let i=0;i<180&&FarmRestVisual.info().scene;i++)update(1/60);});await step(3);await page.keyboard.up('d');const exited=await read();check('WASD levanta e retoma passagem de '+name,!exitStart.resting&&exitStart.blend>0&&exitStart.blend<1&&!exited.resting&&exited.context===null&&Math.hypot(exited.x-entered.x,exited.y-entered.y)>1,{exitStart,exited});
  }
  for(const name of ['greenhouse','main']){
   await page.evaluate(name=>{setSceneTo(name);if(name==='greenhouse'){player.x=15*TS+8;player.y=9*TS+8;}player.dir=0;player.resting=false;player.restTimer=0;player.gaitBlend=0;player.actionTimer=0;player.temp=37;player.en=100;player.hyd=100;_camSnap=true;},name);

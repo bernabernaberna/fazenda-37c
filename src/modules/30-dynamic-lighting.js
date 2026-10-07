@@ -16,6 +16,8 @@
 (function(){
   const FIRE_TYPES = new Set(['fireplace','mtn_fire','i_fireplace','b_stove']);
   const _sparks = [];
+  let _scene = null;
+  const reduced = ()=>typeof A11Y!=='undefined'&&!!A11Y.reduceMotion;
 
   function _flicker(seed, t){
     // Stable per-source flicker — mixes two sin waves for warm jitter
@@ -64,6 +66,7 @@
 
   function _isLitFire(o){
     if(!FIRE_TYPES.has(o.type)) return false;
+    if(o.lit===false)return false;
     // i_fireplace / b_stove are always lit (interior); fireplace needs o.lit
     if(o.type === 'fireplace') return !!o.lit;
     return true;
@@ -85,7 +88,7 @@
     if(typeof isFrio === 'function' && isFrio()) intensity *= 0.55; // softer in winter
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    const t = performance.now()/4000;
+    const t = reduced()?0:performance.now()/4000;
     const beams = 5;
     for(let i=0; i<beams; i++){
       const phase = (i / beams) + (t * 0.05);
@@ -148,21 +151,30 @@
     // ----- Sparks rising from the fire -----
     // Spawn rate proportional to fire size; throttled by time
     const sparkChance = (o.type === 'fireplace' ? 0.25 : 0.18);
-    if(Math.random() < sparkChance){
+    if(!reduced()&&Math.random() < sparkChance){
       _spawnSpark(o.x + (Math.random()-0.5)*8, o.y - 6, seed);
     }
   }
 
   function drawDynamicLights(camX, camY, visW, visH){
     const nightAlpha = (typeof nightOverlayAlpha === 'function') ? nightOverlayAlpha() : 0;
-    const t = performance.now() / 1000;
+    const still=reduced(),scene=typeof currentScene==='string'?currentScene:'';
+    if(_scene!==scene||still){_sparks.length=0;_scene=scene;}
+    const t = still?0:performance.now() / 1000;
+    const indoor=typeof isIndoor==='function'&&isIndoor();
 
     // 1) Sun god-rays (outdoor only)
-    if(typeof isIndoor === 'function' && !isIndoor()){
+    if(!indoor){
       _drawSunRays(camX, camY, visW, visH);
     }
 
     // 2) Fire-source point lights
+    ctx.save();
+    // Uma sala é um recorte do prédio. O fogo pode iluminar a parede,
+    // mas o halo não atravessa a moldura para a área externa do mapa.
+    if(indoor&&typeof MW==='number'&&typeof MH==='number'){
+      ctx.beginPath();ctx.rect(3,0,MW*TS-6,MH*TS-4);ctx.clip();
+    }
     if(typeof objects !== 'undefined' && Array.isArray(objects)){
       for(const o of objects){
         if(_isLitFire(o)){
@@ -170,12 +182,23 @@
         }
       }
     }
+    ctx.restore();
 
     // 3) Update + draw sparks (after lights so they overlay)
-    _updateSparks();
-    _drawSparks(camX, camY, visW, visH);
+    if(!still){
+      _updateSparks();
+      ctx.save();
+      // As fagulhas do fogão ficam dentro da sala; não sobem através da
+      // parede norte nem sobrevivem à troca de cena.
+      if(indoor&&typeof MW==='number'&&typeof MH==='number'){
+        ctx.beginPath();ctx.rect(4,17,MW*TS-8,MH*TS-21);ctx.clip();
+      }
+      _drawSparks(camX, camY, visW, visH);
+      ctx.restore();
+    }
   }
 
   // Expose
   window.drawDynamicLights = drawDynamicLights;
+  window.FarmDynamicLighting={info:()=>({sparks:_sparks.length,scene:_scene,reducedMotion:reduced()})};
 })();

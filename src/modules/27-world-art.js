@@ -160,9 +160,15 @@
         rect(g,cold?'#959d8e':P.soilLight,8+v%4,9,3,1);
         rect(g,P.pathLight,2,13-v%3,2,1);rect(g,P.soilLight,13,3+v%5,1,1);
       }else if(t===T.FIELD){
-        rect(g,P.soil,0,0,TS,TS);
-        for(let y=2;y<TS;y+=4){rect(g,P.woodDark,0,y,TS,1);rect(g,P.soilLight,0,y-1,TS,1);}
-        rect(g,P.soilLight,ox+2,oy+2,2,1);rect(g,P.woodDark,12,12,2,1);
+        // Sulcos de terra: contraste baixo e bordas partidas, sem o brilho
+        // contínuo que fazia o canteiro parecer um assoalho de madeira.
+        rect(g,'#634d39',0,0,TS,TS);
+        for(let y=3;y<TS;y+=5){
+          rect(g,'#53412f',0,y,TS,1);
+          rect(g,'#7a5e40',(v+y)%4,y-1,5+(v%3),1);
+          rect(g,'#73583d',10+(v%2),y-1,4,1);
+        }
+        rect(g,'#806346',ox+2,oy+2,2,1);rect(g,'#59432f',12,12,2,1);
         if(cold){rect(g,P.snow,1,0,5,1);rect(g,P.snow,10,15,4,1);}
       }else if(t===T.COBBLE){
         rect(g,P.stoneDark,0,0,TS,TS);
@@ -280,8 +286,9 @@
     const tileTypes=[T.GRASS,T.GRASS2,T.FLOWER,T.PATH,T.FIELD,T.WATER,T.RIVER,T.OASIS,
       T.SNOW,T.ICE,T.SAND,T.DUNE,T.CRACKED,T.STONE,T.SNOWROCK,T.COBBLE,T.FENCE];
     for(const t of tileTypes) API.registerTileDrawer(t,(g,px,py,x,y,cold)=>{
-      if(API.rawScene&&API.rawScene!=='main'){
-        // As salas continuam usando o piso próprio e as dimensões originais.
+      if(API.rawScene&&API.rawScene!=='main'&&API.rawScene!=='greenhouse'){
+        // Casa e celeiro têm pisos próprios. A estufa, que também contém
+        // jardim ao ar livre, compartilha os materiais naturais da fazenda.
         API.drawBaseTile(g,px,py,x,y,t,cold);return;
       }
       const kind=naturalKind(t);

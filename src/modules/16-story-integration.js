@@ -260,6 +260,8 @@
           caio:'Minha caixa está encostada na parede. Hoje vim para a conversa que não cabe dentro dela.',
           nico:'A placa ficou um pouco torta. Eu ia endireitar, mas todo mundo entrou sem problema. Posso sentar também?'}[o.npcId]};
     }
+    const lesson=window.FarmValleyDetails?.mentorDestination?.(o.npcId,timeOfDay);
+    if(lesson)return lesson;
     return {key:'routine:'+band,x:home.x+normal.dx,y:home.y+normal.dy,...normal};
   }
   function update(dt){
@@ -292,6 +294,15 @@
       const gaitTarget=o.moving?1:0;
       o.gaitBlend=(o.gaitBlend||0)+(gaitTarget-(o.gaitBlend||0))*(1-Math.exp(-dt/(gaitTarget ? .045 : .065)));
       o.region=o.y<42*TS?'mountain':o.y>=90*TS?'desert':'farm';
+    }
+    // Durante a aula, quem já chegou acompanha o outro morador com o olhar.
+    // As rotas continuam físicas; nenhuma chegada teleporta o elenco.
+    for(const o of actors)if(o._routineKey.startsWith('mentoria:')&&o.npcActivity!=='talk'&&!o.moving&&!o._route.length){
+      const partner=actors.find(a=>a.npcId===(o.npcId==='tomas'?'nico':'tomas'));
+      if(partner&&Math.hypot(partner.x-o.x,partner.y-o.y)<70){
+        const dx=partner.x-o.x,dy=partner.y-o.y;
+        o.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);
+      }
     }
   }
   function configureCommunity(point){
