@@ -45,7 +45,7 @@
   const farmRead=()=>({...read(),player,objects:scenes.main.objects,mainCrops:currentScene==='main'?crops:scenes.main.crops,active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen()});
   // A exploração é atualizada a cada quadro; não precisa clonar os diários.
   const frontierRead=()=>({...read(),active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen()});
-  function canOpenReading(){return gameStarted&&!player.dead&&!cutsceneActive&&!window.FarmStoryCinematics?.isOpen?.()&&!histologyMissionOpen&&!tutorialActive
+  function canOpenReading(){return !window.FarmAnimalCare?.isOpen()&&gameStarted&&!player.dead&&!cutsceneActive&&!window.FarmStoryCinematics?.isOpen?.()&&!histologyMissionOpen&&!tutorialActive
     &&!(typeof _pendingTutorialAfterCutscene!=='undefined'&&_pendingTutorialAfterCutscene)&&!document.getElementById('tutorialOverlay')?.classList.contains('show');}
   function safePoint(x,y){
     const main=scenes.main;const tx=Math.floor(x/TS),ty=Math.floor(y/TS),t=main.map[ty]?.[tx];

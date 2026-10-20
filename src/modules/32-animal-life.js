@@ -1,10 +1,11 @@
 /* Animais do Vale: anatomia própria, quatro vistas e locomoção pelo chão.
-   Não muda recompensas, alimentação, lã, IDs, inventário ou saves. A saciedade
+   Reações de cuidado são transitórias; a lã volta após tempo bem alimentado.
+   Não muda recompensas, inventário ou IDs. A saciedade
    conserva exatamente as taxas do updateAnimals anterior (.003/.005 por s).
    Curral é obtido do objeto de mundo: nenhum deslocamento FARM_Y0 é reaplicado. */
 (function(){
  'use strict';
- const TAU=Math.PI*2,W=64,H=64,AX=32,AY=48,MAX_SPRITES=768;
+ const TAU=Math.PI*2,W=64,H=64,AX=32,AY=48,MAX_SPRITES=768,WOOL_SECONDS=180;
  const P={ink:'#233c35',edge:'#496057',cream:'#eee8ca',light:'#fff4d8',shade:'#c5c9ad',dark:'#335044',
   patch:'#385348',patchHi:'#577264',rose:'#c99180',roseHi:'#e5b6a0',roseSh:'#aa796d',horn:'#d7be8c',hoof:'#34483c',
   wool:'#f0e5c1',woolHi:'#fff3d2',woolSh:'#c3bea1',woolDeep:'#9fa98b',skin:'#cba78f',skinHi:'#e0bfa2',
@@ -28,7 +29,8 @@
   return pens.find(p=>a.x>=p.x&&a.x<=p.x+p.w&&a.y>=p.y&&a.y<=p.y+p.h)||pens.reduce((best,p)=>!best||Math.hypot(a.x-p.x-p.w/2,a.y-p.y-p.h/2)<Math.hypot(a.x-best.x-best.w/2,a.y-best.y-best.h/2)?p:best,null);
  }
  function brain(a,objects,index){
-  let b=brains.get(a);if(b)return b;
+  let b=brains.get(a);if(b&&b.k)return b;
+  const pending=b&&b.reaction;
   const kind=kindOf(a),k=KIND[kind],pen=penFor(a,objects),random=seed((a.x*997+a.y*199+index*104729+3700)|0);
   const bounds=pen?{left:pen.x+k.radius+2,right:pen.x+pen.w-k.radius-2,top:pen.y+10,bottom:pen.y+pen.h-12}:
    {left:a.x-24,right:a.x+24,top:a.y-24,bottom:a.y+24};
@@ -37,7 +39,26 @@
   if(pen){a.penX=pen.x+8;a.penY=pen.y+8;a.penW=pen.w-16;a.penH=pen.h-16;}
   a.tx=a.x;a.ty=a.y;a.animalPhase=Number(a.animalPhase)||0;a.animalBlend=0;a.moving=false;a.dir=Number.isInteger(a.dir)?a.dir:2;
   b={random,bounds,kind,k,mode:kind==='chicken'?'peck':'graze',timer:1+random()*2,vx:0,vy:0,clock:random()*10,
-   previousWell:a.well??.85,blocked:0,lastX:a.x,lastY:a.y,feed:0,rest:0,graze:0,activityClock:0,lastMode:null,wake:0,yieldSide:0};brains.set(a,b);return b;
+   previousWell:a.well??.85,blocked:0,lastX:a.x,lastY:a.y,feed:pending&&pending.action==='feed'?1.8:0,rest:0,graze:0,activityClock:0,lastMode:null,
+   wake:pending?pending.remaining+.4:0,yieldSide:0,reaction:pending||null};
+  if(pending){b.mode='look';a.dir=pending.dir;}
+  brains.set(a,b);return b;
+ }
+ function react(a,action='pet',visitor){
+  if(!a||a.type!=='animal'||!['pet','feed','shear'].includes(action))return false;
+  let b=brains.get(a);if(!b){b={};brains.set(a,b);}
+  if(action==='pet'&&b.reaction?.action==='pet'&&b.reaction.remaining>0)return false;
+  const duration=action==='feed'?1.8:action==='pet'?1.6:1.2;
+  let dir=Number.isInteger(a.dir)?clamp(a.dir,0,3):2;
+  if(visitor&&Number.isFinite(visitor.x)&&Number.isFinite(visitor.y)){
+   const dx=visitor.x-a.x,dy=visitor.y-a.y;
+   if(Math.hypot(dx,dy)>.1)dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);
+  }
+  b.reaction={action,duration,remaining:duration,dir};
+  if(b.k){b.mode='look';b.timer=duration+.4;b.vx=b.vy=0;b.wake=duration+.4;b.graze=0;b.yielding=false;if(action==='feed')b.feed=duration;}
+  a.dir=dir;a.facing=dir===1?-1:1;a.moving=false;a.animalBlend=0;a.animalGraze=0;a.animalActivity='look';a.tx=a.x;a.ty=a.y;
+  if(action==='feed')a.animalFed=true;
+  return true;
  }
  function chooseActivity(a,b){
   b.mode=b.random()<(b.kind==='chicken'?.8:.68)?(b.kind==='chicken'?'peck':'graze'):'look';
@@ -76,10 +97,16 @@
    const a=animals[i],b=brain(a,objects,i),k=b.k,oldX=a.x,oldY=a.y;
    if(a.well===undefined)a.well=.85;
    const fed=a.well>b.previousWell+.035;a.well=Math.max(0,a.well-dt*(context.cold?.005:.003));b.previousWell=a.well;
+   if(b.kind==='sheep'){
+    a.woolGrowth=a.shorn?clamp(Number.isFinite(a.woolGrowth)?a.woolGrowth:0,0,WOOL_SECONDS):0;
+    if(a.shorn&&a.well>=.45){a.woolGrowth=Math.min(WOOL_SECONDS,a.woolGrowth+dt);if(a.woolGrowth>=WOOL_SECONDS-1e-6){a.shorn=false;a.woolGrowth=0;}}
+   }
    b.clock+=step;b.feed=Math.max(0,b.feed-step);b.wake=Math.max(0,b.wake-step);a.animalClock=b.clock;
+   if(b.reaction){b.reaction.remaining=Math.max(0,b.reaction.remaining-step);if(b.reaction.remaining===0)b.reaction=null;}
    if(Math.hypot(a.x-b.lastX,a.y-b.lastY)>8){b.vx=b.vy=0;a.tx=a.x;a.ty=a.y;chooseActivity(a,b);}
    if(fed){b.feed=1.8;b.mode=b.kind==='chicken'?'peck':'graze';b.timer=2.4;b.vx=b.vy=0;}
-   const yielding=!context.reducedMotion&&giveSpace(a,b,animals,context.player);
+   if(b.reaction){b.mode='look';b.timer=Math.max(b.timer,b.reaction.remaining+.4);b.vx=b.vy=0;a.dir=b.reaction.dir;a.facing=a.dir===1?-1:1;b.yielding=false;}
+   const yielding=!b.reaction&&!context.reducedMotion&&giveSpace(a,b,animals,context.player);
    if(night&&!yielding&&b.wake===0&&b.mode!=='rest'){b.mode='rest';b.vx=b.vy=0;}
    else if(!night&&b.mode==='rest'){chooseActivity(a,b);}
    if(context.reducedMotion||b.mode==='rest'){
@@ -251,16 +278,29 @@
   }g.restore();
  }
  function visualState(a,reduced=false){
+  const reaction=brains.get(a)?.reaction||null;
   const kind=kindOf(a),phase=Number(a.animalPhase??a.animT)||0,wantsRest=a.animalActivity==='rest'||a.sleeping||a.asleep||a.dormindo;
   const restAmount=reduced?Number(!!wantsRest):Math.round(clamp(Number.isFinite(a.animalRest)?a.animalRest:Number(!!wantsRest),0,1)*4)/4,rest=restAmount>0;
   const time=Number(a.animalClock)||0,activity=a.animalActivity||'look',moving=!reduced&&!rest&&(a.moving||a.animalBlend>.01);
   const blend=moving?Math.round(clamp(Number(a.animalBlend??1),0,1)*4)/4:0;
   const frame=moving?Math.floor(((phase%TAU+TAU)%TAU)/TAU*16)%16:0;
   const grazes=!reduced&&!moving&&!rest&&(activity==='graze'||activity==='peck');
-  const graze=reduced?0:Number.isFinite(a.animalGraze)?Math.round(a.animalGraze):grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
+  let graze=reduced?0:Number.isFinite(a.animalGraze)?Math.round(a.animalGraze):grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
+  const reactionProgress=reaction?clamp(1-reaction.remaining/reaction.duration,0,1):0;
+  if(reaction&&!reduced&&!rest){const depth=reaction.action==='feed'?6:reaction.action==='pet'?3:1;graze=Math.round(Math.sin(reactionProgress*Math.PI)*depth);}
   const dir=Number.isInteger(a.dir)?clamp(a.dir,0,3):(a.facing<0?1:2);
   return{kind,dir,phase:frame*TAU/16,frame,blend,graze,rest:!!rest,restAmount,shorn:!!a.shorn,
-   closed:restAmount===1||(!reduced&&Math.floor(time*5)%31===30),tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed};
+   closed:restAmount===1||(!reduced&&(Math.floor(time*5)%31===30||(reaction?.action==='pet'&&reactionProgress>.3&&reactionProgress<.75))),
+   tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed,heart:!!a.animalFed||reaction?.action==='pet',
+   reaction:reaction?.action||null,reactionRemaining:reaction?.remaining||0};
+ }
+ function snapshot(a){
+  if(!a||a.type!=='animal')return null;
+  const b=brains.get(a),reaction=b?.reaction;
+  return{kind:kindOf(a),activity:a.animalActivity||'look',moving:!!a.moving,dir:a.dir,
+   reaction:reaction?.action||null,reactionRemaining:reaction?.remaining||0,
+   well:Number.isFinite(a.well)?a.well:.85,shorn:!!a.shorn,
+   woolGrowth:a.shorn?clamp(Number.isFinite(a.woolGrowth)?a.woolGrowth:0,0,WOOL_SECONDS):0,woolSeconds:WOOL_SECONDS};
  }
  function sprite(s){
   const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.restAmount,s.shorn,s.closed,s.tail].join(':');if(cache.has(key))return cache.get(key);
@@ -279,11 +319,11 @@
   g.fillStyle='rgba(28,53,43,.24)';g.beginPath();g.ellipse(x,y+feet,s.kind==='cow'?15:s.kind==='sheep'?12:7,s.kind==='chicken'?2:3,0,0,TAU);g.fill();
   g.drawImage(sprite(s),x-AX,y+feet-AY);
   if(a.well!==undefined&&a.well<.3){R(g,P.edge,x-3,y-(s.kind==='chicken'?31:35),7,8);R(g,P.horn,x-2,y-(s.kind==='chicken'?30:34),5,6);R(g,P.ink,x,y-(s.kind==='chicken'?29:33),1,3);R(g,P.ink,x,y-(s.kind==='chicken'?25:29),1,1);}
-  if(s.fed&&!reduced){const yy=y-(s.kind==='chicken'?30:35);R(g,P.comb,x-2,yy,2,2);R(g,P.comb,x+1,yy,2,2);R(g,P.comb,x-1,yy+2,3,2);R(g,P.comb,x,yy+4,1,1);}
+  if(s.heart){const xx=x+(a.well<.3?10:0),yy=y-(s.kind==='chicken'?30:35);R(g,P.comb,xx-2,yy,2,2);R(g,P.comb,xx+1,yy,2,2);R(g,P.comb,xx-1,yy+2,3,2);R(g,P.comb,xx,yy+4,1,1);}
   g.restore();
  }
- window.FarmAnimalLife={update,draw,blocksPlayer,contactRadii:CONTACT,reset(){brains=new WeakMap();},visualState,
-  info(){return{version:3,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
+ window.FarmAnimalLife={update,draw,react,snapshot,blocksPlayer,contactRadii:CONTACT,woolSeconds:WOOL_SECONDS,reset(){brains=new WeakMap();},visualState,
+  info(){return{version:4,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
  };
  (window.__farmBiomes=window.__farmBiomes||[]).push(api=>{api.registerObjectDrawer('animal',(animal,g)=>draw(g,animal));});
 })();

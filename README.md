@@ -47,6 +47,8 @@ e descanso mantêm a pixel art do vale e respeitam a opção de reduzir moviment
 
 A **mochila (I)** reúne 32 tipos de item com ícones próprios, categorias, busca, quantidades e instruções. Selecione para inspecionar; os botões de usar, equipar e organizar os seis atalhos são explícitos. Ela também mostra o depósito da fazenda sem duplicar seus produtos. O adubo da estufa acelera em 50% o crescimento de uma planta regada. Consumíveis são preservados quando não trazem benefício.
 
+Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressione **E** para fazer carinho, alimentar ou tosquiar. Eles olham para o jogador e reagem ao toque; a fome aparece no painel. O cocho distribui até três porções aos mais famintos, sem gastar feno em animais satisfeitos. A lã volta após três minutos ativos com alimentação suficiente. Movimento reduzido e progresso antigo continuam disponíveis.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

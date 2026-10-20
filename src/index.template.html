@@ -3599,6 +3599,7 @@ function _gameInputBlocked(){
 // Retorna true se qualquer overlay/modal/pause estiver bloqueando ações de jogo.
 // (Toggles como J/I/M ainda funcionam — eles fecham o próprio overlay.)
 function _actionUiOpen(){
+  if(window.FarmAnimalCare?.isOpen()) return true;
   if(window.FarmWorldMap?.isOpen()) return true;
   if(window.FarmStoryIntegration?.isOpen()) return true;
   if(window.FarmActivityReport?.isOpen()) return true;
@@ -5794,7 +5795,7 @@ function histologyUiBusy(){
   const shown = id => document.getElementById(id)?.classList.contains('show');
   // Inclui tutorial, cutscene e painel do professor: um quiz NUNCA deve abrir
   // por cima dessas telas (antes podia sobrepor o tutorial — parecia bugado).
-  return window.FarmWorldMap?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || inventoryOpen || shopOpen || journalOpen || skinOpen
+  return window.FarmAnimalCare?.isOpen() || window.FarmWorldMap?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || inventoryOpen || shopOpen || journalOpen || skinOpen
     || (typeof tutorialActive !== 'undefined' && tutorialActive)
     || (typeof cutsceneActive !== 'undefined' && cutsceneActive)
     || shown('tutorialOverlay') || shown('histologyAtlas')
@@ -5999,7 +6000,7 @@ function saveGame(auto=false){
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
       histologyPlayTime,lastHistMissionAt:_lastHistMissionAt,
-      objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0,...(o.type==='animal'?{well:typeof o.well==='number'&&Number.isFinite(o.well)?Math.max(0,Math.min(1,o.well)):.85}:{})}))
+      objects: keyedObjectStates(mainObjects).map(({o,key})=>({stateId:key,type:o.type,kind:o.kind||null,shorn:!!o.shorn,lit:!!o.lit,fuel:Number(o.fuel)||0,...(o.type==='animal'?{woolGrowth:o.shorn&&Number.isFinite(o.woolGrowth)?Math.max(0,Math.min(180,o.woolGrowth)):0,well:typeof o.well==='number'&&Number.isFinite(o.well)?Math.max(0,Math.min(1,o.well)):.85}:{})}))
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     refreshSaveButtons();
@@ -6013,6 +6014,7 @@ function saveGame(auto=false){
 }
 function loadGameFromData(data){
   if(!data || (data.version!==1 && data.version!==2)) return false;
+  window.FarmAnimalCare?.close();
   window.FarmWorldMap?.reset();
   // A migração trabalha numa cópia: carregar o mesmo save v1 duas vezes não
   // deve aplicar o deslocamento do mapa novamente ao objeto do chamador.
@@ -6060,7 +6062,7 @@ function loadGameFromData(data){
   journalUnlocked.clear(); (data.journalUnlocked||['intro']).forEach(id=>journalUnlocked.add(id));
   // Saves antigos não guardavam saciedade. O padrão também evita herdar a
   // fome de outra partida ao carregar novamente sem recarregar a página.
-  for(const o of objects)if(o.type==='animal')o.well=.85;
+  for(const o of objects)if(o.type==='animal'){o.well=.85;o.shorn=false;o.woolGrowth=0;}
   window.FarmAnimalLife?.reset();
   if(Array.isArray(data.objects)){
     const targets=new Map(keyedObjectStates(objects).map(({o,key})=>[key,o]));
@@ -6068,6 +6070,7 @@ function loadGameFromData(data){
       const target=targets.get(key);if(!target||target.type!==saved.type||(target.kind||null)!==(saved.kind||null))continue;
       if(target.type==='animal'){
         if('shorn'in saved)target.shorn=!!saved.shorn;
+        if(target.shorn&&typeof saved.woolGrowth==='number'&&Number.isFinite(saved.woolGrowth))target.woolGrowth=Math.max(0,Math.min(180,saved.woolGrowth));
         if(typeof saved.well==='number'&&Number.isFinite(saved.well))target.well=Math.max(0,Math.min(1,saved.well));
       }
       if(['fireplace','mtn_fire','i_fireplace','b_stove'].includes(target.type)){
@@ -6465,7 +6468,7 @@ function useItemByKey(key){
     showAlert('Use F para regar as plantas');
     return;
   }
-  if(key==='hay') return tryInteract();
+  if(key==='hay'){ const animal=window.FarmAnimalCare?.target(); if(animal)return careForAnimal('feed',animal); showAlert('Aproxime-se de um animal para oferecer feno.'); return; }
   if(key==='towel'){
     if(player.inv.towel>0){
       if(player.temp<=36.5){ showAlert('Guarde a toalha para quando o corpo estiver quente.'); return; }
@@ -7288,6 +7291,7 @@ function tryInteract(){
     }
     return;
   }
+  if(window.FarmAnimalCare?.open()) return;
   // Seam de extensão: interações registradas por biomas (fogueira, oásis, placa…)
   if(biomeInteractHook()) return;
   // Interior interactions (when inside)
@@ -7456,36 +7460,7 @@ function tryInteract(){
     renderInv();
     return;
   }
-  const an = objectAtPlayer(['animal']);
-  if(isFrio() && an && an.kind==='sheep' && !an.shorn){
-    // Ovelha faminta dá lã ruim — precisa estar alimentada
-    if(an.well !== undefined && an.well < 0.3){
-      showAlert('A ovelha está com fome 🌾 — alimente-a (feno) para a lã ficar boa'); return;
-    }
-    an.shorn = true;
-    player.inv.wool++;
-    window.FarmStoryIntegration?.record('collect',{item:'wool',amount:1});
-    an.well = Math.max(0, (an.well===undefined?0.85:an.well) - 0.25);  // tosar cansa um pouco
-    tickTask('wool');
-    flashFx(an.x,an.y-8,'+wool','#ffffff');
-    sfx.wool();
-    renderInv();
-    return;
-  }
-  if(an && player.inv.hay>0){
-    player.inv.hay--;
-    an.well = 1;   // alimentado: saciedade cheia
-    const woolRegrew = an.kind==='sheep' && an.shorn;
-    if(woolRegrew) an.shorn = false;
-    tickTask('feed');
-    if(isFrio()) tickTask('protect');
-    flashFx(an.x,an.y-8,woolRegrew?'lã cresceu':(isFrio()?'protegido':'alimentado'),'#cfe57a');
-    if(woolRegrew) showAlert('A lã da ovelha voltou a crescer depois de alimentar');
-    window.synthSfx?.animal(an.kind);
-    triggerPlayerAction('feed',an);
-    renderInv();
-    return;
-  }
+
 }
 
 function buildScarecrow(){
@@ -7854,43 +7829,53 @@ function updatePot(){
   }
 }
 
-// ===== BARN: communal feed trough =====
-//   Player loads hay into the trough; trough then distributes to all
-//   farm animals over the next few frames. Marks 'feed' task complete.
+// Cuidados: o mesmo alcance usado no aviso, na abertura e na ação.
+function reachableAnimal(animal){
+  if(currentScene!=='main'||!animal||animal.type!=='animal'||!objects.includes(animal)||Math.hypot(player.x-animal.x,player.y-animal.y)>28)return false;
+  const steps=Math.max(1,Math.ceil(Math.hypot(player.x-animal.x,player.y-animal.y)/2));
+  for(let i=1;i<=steps;i++){
+    const x=player.x+(animal.x-player.x)*i/steps,y=player.y+(animal.y-player.y)*i/steps;
+    if(map[Math.floor(y/TS)]?.[Math.floor(x/TS)]===T.FENCE||window.FarmWorldDepth?.isBlocked(x,y))return false;
+  }
+  return true;
+}
+function feedAnimal(animal){
+  const well=Number.isFinite(animal.well)?animal.well:.85;
+  if(well>=.9||!(player.inv.hay>0))return false;
+  player.inv.hay--;animal.well=1;
+  tickTask('feed');if(isFrio())tickTask('protect');
+  window.FarmAnimalLife?.react?.(animal,'feed',player);
+  return true;
+}
+function careForAnimal(action,animal){
+  if(player.dead||!reachableAnimal(animal))return false;
+  const name=window.FarmAnimalCare.name(animal);
+  if(action==='feed'){
+    if(!feedAnimal(animal)){showAlert(player.inv.hay>0?name+' já está satisfeita. Guarde o feno.':'Você precisa de feno para alimentar.');return false;}
+    triggerPlayerAction('feed',animal);showToast(name+' recebeu feno e está satisfeita.','success');
+  }else if(action==='pet'){
+    if(!window.FarmAnimalLife?.react?.(animal,'pet',player)){showAlert('Dê um instante para '+name+' aproveitar o carinho.');return false;}
+    triggerPlayerAction('pet',animal);showToast(name+' se vira para você e recebe o carinho.','success');
+  }else if(action==='shear'){
+    if(animal.kind!=='sheep'||!isFrio()||animal.shorn||(animal.well??.85)<.3)return false;
+    animal.shorn=true;animal.woolGrowth=0;animal.well=Math.max(0,(animal.well??.85)-.25);player.inv.wool=(player.inv.wool||0)+1;
+    tickTask('wool');window.FarmStoryIntegration?.record('collect',{item:'wool',amount:1});
+    window.FarmAnimalLife?.react?.(animal,'shear',player);sfx.wool();showToast('1 lã de '+name+' guardada na mochila.','success');
+  }else return false;
+  if(soundEnabled)window.synthSfx?.animal(animal.kind);
+  renderInv();if(action!=='pet')saveGame(true);return true;
+}
+// Cocho distribui até três porções de imediato, começando pelos mais famintos.
 function handleFeedTrough(trough){
-  if((trough.fillLevel||0) >= 5){
-    showAlert('🌾 Cocho cheio — animais estão satisfeitos');
-    return;
-  }
-  if(player.inv.hay <= 0){
-    showAlert('Você precisa de feno. Colete em forragens ou no celeiro.');
-    return;
-  }
-  // Each interaction transfers up to 3 hay (or whatever is available)
-  const want = Math.min(3, player.inv.hay, 5 - (trough.fillLevel||0));
-  player.inv.hay -= want;
-  trough.fillLevel = (trough.fillLevel||0) + want;
-  // Auto-feed all farm animals on the main scene
-  const mainAnimals = (scenes.main && scenes.main.objects)
-    ? scenes.main.objects.filter(o=>o.type==='animal') : [];
-  let fed = 0;
-  for(const a of mainAnimals){
-    if(fed >= want) break;
-    if(a.shorn){ a.shorn = false; }
-    fed++;
-  }
-  if(typeof tickTask === 'function'){ for(let i=0;i<fed;i++) tickTask('feed'); }
-  if(typeof isFrio === 'function' && isFrio() && typeof tickTask === 'function'){
-    for(let i=0;i<fed;i++) tickTask('protect');
-  }
-  flashFx(player.x, player.y-12, `cocho +${want} feno · alimentou ${fed} animais`, '#e7c14a');
+  const hungry=(scenes.main?.objects||[]).filter(a=>a.type==='animal'&&(a.well??.85)<.9).sort((a,b)=>(a.well??.85)-(b.well??.85));
+  if(!hungry.length){showAlert('Os animais estão satisfeitos. Guarde o feno para mais tarde.');return;}
+  if(!(player.inv.hay>0)){showAlert('Você precisa de feno. Colete forragem ou prepare ração.');return;}
+  let fed=0;for(const a of hungry.slice(0,3)){if(feedAnimal(a))fed++;}
+  if(!fed)return;
+  trough.fillLevel=0; // As porções foram consumidas, não são uma reserva duplicada.
   triggerPlayerAction('feed',{x:trough.x+(trough.w||0)/2,y:trough.y+(trough.h||0)/2});
-  showToast(`🌾 Cocho preenchido (+${want}). ${fed} animal(is) alimentado(s).`, 'success', 2600);
-  try {
-    sfx.harvest && sfx.harvest();
-    window.synthSfx && synthSfx.pop();
-  } catch(e){}
-  renderInv();
+  showToast(fed+' porções de feno distribuídas aos animais com mais fome.','success',3000);
+  if(soundEnabled)window.synthSfx?.pop();renderInv();saveGame(true);
 }
 
 // ===== GREENHOUSE: compost bin =====
@@ -8223,7 +8208,7 @@ function windowsLit(){ return nightOverlayAlpha() > 0.10; }
 
 
 function updateAnimals(dt){
-  if(window.FarmAnimalLife){FarmAnimalLife.update(dt,objects,{cold:isFrio(),timeOfDay,reducedMotion:!!A11Y.reduceMotion,player:currentScene==='main'?player:null});return;}
+  if(window.FarmAnimalLife){FarmAnimalLife.update(dt,currentScene==='main'?objects:scenes.main.objects,{cold:isFrio(),timeOfDay,reducedMotion:!!A11Y.reduceMotion,player:currentScene==='main'?player:null});return;}
   // Wander AI: each animal walks toward target, picks new target after pause
   for(const a of objects){
     if(a.type !== 'animal') continue;
@@ -8552,8 +8537,8 @@ function update(dt){
     if(player.actionTimer > 0){ player.actionTimer = Math.max(0, player.actionTimer - dt); }
     window.FarmPlayerActions?.update(player,currentScene);
   }
-  // Animals & crows wander/fly even if histology mission is open
-  updateAnimals(dt);
+  // Cuidados, fome, lã e reações aguardam também durante a leitura do quiz.
+  if(!histologyMissionOpen) updateAnimals(dt);
   updateCrows(dt);
   // Vida ambiente (visual) — continua animando mesmo com missão aberta
   updateButterflies(dt);
@@ -8876,7 +8861,7 @@ function learningContext(){
 }
 function readingPanelOpen(){
   const shown=id=>!!document.getElementById(id)?.classList.contains('show');
-  return window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || skinOpen || journalOpen || inventoryOpen || shopOpen
+  return window.FarmAnimalCare?.isOpen() || window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || skinOpen || journalOpen || inventoryOpen || shopOpen
     || ['summary','accessMenu','achPanel','creditsPanel','tutorialOverlay'].some(shown);
 }
 function resetSeasonTasks(list){
@@ -8893,6 +8878,7 @@ function resetSeasonTasks(list){
 }
 function resetSandboxRun(){
   window.FarmStoryCinematics?.reset();
+  window.FarmAnimalCare?.close();
   window.FarmWorldMap?.reset();
   window.FarmAnimalLife?.reset();
   window.FarmRestVisual?.reset();window.FarmPlayerActions?.reset(player);
@@ -8909,7 +8895,7 @@ function resetSandboxRun(){
     }
     if(o.type==='animal'){
       for(const key of ['x','y','tx','ty','penX','penY','penW','penH','pauseT','speed','facing'])if(key in record)o[key]=record[key];
-      Object.assign(o,{well:.85,moving:false,dir:2,animT:0,animalPhase:0,animalClock:0,animalBlend:0,animalActivity:'look',animalFed:false});
+      Object.assign(o,{well:.85,woolGrowth:0,moving:false,dir:2,animT:0,animalPhase:0,animalClock:0,animalBlend:0,animalActivity:'look',animalFed:false});
     }
   });
   currentSeason='hot';seasonTimer=0;timeOfDay=8;tasks=hotTasks;
@@ -14362,18 +14348,16 @@ function render(){
 function currentHint(){
   if(player.dead) return 'RENASCER: reiniciar personagem';
   if(player.resting) return 'Descansando... mova-se ou pressione R para parar';
+  if(!nearObj(['door_house','door_barn','gh_exit','i_door'],22)){const animalHint=window.FarmAnimalCare?.hint();if(animalHint)return animalHint;}
   const recurso=nearObj(Object.keys(INTERACTION_HANDLERS),26);
   if(recurso && recurso.interactionHint) return 'E: '+recurso.interactionHint;
   const barn = objectAtPlayer(['barn']);
   if(isFrio() && barn && player.inv.wool>=2 && player.inv.coat<1) return 'E: fazer casaco de lã';
-  const animalHint = objectAtPlayer(['animal']);
-  if(isFrio() && animalHint && animalHint.kind==='sheep' && !animalHint.shorn) return 'E: coletar lã';
   if(objectAtPlayer(['well'])) return 'E: puxar água';
   if(objectAtPlayer(['sellbox'])) return 'E: abrir venda / comprar sementes';
   if(objectAtPlayer(['woodpile'])) return 'E: coletar lenha';
   if(isFrio() && objectAtPlayer(['fireplace'])){ const fp = objectAtPlayer(['fireplace']); return fp && fp.lit ? 'E: adicionar lenha / aquecer' : 'E: acender fogueira'; }
   if(isFrio() && objectAtPlayer(['loom']) && player.inv.wool>=2 && player.inv.coat<1) return 'E: usar tear e fazer casaco';
-  if(animalHint && player.inv.hay>0) return 'E: alimentar animal';
   const ct = cropTileAtPlayer();
   if(ct){
     const c=getCrop(ct.x,ct.y);
@@ -15146,6 +15130,14 @@ window.FarmWorldMap?.init({
   canOpen:()=>gameStarted&&!player.dead&&!_gameInputBlocked()&&!_actionUiOpen(),
   beforeOpen(){for(const k in keys)keys[k]=false;player.moving=false;player.running=false;FarmOriginalAudio.resetFootsteps();},
   focusGame(){cvs.focus({preventScroll:true});}
+});
+window.FarmAnimalCare?.init({
+  animals:()=>currentScene==='main'?queryObjects(['animal']):[],reachable:reachableAnimal,
+  distance:a=>Math.hypot(player.x-a.x,player.y-a.y),
+  identity:a=>(scenes.main?.objects||[]).filter(o=>o.type==='animal'&&o.kind===a.kind).indexOf(a),
+  hay:()=>player.inv.hay||0,cold:isFrio,act:careForAnimal,message:showAlert,
+  canOpen:()=>gameStarted&&!player.dead&&!_gameInputBlocked()&&!_actionUiOpen(),
+  beforeOpen(){for(const k in keys)keys[k]=false;player.moving=false;player.running=false;FarmOriginalAudio.resetFootsteps();}
 });
 renderTasks(); renderInv(); renderShop(); renderJournal(); renderHistologyHud(); updateBars(); refreshSaveButtons();
 requestAnimationFrame(loop);

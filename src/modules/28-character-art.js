@@ -51,9 +51,10 @@
   const expressions=Object.freeze(['neutral','warm','thoughtful','concerned','joyful','resolved','surprised']);
   const armGestures=Object.freeze(['explain','invite','point','reflect','reassure','shrug']);
   const heldProps=Object.freeze(['seed','notebook','sign','ribbon','crate','vessel']);
-  const actionKinds=Object.freeze(['plant','water','harvest','collect','feed','fish']);
+  const actionKinds=Object.freeze(['plant','water','harvest','collect','feed','pet','fish']);
   const actionBend=Object.freeze({plant:[0,0,1,2,4,5,5,4,3,2,1,0],water:[0,0,0,1,1,1,1,1,1,0,0,0],
-    harvest:[0,0,1,3,5,5,4,3,2,1,0,0],collect:[0,0,1,2,3,3,2,1,1,0,0,0],feed:[0,0,0,1,2,2,2,1,1,0,0,0],fish:[0,0,-1,-1,0,0,0,0,0,0,0,0]});
+    harvest:[0,0,1,3,5,5,4,3,2,1,0,0],collect:[0,0,1,2,3,3,2,1,1,0,0,0],feed:[0,0,0,1,2,2,2,1,1,0,0,0],
+    pet:[0,0,0,0,1,1,1,1,1,0,0,0],fish:[0,0,-1,-1,0,0,0,0,0,0,0,0]});
   // Rosa acompanha a fala com calma; Nico começa rápido e logo espera. Os
   // tempos pertencem à identidade, sem sorteio ou estado persistente extra.
   const acting=Object.freeze({rosa:[4.9,1.12,.20],lia:[3.8,.95,.09],tomas:[5.3,1.22,.27],
@@ -179,14 +180,16 @@
   }
   function actionGeometry(s){
     const f=s.actionFrame,side=s.dir===1||s.dir===2,back=s.dir===3,bend=actionBend[s.action]?.[f]||0;
-    const reach=[0,.08,.22,.52,.82,1,1,.88,.65,.38,.12,0][f],lean=side&&f>=3&&f<=8?1:0;
+    const reach=(s.action==='pet'?[0,.12,.35,.65,.92,1,1,1,.9,.55,.2,0]:[0,.08,.22,.52,.82,1,1,.88,.65,.38,.12,0])[f],lean=side&&f>=3&&f<=8?1:0;
     let endX=side?7+s.actionReach*2:back?6:2,endY=back?-10:-2;
     if(s.action==='water'){endX=side?9:back?7:2;endY=back?-19:-10;}
     if(s.action==='feed'){endX=side?11:back?7:6;endY=back?-16:side?-8:-4;}
+    if(s.action==='pet'){endX=side?11+s.actionReach:back?7:5;endY=back?-22:side?-18:-11;}
     if(s.action==='collect'){endX=side?9:back?7:3;endY=back?-14:-6;}
     if(s.action==='fish'){endX=side?5:back?6:3;endY=-13;}
     const startX=side?2:back?5:4,startY=back?-14:-9;
     let hx=Math.round(startX+(endX-startX)*reach),hy=Math.round(startY+(endY-startY)*reach);
+    if(s.action==='pet'){const stroke=[0,0,0,0,0,1,2,1,0,0,0,0][f];if(side)hx+=stroke;else hy+=back?-stroke:stroke;}
     if((s.action==='harvest'||s.action==='collect')&&f>=6){const carry=[0,0,0,0,0,0,0,.25,.55,.8,1,1][f];hx=Math.round(hx+(2-hx)*carry);hy=Math.round(hy+(-9-hy)*carry);}
     const rodX=side?[-5,-7,-8,3,13,20,20,20,19,15,9,4][f]:[2,1,0,3,6,8,9,9,8,7,6,5][f];
     const rodY=[-28,-30,-33,-31,-27,-23,-21,-21,-22,-24,-27,-28][f];
@@ -226,6 +229,10 @@
     }else if(s.action==='feed'){
       rect(g,P.soil,ox-2,oy-1,7,5);rect(g,'#b99a66',ox-1,oy-1,5,4);rect(g,P.amber,ox-1,oy-1,5,1);
       if(f>=2&&f<=8){for(let i=0;i<4;i++)limb(g,i%2?P.amber:P.leaf,hx-1+i,hy-1,hx+i,hy-4+(i%2),1);rect(g,hand,hx,hy+1,4,1);}
+    }else if(s.action==='pet'){
+      // Palma aberta e um afago curto: sem saco de feno nem ferramenta.
+      // O quadro seis fica parado quando a redução de movimento está ativa.
+      if(f>=3&&f<=8){rect(g,hand,hx,hy,side?5:4,1);rect(g,hand,hx+1,hy+1,2,1);}
     }else if(s.action==='fish'){
       limb(g,P.ink,hx,hy+1,a.rodX,a.rodY,2);limb(g,'#c39a60',hx,hy,a.rodX,a.rodY,1);
       rect(g,P.edge,hx-2,hy+1,4,4);rect(g,'#a6b7a1',hx-1,hy+2,2,2);rect(g,hand,hx,hy,3,2);
