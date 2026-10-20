@@ -179,8 +179,8 @@
   }
   function closeDialogue(){story()?.close();}
   function mapCanvas(){
-    const c=el('canvas','vale-map');c.width=180;c.height=372;c.setAttribute('aria-label','Mapa do vale com sua posição e os seis moradores');
-    const g=c.getContext('2d'),info=state();g.imageSmoothingEnabled=false;
+    const info=state(),c=el('canvas','vale-map');c.width=180;c.height=Math.round(180*(info.worldHeight||1984)/(info.worldWidth||960));c.setAttribute('aria-label','Mapa do vale com sua posição e os moradores');
+    const g=c.getContext('2d');g.imageSmoothingEnabled=false;
     adapter.drawMap?.(g,c.width,c.height);
     const w=info.worldWidth||960,h=info.worldHeight||1984;
     const house=info.community;if(house){g.fillStyle='#ac6d42';g.fillRect(Math.round(house.x/w*c.width)-4,Math.round(house.y/h*c.height)-4,9,8);g.strokeStyle='#fff0bf';g.strokeRect(Math.round(house.x/w*c.width)-4,Math.round(house.y/h*c.height)-4,9,8);}
@@ -195,7 +195,7 @@
     return n;
   }
   function location(def,info){
-    const n=(info.npcs||[]).find(x=>x.npcId===def.id);const names={farm:'Fazenda',mountain:'Montanha',desert:'Oásis'};
+    const n=(info.npcs||[]).find(x=>x.npcId===def.id);const names={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul'};
     if(!n)return names[def.region]||'Vale';
     const dx=n.x-(info.x||0),dy=n.y-(info.y||0),tiles=Math.round(Math.hypot(dx,dy)/16);
     const direction=Math.abs(dx)>Math.abs(dy)?(dx<0?'oeste':'leste'):(dy<0?'norte':'sul');
@@ -221,7 +221,7 @@
     const active=(s.quests||[]).filter(q=>q.accepted&&!q.completed);
     if(active.length){main.append(el('h3','','Pedidos em andamento'));active.forEach(q=>main.append(questBlock(q)));}
     main.append(button('Ler a carta de Rosa',()=>{closeBook(false);story().interact('letter');}));
-    aside.append(el('span','vale-kicker','Norte · montanha / Sul · oásis'),mapCanvas(),el('p','','O ponto branco é você. Aproxime-se dos moradores e pressione E para conversar.'));
+    aside.append(el('span','vale-kicker','Norte · montanha / Sul · oásis / Leste · mata e veredas'),mapCanvas(),el('p','','O ponto branco é você. Aproxime-se dos moradores e pressione E para conversar.'));
     grid.append(main,aside);card.append(grid,el('h3','','Quem vive no vale'));
     const people=el('div','vale-residents');
     for(const def of cast()){

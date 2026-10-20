@@ -5,7 +5,7 @@
   'use strict';
   const P=Object.freeze({ink:'#183b36',edge:'#28554a',sage:'#66805a',leaf:'#a8b97a',
     amber:'#e3b86b',cream:'#f2dfb4',terra:'#ad6650',soil:'#705348',snow:'#d2e3de'});
-  const keys=Object.freeze(['rosa','lia','tomas','ines','caio','nico']);
+  const keys=Object.freeze(['rosa','lia','tomas','ines','caio','nico','helena','davi','bia']);
   const profiles={
     rosa:{name:'Rosa',role:'Guardiã das sementes',skin:'#d7a982',skinHi:'#efc7a1',skinSh:'#ab765e',
       hair:'#b8bcb0',hairHi:'#e1dfc9',hairSh:'#778a7b',shirt:'#ad6650',shirtHi:'#d78a65',shirtSh:'#794b43',
@@ -24,7 +24,16 @@
       pants:'#847454',pantsHi:'#b09a6a',trim:'#d4a84d',style:'wrap',hairStyle:'headwrap',expression:'warm'},
     nico:{name:'Nico',role:'Aprendiz curioso',skin:'#e3b382',skinHi:'#f4cc99',skinSh:'#c9906b',
       hair:'#875734',hairHi:'#b88142',hairSh:'#5e4432',shirt:'#66805a',shirtHi:'#a8b97a',shirtSh:'#435f49',
-      pants:'#6a715f',pantsHi:'#929b79',trim:'#e3b86b',style:'patch',hairStyle:'messy',expression:'curious'}
+      pants:'#6a715f',pantsHi:'#929b79',trim:'#e3b86b',style:'patch',hairStyle:'messy',expression:'curious'},
+    helena:{name:'Helena',role:'Companheira de estrada',skin:'#bd9b73',skinHi:'#dcc19b',skinSh:'#937451',
+      hair:'#634839',hairHi:'#926d4c',hairSh:'#443b30',shirt:'#795363',shirtHi:'#a67983',shirtSh:'#533e50',
+      pants:'#505f59',pantsHi:'#758274',trim:'#7096a0',style:'traveler',hairStyle:'shortBraid',expression:'steady'},
+    davi:{name:'Davi',role:'Zelador dos canais',skin:'#80563f',skinHi:'#ac805d',skinSh:'#5c3c32',
+      hair:'#7b847c',hairHi:'#bbc0ad',hairSh:'#505d55',shirt:'#a6654c',shirtHi:'#ca8964',shirtSh:'#764b40',
+      pants:'#566258',pantsHi:'#7d8771',trim:'#d4b478',style:'channel',hairStyle:'cropped',expression:'warm'},
+    bia:{name:'Bia',role:'Cultivadora de variedades',skin:'#b1825b',skinHi:'#d9ac7b',skinSh:'#825b44',
+      hair:'#253b34',hairHi:'#4c6050',hairSh:'#182e2b',shirt:'#b69a4d',shirtHi:'#d9bb6d',shirtSh:'#83713e',
+      pants:'#62694d',pantsHi:'#899174',trim:'#6d8054',style:'grower',hairStyle:'bob',expression:'bright'}
   };
   const heroM={name:'Você',role:'Explorador do vale',skin:'#d2a17b',skinHi:'#edc29b',skinSh:'#ac765b',
     hair:'#634839',hairHi:'#936745',hairSh:'#443b30',shirt:'#66805a',shirtHi:'#a8b97a',shirtSh:'#435f49',
@@ -42,10 +51,14 @@
   const expressions=Object.freeze(['neutral','warm','thoughtful','concerned','joyful','resolved','surprised']);
   const armGestures=Object.freeze(['explain','invite','point','reflect','reassure','shrug']);
   const heldProps=Object.freeze(['seed','notebook','sign','ribbon','crate','vessel']);
+  const actionKinds=Object.freeze(['plant','water','harvest','collect','feed','fish']);
+  const actionBend=Object.freeze({plant:[0,0,1,2,4,5,5,4,3,2,1,0],water:[0,0,0,1,1,1,1,1,1,0,0,0],
+    harvest:[0,0,1,3,5,5,4,3,2,1,0,0],collect:[0,0,1,2,3,3,2,1,1,0,0,0],feed:[0,0,0,1,2,2,2,1,1,0,0,0],fish:[0,0,-1,-1,0,0,0,0,0,0,0,0]});
   // Rosa acompanha a fala com calma; Nico começa rápido e logo espera. Os
   // tempos pertencem à identidade, sem sorteio ou estado persistente extra.
   const acting=Object.freeze({rosa:[4.9,1.12,.20],lia:[3.8,.95,.09],tomas:[5.3,1.22,.27],
-    ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],player:[4.4,1,.12]});
+    ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],helena:[5.1,1.13,.22],
+    davi:[5.7,1.18,.18],bia:[4.0,.94,.08],player:[4.4,1,.12]});
   const syllables=Object.freeze(['0121031200103200012010300','01321003001210300121000','01200132000130121000300']);
   const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
@@ -101,16 +114,22 @@
     const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
-    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion&&!speech.conversing;
+    const requested=actionKinds.includes(opts.actionKind)?opts.actionKind:actor.actionType;
+    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&(!opts.reducedMotion||hero)&&!speech.conversing;
+    const heroAction=!!(hero&&action&&actionKinds.includes(requested));
+    const target=opts.actionTarget,hasTarget=heroAction&&Number.isFinite(target?.x)&&Number.isFinite(target?.y);
+    const dx=hasTarget?target.x-actor.x:0,dy=hasTarget?target.y-actor.y-FEET_Y:0;
+    const aim=hasTarget&&Math.hypot(dx,dy)>2?(Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0)):dirOf(actor.dir);
+    const progress=Math.max(0,Math.min(1,Number.isFinite(opts.actionProgress)?opts.actionProgress:1-actor.actionTimer/.35));
     // A simulação conserva a fase ao parar. A amplitude recolhe a passada até
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:restWalking?8:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving&&!restWalking?blend(actor.gaitRunBlend,actor.running?1:0):0;
-    return {dir:dirOf(restWalking?opts.restWalkDir:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
+    return {dir:dirOf(restWalking?opts.restWalkDir:heroAction?aim:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
       moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
       heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
-      action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
-      actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
+      action:action?(hero?(heroAction?requested:'work'):job):'',heroAction,actionReach:hasTarget&&Math.hypot(dx,dy)>18?1:0,
+      actionFrame:action?(heroAction?(opts.reducedMotion?6:Math.min(11,Math.floor(progress*12))):Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8)))):0,
       blink:speech.conversing?speech.speechBlink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
       hat:hero&&!!actor.hat,coat:hero&&!!actor.coatEquipped,scarf:hero&&!!actor.scarf,
       boots:hero&&!!actor.boots,gloves:hero&&!!actor.glovesEquipped,
@@ -118,6 +137,7 @@
   }
   function paintAction(g,d,s,hand,behind){
     if(!s.action||(s.dir===3)!==behind)return;
+    if(s.heroAction){paintHeroAction(g,d,s,hand,behind);return;}
     const f=s.actionFrame,side=s.dir===1||s.dir===2,back=s.dir===3;
     const reach=[0,-1,1,3,4,3,2,0][f],drop=[0,-1,0,2,3,2,1,0][f];
     // A mão direita alcança o chão na direção observada; de costas, ferramenta
@@ -156,6 +176,83 @@
       limb(g,P.soil,0,0,side?5:0,tip,1);rect(g,P.cream,side?4:-2,tip,side?4:5,2);rect(g,'#82b6aa',side?4:-2,tip,side?4:5,1);
     }
     g.restore();
+  }
+  function actionGeometry(s){
+    const f=s.actionFrame,side=s.dir===1||s.dir===2,back=s.dir===3,bend=actionBend[s.action]?.[f]||0;
+    const reach=[0,.08,.22,.52,.82,1,1,.88,.65,.38,.12,0][f],lean=side&&f>=3&&f<=8?1:0;
+    let endX=side?7+s.actionReach*2:back?6:2,endY=back?-10:-2;
+    if(s.action==='water'){endX=side?9:back?7:2;endY=back?-19:-10;}
+    if(s.action==='feed'){endX=side?11:back?7:6;endY=back?-16:side?-8:-4;}
+    if(s.action==='collect'){endX=side?9:back?7:3;endY=back?-14:-6;}
+    if(s.action==='fish'){endX=side?5:back?6:3;endY=-13;}
+    const startX=side?2:back?5:4,startY=back?-14:-9;
+    let hx=Math.round(startX+(endX-startX)*reach),hy=Math.round(startY+(endY-startY)*reach);
+    if((s.action==='harvest'||s.action==='collect')&&f>=6){const carry=[0,0,0,0,0,0,0,.25,.55,.8,1,1][f];hx=Math.round(hx+(2-hx)*carry);hy=Math.round(hy+(-9-hy)*carry);}
+    const rodX=side?[-5,-7,-8,3,13,20,20,20,19,15,9,4][f]:[2,1,0,3,6,8,9,9,8,7,6,5][f];
+    const rodY=[-28,-30,-33,-31,-27,-23,-21,-21,-22,-24,-27,-28][f];
+    return{f,side,back,bend,lean,hx,hy,rodX,rodY};
+  }
+  function paintHeroAction(g,d,s,hand,behind){
+    const a=actionGeometry(s),{f,side,back,bend,lean,hx,hy}=a,shirt=s.coat?'#739598':d.shirtHi;
+    g.save();if(!behind)g.translate(-lean,-bend);
+    // As mãos têm um ombro e um cotovelo. Ferramentas seguem o punho, enquanto
+    // os dois pés sustentam a flexão; o corpo nunca desliza para alcançar o alvo.
+    const sx=(side?0:5)+lean,sy=(back?-15:-13)+bend,kx=Math.round((sx+hx)/2)+(side?-1:1),ky=Math.round((sy+hy)/2)+1;
+    limb(g,shirt,sx,sy,kx,ky,3);limb(g,shirt,kx,ky,hx,hy,2);rect(g,hand,hx,hy,3,2);
+    // A mão de apoio sobe em relação ao tronco ao agachar: o saco e o cesto
+    // ficam suspensos, sem atravessar as botas nem afundar no chão.
+    const ox=side?-3:-6,oy=Math.min(-6,-8+bend);
+    limb(g,s.coat?'#2e505b':d.shirtSh,(side?-3:-7)+lean,-13+bend,ox,oy,3);rect(g,hand,ox,oy+2,3,2);
+    if(s.action==='plant'){
+      rect(g,P.edge,ox-2,oy-3,6,7);rect(g,'#b99a66',ox-1,oy-3,4,6);rect(g,P.cream,ox,oy-1,2,2);rect(g,P.soil,ox-1,oy-3,4,1);
+      if(f>=3&&f<=7){rect(g,P.amber,hx+1,hy+2,2,1);rect(g,P.cream,hx+1,hy+2,1,1);}
+    }else if(s.action==='water'){
+      const tilt=f>=4&&f<=8;
+      rect(g,P.edge,hx-3,hy-4,7,6);rect(g,'#60968a',hx-2,hy-4,5,5);rect(g,'#a6c6ad',hx-2,hy-4,4,1);
+      rect(g,P.edge,hx-5,hy-4,2,4);rect(g,P.edge,hx-4,hy-5,4,1);rect(g,hand,hx-3,hy-2,2,2);
+      if(side){limb(g,P.edge,hx+3,hy-2,hx+7,hy+(tilt?0:-4),2);rect(g,'#a6c6ad',hx+7,hy+(tilt?0:-4),2,1);}
+      else if(back){limb(g,P.edge,hx+2,hy-3,hx+3,hy-7,2);rect(g,'#a6c6ad',hx+2,hy-8,3,1);}
+      else{rect(g,P.edge,hx+1,hy+1,2,4);rect(g,'#a6c6ad',hx,hy+4,4,1);}
+    }else if(s.action==='harvest'){
+      rect(g,P.soil,ox-3,oy,9,5);rect(g,P.amber,ox-3,oy,9,1);rect(g,'#bd9450',ox-2,oy+3,7,1);
+      limb(g,P.soil,ox-2,oy,ox,oy-3,1);limb(g,P.soil,ox,oy-3,ox+4,oy,1);
+      if(f>=6){rect(g,P.terra,hx,hy-2,4,4);rect(g,P.leaf,hx+1,hy-4,2,2);rect(g,P.cream,hx,hy-2,1,1);}
+    }else if(s.action==='collect'){
+      if(f>=5){
+        const xx=hx-5,yy=hy-3;rect(g,P.edge,xx,yy,11,6);rect(g,'#a97d4d',xx,yy,10,5);
+        rect(g,'#d1a16a',xx,yy,9,1);rect(g,P.soil,xx,yy+2,10,1);rect(g,'#e0bd85',xx+8,yy,3,2);rect(g,'#e0bd85',xx+7,yy+3,3,2);
+        rect(g,hand,xx+1,yy+4,3,2);rect(g,hand,xx+7,yy+4,3,2);
+      }
+    }else if(s.action==='feed'){
+      rect(g,P.soil,ox-2,oy-1,7,5);rect(g,'#b99a66',ox-1,oy-1,5,4);rect(g,P.amber,ox-1,oy-1,5,1);
+      if(f>=2&&f<=8){for(let i=0;i<4;i++)limb(g,i%2?P.amber:P.leaf,hx-1+i,hy-1,hx+i,hy-4+(i%2),1);rect(g,hand,hx,hy+1,4,1);}
+    }else if(s.action==='fish'){
+      limb(g,P.ink,hx,hy+1,a.rodX,a.rodY,2);limb(g,'#c39a60',hx,hy,a.rodX,a.rodY,1);
+      rect(g,P.edge,hx-2,hy+1,4,4);rect(g,'#a6b7a1',hx-1,hy+2,2,2);rect(g,hand,hx,hy,3,2);
+      limb(g,shirt,ox,-12+bend,hx-3,hy+3,2);rect(g,hand,hx-3,hy+3,2,2);
+    }
+    g.restore();
+  }
+  function actionEffects(g,actor,s,p,opts){
+    if(!s.heroAction||s.rest||actor.dead)return;
+    const a=actionGeometry(s),flip=s.dir===1?-1:1,target=opts.actionTarget;
+    const finite=Number.isFinite(target?.x)&&Number.isFinite(target?.y);
+    const fallback={x:p.x+(s.dir===1?-18:s.dir===2?18:0),y:p.y+FEET_Y+(s.dir===3?-15:s.dir===0?12:0)};
+    const tx=finite?p.x+target.x-actor.x:fallback.x,ty=finite?p.y+target.y-actor.y:fallback.y;
+    if(Math.hypot(tx-p.x,ty-p.y)>112)return;
+    const px=x=>Math.round(p.x+x*flip),py=y=>Math.round(p.y+FEET_Y+y),f=a.f;
+    if(s.action==='fish'){
+      const cast=[0,0,.08,.3,.7,1,1,1,1,.75,.3,0][f],rx=px(a.rodX),ry=py(a.rodY);
+      const endX=Math.round(rx+(tx-rx)*cast),endY=Math.round(ry+(ty-ry)*cast+4*(1-cast));
+      const middleX=Math.round((rx+endX)/2),middleY=Math.round((ry+endY)/2+(opts.reducedMotion?1:3));
+      limb(g,'#d1d3ad',rx,ry,middleX,middleY,1);limb(g,'#d1d3ad',middleX,middleY,endX,endY,1);
+      rect(g,P.terra,endX-1,endY-2,3,2);rect(g,P.cream,endX-1,endY-3,3,1);
+    }else if(!opts.reducedMotion&&s.action==='water'&&f>=4&&f<=8){
+      const sx=px(a.hx+(a.side?8:a.back?3:1)),sy=py(a.hy+(a.side?1:a.back?-7:5));
+      for(let i=0;i<3;i++){const t=(i+(f%3)/3)/3,x=Math.round(sx+(tx-sx)*t),y=Math.round(sy+(ty-sy)*t-2*Math.sin(t*Math.PI));rect(g,i%2?'#82b6aa':P.snow,x,y,1,2);}
+    }else if(!opts.reducedMotion&&s.action==='plant'&&f>=5&&f<=7){
+      const t=(f-4)/4,x=Math.round(px(a.hx+1)+(tx-px(a.hx+1))*t),y=Math.round(py(a.hy+2)+(ty-py(a.hy+2))*t);rect(g,P.amber,x,y,1,1);
+    }
   }
   // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
@@ -209,6 +306,16 @@
         for(let i=0;i<4;i++){rect(g,d.hair,side?-6:5,-23+i*2,3,2);rect(g,d.hairHi,side?-6:5,-23+i*2,1,1);}
         rect(g,d.trim,side?-6:5,-15,2,1);
       }else{rect(g,d.hair,side?-7:5,-24,3,8);rect(g,d.hairHi,side?-7:5,-24,1,6);rect(g,d.trim,side?-7:5,-24,2,1);}
+    }else if(d.hairStyle==='shortBraid'){
+      rect(g,d.hairHi,-4,-26,5,1);
+      for(let i=0;i<3;i++){rect(g,d.hair,side?-7:5,-23+i*2,3,2);rect(g,d.hairHi,side?-7:5,-23+i*2,1,1);}
+      rect(g,d.trim,side?-7:5,-17,2,1);
+    }else if(d.hairStyle==='cropped'){
+      rect(g,d.hair,-5,-27,10,3);rect(g,d.hairHi,-4,-27,6,1);
+      rect(g,d.hairHi,side?-4:-5,-23,2,3);if(!side)rect(g,d.hairHi,4,-23,1,3);
+    }else if(d.hairStyle==='bob'){
+      rect(g,d.hair,side?-6:-7,-26,side?4:3,10);rect(g,d.hairSh,side?-6:5,-23,side?2:3,7);
+      rect(g,d.hairHi,side?-5:-6,-25,1,7);rect(g,d.hair,-4,-25,8,2);rect(g,d.hair,-4,-23,3,2);
     }else if(d.hairStyle==='messy'){
       rect(g,d.hair,-5,-28,3,2);rect(g,d.hair,0,-29,3,3);rect(g,d.hairHi,0,-28,1,1);
       rect(g,d.hair,4,-27,2,3);
@@ -217,6 +324,10 @@
       rect(g,'#9b793d',-7,-29,14,3);rect(g,P.amber,-6,-30,12,3);rect(g,P.cream,-6,-30,5,1);
       rect(g,P.edge,-7,-27,14,1);rect(g,'#bd9450',-9,-26,18,2);rect(g,P.amber,-9,-26,16,1);
       rect(g,P.cream,-8,-26,5,1);rect(g,'#9b793d',6,-25,3,1);
+    }
+    if(d.style==='traveler'){
+      rect(g,d.trim,side?-4:-5,-17,side?8:10,2);rect(g,'#a3b7b3',side?-3:-4,-17,side?5:7,1);
+      rect(g,d.trim,side?2:3,-15,2,4);rect(g,'#496c7a',side?3:4,-14,1,3);
     }
     if(s.scarf){
       rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
@@ -328,7 +439,7 @@
     if(!bed&&s.dir===1)g.scale(-1,1);
     const side=!bed&&(s.dir===1||s.dir===2),back=!bed&&s.dir===3;
     const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
-    const hand=s.gloves?'#b79562':d.skin,boot=s.boots?'#40534a':P.soil;
+    const hand=s.gloves?'#b79562':d.skin,boot=s.boots?'#40534a':d.style==='channel'?'#43534c':P.soil;
     if(bed){
       // Âncora fornecida pela integração: pés = margem inferior do colchão-5.
       // A cabeça repousa no travesseiro, e a manta cobre as pernas sem sombra
@@ -364,6 +475,18 @@
         if(d.style==='field'&&!s.coat){rect(g,P.soil,side?-4:-6,top+5,3,3);rect(g,P.amber,side?-4:-6,top+5,3,1);}
         if(d.style==='patch'){rect(g,d.trim,3,top+4,2,2);}
       }
+      // A pausa conserva os pertences e a roupa dos novos moradores.
+      if(d.style==='traveler'){
+        if(back||side){rect(g,P.soil,side?-7:-5,top+1,side?4:10,7);rect(g,'#9a7d5d',side?-7:-4,top+2,side?3:8,5);rect(g,P.amber,side?-7:-4,top+2,side?3:8,1);rect(g,P.cream,side?-7:-4,top+5,2,2);}
+        else{for(let i=0;i<5;i++)rect(g,P.soil,3-i,top+1+i,2,1);rect(g,P.soil,-6,top+5,3,3);rect(g,P.cream,-6,top+6,2,1);}
+      }else if(d.style==='channel'){
+        if(!back){rect(g,P.cream,side?-1:-2,top+2,side?2:4,5);rect(g,d.shirtSh,side?2:3,top+2,2,5);}
+        const rx=side?-5:-6;rect(g,d.trim,rx,top+2,1,6);for(let i=0;i<3;i++)rect(g,P.soil,rx,top+2+i*2,1,1);
+      }else if(d.style==='grower'){
+        if(back){rect(g,d.trim,-4,top+1,2,6);rect(g,d.trim,3,top+1,2,6);}
+        else{rect(g,d.trim,side?-2:-4,top+2,side?6:8,5);rect(g,'#8d9b68',side?-2:-4,top+2,2,5);}
+        const bx=side?-5:-7;rect(g,P.soil,bx,top+4,4,4);rect(g,'#9b895b',bx,top+5,3,2);rect(g,P.cream,bx,top+4,1,2);rect(g,'#a8c4aa',bx+2,top+4,1,2);
+      }
       // Antebraços desenhados sobre as coxas: mãos soltas apoiadas no colo.
       if(side){limb(g,shirtHi,-1,top+2,1,top+6,3);limb(g,shirtHi,1,top+6,5,-5,2);rect(g,hand,5,-5,3,2);}
       else{limb(g,shirtSh,-7,top+2,-5,-6,3);limb(g,shirtHi,5,top+2,3,-6,3);rect(g,hand,-4,-5,3,2);rect(g,hand,1,-5,3,2);}
@@ -385,11 +508,17 @@
     const gaitX=f=>walkX[f]+(runX[f]-walkX[f])*run;
     const gaitY=f=>(walkY[f]+(runY[f]-walkY[f])*run)*strength;
     const careful=['book','map','sort'].includes(s.action);
-    const lift=s.rest?5:(s.action?(careful?[0,0,0,-1,-1,0,0,0]:[0,-1,0,2,3,2,1,0])[s.actionFrame]:Math.round(-strength*(run>.5?[0,0,0,0,0,0,1,1]:[0,0,1,1,1,1,0,0])[s.frame%8]));
-    const boot=s.boots?'#40534a':P.soil,sole=P.ink;
+    const lift=s.heroAction?actionBend[s.action][s.actionFrame]:s.rest?5:(s.action?(careful?[0,0,0,-1,-1,0,0,0]:[0,-1,0,2,3,2,1,0])[s.actionFrame]:Math.round(-strength*(run>.5?[0,0,0,0,0,0,1,1]:[0,0,1,1,1,1,0,0])[s.frame%8]));
+    const boot=s.boots?'#40534a':d.style==='channel'?'#43534c':P.soil,sole=P.ink;
     const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
     const hand=s.gloves?'#b79562':d.skin;
-    if(s.rest){
+    if(s.heroAction){
+      for(const rear of [true,false]){
+        const foot=side?(rear?-4:1):(rear?-5:2),hip=side?-2:(rear?-4:3),knee=foot+(side?Math.min(3,Math.max(0,lift)):Math.sign(foot)*Math.min(2,Math.max(0,lift))),hy=-8+Math.round(Math.max(0,lift)*.6);
+        limb(g,rear?d.pants:d.pantsHi,hip,hy,knee,-4,3);limb(g,rear?d.pants:d.pantsHi,knee,-4,foot,-3,3);
+        rect(g,boot,foot-1,-2,5,2);rect(g,sole,foot-1,-1,5,1);if(s.boots)rect(g,P.amber,foot,-2,2,1);
+      }
+    }else if(s.rest){
       rect(g,d.pants,-7,-5,6,4);rect(g,d.pantsHi,-7,-5,6,1);
       rect(g,d.pants,1,-4,6,3);rect(g,d.pantsHi,1,-4,5,1);
       rect(g,boot,-8,-2,4,2);rect(g,boot,5,-2,4,2);
@@ -424,13 +553,13 @@
     paintSpeechGesture(g,d,s,hand,true);
     // Na corrida o peito avança um pixel sobre o apoio; cabeça e roupa seguem
     // o mesmo volume, sem sacudir os pés ou deslocar a sombra.
-    g.translate(side?Math.round(run*strength):0,lift);
+    g.translate(side?(s.heroAction?actionGeometry(s).lean:Math.round(run*strength)):0,lift);
     // Manga posterior e mãos alternam com a perna oposta.
     const swing=Math.round((gaitX(s.frame)+1)*.28*strength*(back?1:-1));
     if(side){
       const arm=(gaitX(s.frame)+1)*(.45+run*.1)*strength;
       const rearHand=Math.round(arm),frontHand=Math.round(-arm),handY=-7-Math.round(run*2);
-      if(!(bothSpeechArms(s))){
+      if(!(bothSpeechArms(s))&&!s.heroAction){
         limb(g,shirtSh,-2,-15,Math.round(rearHand*.45)-2,-11,3);
         limb(g,shirtSh,Math.round(rearHand*.45)-2,-11,rearHand-1,handY-1,2);rect(g,hand,rearHand,handY,2,2);
       }
@@ -440,7 +569,7 @@
         limb(g,shirtHi,Math.round(frontHand*.4)-1,-10,frontHand,handY-1,2);rect(g,hand,frontHand+1,handY,2,2);
       }
     }else{
-      if(!(bothSpeechArms(s))){rect(g,shirtSh,-8,-14+swing,3,6);rect(g,hand,-8,-8+swing,2,2);}
+      if(!(bothSpeechArms(s))&&!s.heroAction){rect(g,shirtSh,-8,-14+swing,3,6);rect(g,hand,-8,-8+swing,2,2);}
       rect(g,shirt,-6,-16,12,9);rect(g,shirtHi,-6,-15,2,7);rect(g,shirtSh,4,-15,2,8);
       rect(g,shirt,-6,-7,12,1);rect(g,shirt,-6,-15,12,2);
       rect(g,shirt,-6,-15,12,2);
@@ -456,6 +585,26 @@
     }else if(d.style==='vest'&&!s.coat){
       rect(g,P.cream,side?-1:-2,-15,side?2:4,7);rect(g,d.trim,side?2:3,-12,2,2);
       if(!back){rect(g,P.soil,-4,-15,1,8);rect(g,P.amber,-4,-8,3,3);rect(g,P.soil,-4,-8,3,1);}
+    }else if(d.style==='traveler'&&!s.coat){
+      if(back||side){
+        rect(g,P.soil,side?-7:-5,-15,side?4:10,9);rect(g,'#9a7d5d',side?-7:-4,-14,side?3:8,7);
+        rect(g,P.amber,side?-7:-4,-14,side?3:8,1);rect(g,P.soil,side?-6:-1,-11,2,4);
+        rect(g,P.cream,side?-7:-4,-9,2,3);
+      }else{
+        rect(g,d.shirtSh,-4,-15,2,8);rect(g,P.cream,-2,-15,4,7);
+        for(let i=0;i<6;i++)rect(g,P.soil,3-i,-15+i,2,1);
+        rect(g,P.soil,-6,-10,3,4);rect(g,P.cream,-6,-9,2,2);
+      }
+    }else if(d.style==='channel'&&!s.coat){
+      if(!back){rect(g,P.cream,side?-1:-2,-15,side?2:4,8);rect(g,d.shirtSh,side?2:3,-15,2,8);rect(g,d.trim,side?2:3,-12,1,1);}
+      const rx=side?-5:-6;rect(g,P.soil,rx,-13,2,8);rect(g,d.trim,rx,-13,1,8);
+      for(let i=0;i<3;i++)rect(g,P.soil,rx,-11+i*2,1,1);
+      rect(g,d.shirtSh,side?1:3,-8,3,2);rect(g,d.trim,side?1:3,-8,3,1);
+    }else if(d.style==='grower'&&!s.coat){
+      if(back){rect(g,d.trim,-4,-15,2,9);rect(g,d.trim,3,-15,2,9);rect(g,d.trim,-5,-9,10,1);}
+      else{rect(g,d.trim,side?-2:-4,-14,side?6:8,9);rect(g,'#8d9b68',side?-2:-4,-14,side?2:3,8);rect(g,P.cream,side?-1:-3,-9,2,2);}
+      const bx=side?-5:-7;rect(g,P.soil,bx,-10,4,5);rect(g,'#9b895b',bx,-9,3,3);
+      rect(g,P.cream,bx,-10,1,3);rect(g,'#a8c4aa',bx+2,-10,1,3);rect(g,d.trim,bx+2,-10,1,1);
     }else if(d.style==='wrap'&&!s.coat){
       rect(g,d.trim,side?-3:-5,-15,side?6:10,2);rect(g,'#a07839',side?2:3,-13,2,5);
       rect(g,P.cream,side?-3:-5,-7,side?7:10,1);
@@ -522,7 +671,9 @@
     if(!g||!actor) return false;const p=position(actor,opts),s=state(actor,opts,hero);
     g.save();g.imageSmoothingEnabled=false;if(s.restMode!=='bed')shadow(g,p.x,p.y+FEET_Y,s.rest);
     if(actor.dead) g.globalAlpha*=0.65;
+    if(s.dir===3)actionEffects(g,actor,s,p,opts);
     drawSprite(g,id,actor.gender==='f'?'f':'m',s,p.x-AX,p.y+FEET_Y-AY);
+    if(s.dir!==3)actionEffects(g,actor,s,p,opts);
     if(hero&&!opts.reducedMotion&&!actor.dead&&s.restMode!=='bed'){
       const phase=Math.floor(clock(opts)/180)%4;
       if(opts.winter&&actor.temp<36.2&&s.dir!==3){
@@ -597,6 +748,23 @@
       rect(g,d.trim,24,10,3,11);rect(g,'#a07839',26,12,1,9);rect(g,P.amber,24,12,1,6);
       rect(g,d.hairSh,12,19,10,2);rect(g,d.hair,13,20,8,3);rect(g,d.skin,16,19,3,1);
       rect(g,P.cream,16,20,3,1);rect(g,d.trim,10,25,14,2);rect(g,'#a07839',21,27,2,3);
+    }else if(d.hairStyle==='shortBraid'){
+      rect(g,d.hair,9,8,3,8);rect(g,d.hairHi,10,8,1,6);rect(g,d.hair,10,7,12,3);
+      for(let i=0;i<4;i++){rect(g,d.hairSh,23+(i%2),16+i*2,3,2);rect(g,d.hairHi,23+(i%2),16+i*2,1,1);}
+      rect(g,d.trim,24,24,2,1);rect(g,d.trim,11,24,12,3);rect(g,'#a3b7b3',12,24,8,1);
+      rect(g,d.trim,20,27,3,3);rect(g,'#496c7a',22,27,1,3);
+      rect(g,P.soil,9,26,2,4);rect(g,P.cream,10,28,3,2);
+    }else if(d.hairStyle==='cropped'){
+      rect(g,d.hair,10,6,13,4);rect(g,d.hairHi,11,6,10,1);rect(g,d.hairHi,10,10,2,5);rect(g,d.hairHi,22,11,2,4);
+      rect(g,d.hairSh,10,9,2,1);rect(g,d.hairSh,21,9,2,1);
+      rect(g,d.skinSh,11,18,2,1);rect(g,d.skinSh,21,18,2,1);
+      rect(g,P.cream,14,25,6,5);rect(g,d.shirtSh,10,25,3,5);rect(g,d.shirtSh,21,25,3,5);
+      rect(g,d.trim,24,23,2,7);for(let i=0;i<3;i++)rect(g,P.soil,25,24+i*2,1,1);
+    }else if(d.hairStyle==='bob'){
+      rect(g,d.hair,8,8,4,12);rect(g,d.hairHi,9,9,1,8);rect(g,d.hairSh,23,10,3,10);
+      rect(g,d.hair,10,6,13,5);rect(g,d.hairHi,11,6,6,1);rect(g,d.hair,11,10,5,3);
+      rect(g,d.trim,12,25,2,5);rect(g,d.trim,21,25,2,5);rect(g,d.trim,12,28,11,2);
+      rect(g,P.soil,7,27,4,3);rect(g,P.cream,7,26,1,3);rect(g,'#a8c4aa',9,26,1,3);
     }else if(d.hairStyle==='messy'){
       rect(g,d.hair,9,5,5,4);rect(g,d.hair,15,3,5,5);rect(g,d.hair,21,5,3,4);
       rect(g,d.hairHi,16,4,3,1);rect(g,d.hairHi,10,6,3,1);rect(g,d.hair,12,10,3,2);
@@ -682,10 +850,11 @@
     target.setAttribute?.('role','img');target.setAttribute?.('aria-label','Retrato de '+(opts.name||profile(id,gender).name));return true;
   }
   window.FarmCharacterArt=Object.freeze({
-    keys,definitions,palette:P,gestures,expressions,heldProps,anchor:Object.freeze({x:AX,y:AY,feetOffsetY:FEET_Y,width:W,height:H}),
+    keys,definitions,palette:P,gestures,expressions,heldProps,actionKinds,anchor:Object.freeze({x:AX,y:AY,feetOffsetY:FEET_Y,width:W,height:H}),
     drawPlayer(g,p,opts={}){return draw(g,p,'player',opts,true);},
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
+    actionInfo(actor,opts={}){const s=state(actor,opts,true);return{kind:s.action,frame:s.actionFrame,direction:s.dir,active:s.heroAction,reach:s.actionReach};},
     // Diagnóstico de baixo custo para integração; não revela nem altera saves.
     cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,speechBanks:speechBanks.size,maxSprites:MAX_SPRITES,maxPortraits:MAX_PORTRAITS,maxSpeechBanks:MAX_SPEECH_BANKS};}
   });

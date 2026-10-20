@@ -86,9 +86,49 @@
       choices:[decision('Uma casa de encontros e experiências, aberta a quem chegar.','Prepare três produtos para a mesa. Vamos receber quem vem com sementes e quem vem só com perguntas. A casa não cobra uma história pronta para oferecer uma cadeira.','A Casa se torna um ponto aberto de encontros; os moradores mantêm projetos pessoais e convidam Alex a participar.','Ficar não será virar perfeito. Será ter a coragem modesta de ser encontrado amanhã.',[obj('produce','Recolha 3 produções novas para o encontro','produce',3)]),
         decision('Uma casa de trabalho e trocas, com encontros regulares.','Entregue três encomendas. A mesa vai acompanhar o que entra, o que sai e quem precisa de ajuda. Não faremos da festa uma despedida do cuidado.','A Casa organiza trocas regulares; o vale mantém projetos, produção e encomendas após a investigação.','Talvez eu seja bom em começar. Quero descobrir se consigo ser bom em continuar.',[obj('order','Entregue 3 encomendas da fazenda','order',3)])],
       finalChoice:true,
-      resolution:'Rosa põe o envelope no centro. Tomás vira a placa para mostrar o verso. Lia abre a página com a pergunta ainda incompleta. Inês traz a fita; Caio, a caixa de duas etiquetas; Nico, um mapa agora assinado por ele.\n\n“Eu fui embora achando que deixar de atrapalhar era ajudar”, você diz. “Não quero fazer isso outra vez. Se eu precisar partir, aviso. Se ficar difícil, peço ajuda. E se prometi demais, vocês podem me lembrar.”\n\nTomás ergue a sobrancelha. “Essa última parte nós já fazíamos.” Nico ri primeiro. Rosa não fecha o arquivo.\n\nA reserva voltou a circular. A fazenda continua. Cada morador ainda tem um problema, uma vontade e trabalho para amanhã. Você tem lugar entre eles, sem precisar ocupar todos os lugares.',
       inner:'O vento não guardou um tesouro. A gente guardou outra tentativa. Hoje também guardei a chave da minha casa — e parei de tratá-la como bilhete de volta.',focus:{x:608,y:1212},cut:[['player','Não prometo ser a pessoa que resolve tudo. Prometo avisar quando não souber.','thoughtful','explain'],['tomas','Já é uma melhoria enorme no seu antigo sistema de desaparecer com uma tábua.','warm','nod'],['nico','E podemos pôr seu nome no mapa sem escrever “talvez”?','joyful','invite'],['player','Pode. Deixa espaço para errar a letra. Pretendo estar aqui para lixar depois.','joyful','nod']]}
   ];
+  // O ato final já pede seis conversas. Cada uma apresenta a proposta escolhida
+  // e uma condição do morador; as contagens e os IDs continuam os mesmos.
+  const tableAgreements=[{
+    summary:'Rosa divide a acolhida. Lia conduz as perguntas, sem precisar ter todas as respostas. Tomás confere os reparos por etapas. Inês combina horários com retorno seguro. Caio escolhe o que traz do oásis. Nico apresenta sua própria experiência. Você cuida da sua parte e avisa quando precisar de ajuda.',
+    response:{
+      rosa:'Uma casa aberta a quem chegar: quero isso. Mas abrir a porta não pode virar obrigação sua ou minha todo dia. Eu recebo o pessoal e combino quem me substitui. Você traz sua pergunta, Alex; não precisa chegar com seis cadeiras nas costas.',
+      lia:'Topo a casa de encontros e experiências. Fico com a roda de perguntas, com uma condição: uma dúvida pode sair daqui ainda aberta. Você traz o que observou, eu mostro como conferir; nenhum de nós precisa inventar certeza para merecer a cadeira.',
+      tomas:'A casa pode receber gente antes do último reparo, sim. Eu confiro as cadeiras e escolho o serviço que cabe no dia. Se quiser ajudar, combinamos qual peça é sua. Não apareça prometendo uma oficina inteira em meu nome.',
+      ines:'Quero participar desses encontros. Só peço que a hora permita voltar da montanha com calma. Eu confiro a rota e aviso quando precisar mudar. Você pode guardar minha cadeira; não precisa sair para me buscar sempre que eu me atrasar.',
+      caio:'Aceito vir à casa aberta, inclusive num dia em que eu não trouxer caixa. Quero poder escolher o que compartilho do oásis. Eu preparo minha viagem; você me pergunta do que preciso antes de separar ajuda. Assim eu também consigo dizer não.',
+      nico:'Na casa de experiências eu quero mostrar meu canteiro, com a parte que saiu torta. Pode ficar perto se eu travar? Perto, sem terminar minha frase. Eu preparo a página e apresento. Você fica com suas próprias perguntas difíceis.'
+    },
+    echo:{
+      rosa:'Hoje combinei quem abre a porta depois de mim. A casa aberta que escolhemos também precisa permitir que a gente saia um pouco.',
+      lia:'Nossa roda de experiências ganhou uma pergunta que ficou sem resposta. Deixei marcada para voltar a ela, como combinamos.',
+      tomas:'Conferi as cadeiras do encontro. A prateleira espera a próxima etapa. Você não prometeu terminá-la por mim; eu reparei.',
+      ines:'O encontro termina a tempo de eu conferir o retorno. A cadeira guardada ajudou; o horário combinado ajudou também.',
+      caio:'Vim ao encontro sem uma entrega para justificar a visita. Ainda conferi a caixa por costume. Depois deixei em casa.',
+      nico:'Na nossa roda, apresentei minha página antes de pedir sua ajuda. Minha voz saiu meio fina. A história conseguiu sair junto.'
+    },
+    alex:'“Eu fui embora achando que deixar de atrapalhar era ajudar”, você diz. “Agora quase prometi fazer tudo para compensar. Fico com minha horta e com uma pergunta para a roda. Lia conduz a conversa; Nico conta a parte dele. Eu pergunto antes de pegar o trabalho de vocês. Se eu prometer demais de novo, podem me lembrar.”'
+  },{
+    summary:'Rosa confere as entradas com outra pessoa. Lia registra produtos e condições, sem transformar a produção em disputa. Tomás combina prazos que caibam no dia. Inês avisa saída e retorno das rotas. Caio mantém o direito de negociar cada troca. Nico registra somente o que acompanhou. Você assume suas entregas, sem assinar as dos outros.',
+    response:{
+      rosa:'Uma casa de trabalho e trocas regulares pode continuar depois da festa. Eu confiro as entradas com outra pessoa, para a lista não virar segredo de gaveta. Você assume suas entregas, Alex. Se faltar alguma coisa, a gente combina quem pode ajudar; não põe tudo no seu nome.',
+      lia:'Topo acompanhar a casa de trabalho e trocas. Registro o produto e as condições em que foi feito; não quero uma disputa de quem produziu mais. Traga seus números e suas dificuldades. Eu cuido da comparação, sem decidir por você o que precisa fazer amanhã.',
+      tomas:'Aceito o trabalho regular se o prazo for combinado antes da promessa. Deixo no quadro o que consigo fazer e aviso quando a lista encher. Você responde pelas suas entregas; não por todos os atrasos do vale. Uma folga na agenda também sustenta a oficina.',
+      ines:'As trocas precisam de ida e volta, não de alguém sempre disponível na trilha. Eu anoto saída e retorno e aviso se a rota mudar. Combine suas entregas com esse tempo. Se eu adiar uma viagem, quero que a mesa reorganize o trabalho, não que você saia correndo no meu lugar.',
+      caio:'Entro nas trocas regulares, com uma condição: cada lado pode recusar ou propor outra coisa. Eu confiro a reserva do oásis e digo o que posso levar. Você não garante minha parte antes de perguntar. Gosto de um acordo em que a minha voz chega antes da caixa.',
+      nico:'Quero ajudar no registro das trocas. Posso começar pelas caixas que eu realmente conferir? Eu escrevo quem trouxe e pergunto quando não souber. Se você preencher a lista inteira antes de mim, vai ficar bonita, mas eu continuo sem aprender a fazer a minha parte.'
+    },
+    echo:{
+      rosa:'A lista das trocas tem outra letra ao lado da minha. Ficou menos uniforme. Ficou mais fácil sair da mesa para fazer outra coisa.',
+      lia:'Na nossa lista de trocas, uma colheita menor veio com a anotação de uma pausa. Mantive as duas informações; números sozinhos escondem trabalho.',
+      tomas:'Uma encomenda passou para outro dia. Avisei no quadro. Sua parte continuou na sua linha; obrigado por não prometer meu prazo por mim.',
+      ines:'Deixei o retorno da próxima troca anotado. Se a rota mudar, aviso. A mesa já sabe reorganizar o trabalho sem transformar atraso em corrida.',
+      caio:'Propus outra quantidade para a próxima troca. A conversa continuou. A regra de poder discordar já encontrou serviço.',
+      nico:'Conferi uma caixa e escrevi uma linha na lista. Só uma, mas eu consigo explicar cada palavra dela. A próxima espera sua vez.'
+    },
+    alex:'“Eu fui embora achando que deixar de atrapalhar era ajudar”, você diz. “Na primeira lista de trocas, quase pus meu nome em todas as viagens. Risquei. Assumo minhas entregas e aviso se não conseguir. Tomás combina os prazos; Inês e Caio decidem suas rotas. Nico confere sua linha antes de assinar. Se eu prometer demais de novo, podem me lembrar.”'
+  }];
   const arcs={
     rosa:{title:'Uma chave para mais de uma mão',agenda:'Preservar sementes e permitir que a próxima geração transforme a casa.',flaw:'Confunde guardar objetos com proteger pessoas; custa a dividir a responsabilidade.',unlock:0,
       stages:[{title:'A caixa que Rosa não oferece',coins:12,offer:'Guardo a melhor amostra esperando uma estação ideal. É uma maneira elegante de nunca colocá-la em risco. Quero separar um lote novo depois de duas colheitas. Você olha a caixa comigo e escolhe como vamos tratar essa espera.',objectives:[obj('clue','Releia o envelope da caixa','inspect',1,{clueId:'carta-perdida'}),obj('harvest','Faça 2 colheitas depois do combinado','harvest',2)],choices:[decision('Compartilhar a amostra com quem está começando.','Vou separar amostras pequenas para outras mãos. A caixa na varanda ganha a etiqueta “primeira tentativa”.','Rosa expõe uma caixa de primeira tentativa e passa a convidar novatos.','Uma boa semente fora da minha mão ainda pode ser uma boa semente.'),decision('Manter uma referência e plantar o restante.','Vou guardar uma amostra pequena, com registro, e liberar o resto. Se eu tentar reservar a caixa inteira de novo, pode apontar para a etiqueta.','Rosa mantém uma referência identificada e deixa o restante circular.','Guardar uma parte é cuidado. Guardar tudo também pode ser medo.')],resolution:'A caixa ficou mais leve. Eu também. Agora entendi por que você olhava tanto para ela: parecia importante demais para uma primeira tentativa. Obrigada por não aceitar minha desculpa de esperar a estação perfeita.'},
@@ -206,13 +246,14 @@
   function offer(npcId,type,key,step){if(!validTarget(type,key,step))return menu(npcId);const def=definition(type,key,step),data=dataFor(type,key,step)||freshRecord(),prefix='saga:'+targetId(type,key,step);
     const choices=data.status==='offered'?(def.choices?.length?def.choices.map((c,i)=>({id:prefix+':accept:'+i,label:c.label})):[{id:prefix+':accept:0',label:'Aceitar o próximo combinado'}]):data.status==='ready'?[{id:prefix+':deliver',label:def.finalChoice?'Voltar à mesa e firmar o acordo':'Concluir o combinado e contar o resultado'}]:[];
     choices.push({id:'saga:menu',label:'Voltar aos projetos deste morador'},{id:'saga:close',label:'Vou pensar; até depois'});
-    const message=data.status==='offered'?def.offer||def.description:data.status==='ready'?readyLine(npcId,type,key)+'\n\n'+objectiveLine(objectiveViews(def,data)):data.status==='completed'?def.resolution:((type==='episode'?investigationBeats[Number(key)]?.active[data.choice]:null)||def.choices?.[data.choice]?.reply||'Nosso combinado está em andamento.')+'\n\n'+objectiveLine(objectiveViews(def,data));
+    const message=data.status==='offered'?def.offer||def.description:data.status==='ready'?readyLine(npcId,type,key)+'\n\n'+objectiveLine(objectiveViews(def,data)):data.status==='completed'?resolutionFor(def,data):((type==='episode'?investigationBeats[Number(key)]?.active[data.choice]:null)||def.choices?.[data.choice]?.reply||'Nosso combinado está em andamento.')+'\n\n'+objectiveLine(objectiveViews(def,data));
     return show(npcId,message,'saga-quest',choices,def.title);
   }
   function latestConsequence(npcId){for(let i=1;i>=0;i--){const r=state.arcs[npcId][i];if(r.status==='completed')return arcs[npcId].stages[i].choices[r.choice]?.consequence||'';}for(let i=Math.min(state.episodeIndex-1,7);i>=0;i--)if(episodes[i].npcId===npcId){const r=state.episodes[i];return episodes[i].choices[r.choice]?.consequence||'';}return'';}
   function readyLine(npcId,type,key){if(type==='episode')return investigationBeats[Number(key)]?.ready.replace(/Alex/g,context().playerName)||'Vamos conferir o que encontramos.';
     return{rosa:'Separei duas cadeiras. A caixa também veio; hoje ela espera enquanto você me conta.',lia:'Trouxe a página aberta. Mostre o que percebeu antes de eu começar a tomar notas.',tomas:'Terminado? Vamos conferir juntos. Guardei uma pergunta sobre como você fez.',ines:'Você voltou com o combinado pronto. Quero ouvir também como foi o caminho.',caio:'Aqui está nossa lista. Vamos conferir dos dois lados antes de guardar.',nico:'Terminamos essa parte! Vou deixar o lápis parado um instante para ouvir você. Um instante de verdade.'}[npcId];}
   function greeting(npcId,options={}){
+    const agreement=tableConversation(npcId);if(agreement)return agreement;
     const base=baseGreeting(npcId,options);if(!base||options.first)return base;
     const delivery=window.FarmLife?.deliveryMemory?.(npcId);if(!delivery)return base;
     const episode=episodes[state.episodeIndex],record=state.episodes[state.episodeIndex],step=arcStep(npcId);
@@ -221,6 +262,12 @@
     // compromisso em andamento. Depois ela volta como lembrança ocasional.
     if(delivery.recent)return delivery.line+(pending?'\n\n'+base:'');
     return !pending&&!options.night&&Math.max(1,num(options.visit))%4===2?delivery.line:base;
+  }
+  function tableConversation(npcId){
+    const r=state.episodes[7];if(!IDS.includes(npcId)||state.episodeIndex!==7||r.acceptedAt===null||!['active','ready'].includes(r.status)||!tableAgreements[r.choice])return'';
+    // Também vale na primeira visita de um save antigo e depois da última
+    // conversa tornar a etapa pronta. Só ler/reler não emite nenhum evento.
+    return tableAgreements[r.choice].response[npcId].replace(/Alex/g,context().playerName)+(npcId==='rosa'&&r.status==='ready'?'\n\n'+readyLine('rosa','episode',7):'');
   }
   function baseGreeting(npcId,options={}){if(!IDS.includes(npcId))return'';const name=context().playerName;
     const welcome={rosa:name+'. Trouxe as mesmas botas e uma cara nova de quem ensaiou explicações na estrada. Deixe as duas na porta por um instante. Guardei sua cadeira; a Casa das Sementes ainda precisa de gente, e eu senti sua falta.',
@@ -238,6 +285,7 @@
     if(visit%3===0){for(let i=state.clues.length-1;i>=0;i--){const reaction=clueReactions[state.clues[i]]?.[npcId];if(reaction)return reaction;}}
     if(visit%3===1){for(let i=1;i>=0;i--){const personal=state.arcs[npcId][i];if(personal.status==='completed')return personalEchoes[npcId][i][personal.choice];}}
     if(options.night===true)return voice.night;
+    if(state.episodeIndex===8&&visit%4===0)return tableAgreements[state.episodes[7].choice]?.echo[npcId]||voice.settled[0];
     let band=state.episodeIndex>=8?'settled':state.episodeIndex>=7?'archive':state.episodeIndex>=3?'middle':'early';
     if(band==='archive'&&!state.clues.includes('arquivo-casa'))band='middle';
     if(band==='middle'&&!state.clues.includes(voiceClues[npcId]))band='early';
@@ -300,14 +348,18 @@
     return show(npcId,(choice?.reply||'Combinado. Faça estas ações a partir de agora e volte para conversarmos sobre o resultado.')+'\n\n'+objectiveLine(objectiveViews(def,data)),'saga-quest',[{id:'saga:menu',label:'Ver meus outros projetos'},{id:'saga:close',label:'Vou começar'}],def.title);
   }
   function deliver(npcId,type,key,step){if(!validTarget(type,key,step))return menu(npcId);const def=definition(type,key,step),data=dataFor(type,key,step);if(!data||data.status!=='ready'||data.paid)return menu(npcId);
-    if(def.finalChoice)return show(npcId,'As seis pessoas ouviram a proposta. O arquivo explica a reserva; só uma conversa entre vocês pode decidir o próximo capítulo.\n\nVocê quer firmar este acordo com o vale?\n\n'+(def.choices[data.choice]?.consequence||''),'saga-decision',[{id:'saga:episode:'+key+':confirm',label:'Ficar, pedir ajuda e cumprir o novo acordo'},{id:'saga:menu',label:'Quero conversar mais antes de assinar'},{id:'saga:close',label:'Volto quando estiver pronto'}],def.title);
+    if(def.finalChoice)return show(npcId,'Trouxe os combinados para a mesa. Antes de firmar, confira o que cada um assumiu:\n\n'+tableAgreements[data.choice].summary+'\n\nVocê quer firmar este acordo com o vale?\n\n'+(def.choices[data.choice]?.consequence||''),'saga-decision',[{id:'saga:episode:'+key+':confirm',label:'Ficar, pedir ajuda e cumprir o novo acordo'},{id:'saga:menu',label:'Quero conversar mais antes de assinar'},{id:'saga:close',label:'Volto quando estiver pronto'}],def.title);
     return grant(npcId,type,key,step,def,data);
   }
   function grant(npcId,type,key,step,def,data){if(data.paid||data.status!=='ready')return menu(npcId);data.paid=true;data.status='completed';state.trust[npcId]=Math.min(100,state.trust[npcId]+(type==='episode'?6:type==='arc'?8:2));
     if(type==='episode')state.episodeIndex++;
     state.coinsEarned=Math.min(LIMIT,state.coinsEarned+def.coins);const id=targetId(type,key,step),choice=def.choices?.[data.choice];journal('finish:'+id,def.title,def.inner||choice?.inner||'Cumpri o combinado e voltei para contar. O vale continua amanhã.',npcId);
     changed();emit('reward',{kind:'saga-'+type,id:'saga:'+id+(type==='recurring'?':'+state.cycleId:''),npcId,coins:def.coins,label:def.title});
-    return show(npcId,(def.resolution||'Nosso novo combinado foi cumprido. Na próxima estação podemos escolher outra tentativa, sem apagar o que já fizemos.')+(choice?.consequence?'\n\nO que mudou: '+choice.consequence:''),def.finalChoice?'saga-final':'saga-response',[{id:'saga:menu',label:state.episodeIndex===8?'A fazenda continua · ver projetos':'Continuar a investigação e os projetos'},{id:'saga:close',label:'Guardar este momento'}],def.title);
+    return show(npcId,(resolutionFor(def,data)||'Nosso novo combinado foi cumprido. Na próxima estação podemos escolher outra tentativa, sem apagar o que já fizemos.')+(choice?.consequence?'\n\nO que mudou: '+choice.consequence:''),def.finalChoice?'saga-final':'saga-response',[{id:'saga:menu',label:state.episodeIndex===8?'A fazenda continua · ver projetos':'Continuar a investigação e os projetos'},{id:'saga:close',label:'Guardar este momento'}],def.title);
+  }
+  function resolutionFor(def,data){
+    if(!def.finalChoice)return def.resolution;
+    return 'Rosa põe o envelope no centro. Tomás vira a placa para mostrar o verso. Lia abre a página com a pergunta ainda incompleta. Inês traz a fita; Caio, a caixa de duas etiquetas; Nico, um mapa agora assinado por ele.\n\n'+tableAgreements[data.choice].alex+'\n\nTomás ergue a sobrancelha. “Essa última parte nós já fazíamos.” Nico ri primeiro. Rosa não fecha o arquivo.\n\nA reserva voltou a circular. A fazenda continua. Cada morador ainda tem um problema, uma vontade e trabalho para amanhã. Você tem lugar entre eles, sem precisar ocupar todos os lugares.';
   }
   function choose(choiceId){if(!dialogue||!dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();const npcId=dialogue.npcId;
     if(choiceId==='saga:close'||choiceId==='saga:back')return close();if(choiceId==='saga:menu')return menu(npcId);

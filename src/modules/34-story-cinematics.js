@@ -3,7 +3,7 @@
    pela barreira de leitura do jogo. As cenas aguardam avanço do jogador. */
 (function(){
   'use strict';
-  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',player:'Você'};
+  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',helena:'Helena',davi:'Davi',bia:'Bia',player:'Você'};
   const shot=(speaker,line,expression='warm',gesture='explain',focus=0)=>({speaker,line,expression,gesture,focus});
   const films=[
     {id:'carta',title:'Uma cadeira guardada',chapter:0,region:'farm',scene:'main',focusX:264,focusY:920,
@@ -54,15 +54,17 @@
   function registerScenes(definitions){
     if(!Array.isArray(definitions))return 0;let count=0;
     for(const def of definitions.slice(0,16)){
-      if(!def||!/^saga-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(!def||!/^(saga|frontier)-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(def.id.startsWith('frontier-')&&(typeof def.frontierMission!=='string'||!/^helena-[a-z-]+$/.test(def.frontierMission)))continue;
       if(!def.shots.every(s=>s&&names[s.speaker]&&typeof s.line==='string'&&s.line.length<1800))continue;
-      const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.slice(5)};
+      const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.startsWith('saga-')?def.id.slice(5):null};
       films.push(film);byId.set(film.id,film);count++;
     }
     return count;
   }
   function available(film){
     if(seen.has(film.id))return true;
+    if(film.frontierMission)return !!read().frontier?.arcs?.some(a=>a.missions?.some(m=>m.id==='frontier:'+film.frontierMission&&m.completed));
     if(!film.sagaEpisode)return film.chapter<=chapterIndex();
     const saga=read().saga;
     return !!saga?.episodes?.some(e=>e.id===film.sagaEpisode&&(e.completed||e.status==='completed'));
@@ -91,7 +93,7 @@
     install();safely(adapter.beforeOpen);previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';root.setAttribute('aria-hidden','false');reduced=isReduced();
   }
   function play(id,opts={}){
-    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||film.sagaEpisode&&!available(film))return false;
+    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||(film.sagaEpisode||film.frontierMission)&&!available(film))return false;
     showOverlay();const state=read();active={kind:'film',film,index:0,elapsed:0,speech:0,reveal:0,replay:!!opts.replay,player:{name:typeof state.name==='string'?state.name.slice(0,40):'Você',gender:state.gender==='f'?'f':'m'},backdrop:null};
     root.querySelector('.vc-gallery').hidden=true;stage.hidden=false;root.querySelector('.vc-dialogue').hidden=false;root.querySelector('.vc-controls').hidden=false;root.querySelector('.vc-skip').textContent='Pular cena';
     heading.textContent=film.title;subheading.textContent='Uma lembrança do vale · avance no seu ritmo';enterShot();nextButton.focus({preventScroll:true});return true;

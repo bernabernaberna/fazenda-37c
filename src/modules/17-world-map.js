@@ -6,13 +6,13 @@
  let adapter={},ready=false,opened=false,previousFocus=null,timer=0,selected=null;
  let mini,miniCanvas,miniRegion,miniTarget,overlay,fullCanvas,currentLabel,selectionLabel,clearButton,list;
  let base=null,baseMap=null,baseObjects=null,baseSeason='',places=[],lastInfo=null,lastMiniView=null;
- const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis'};
+ const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul'};
  const ROOM_NAMES={house:'Casa',barn:'Celeiro',greenhouse:'Estufa'};
  const COLORS={ink:'#213f36',paper:'#f4ecd7',gold:'#ffdc67',teal:'#60d0bd',pin:'#bb537b',water:'#3c8790'};
  const element=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
  const button=(label,fn,cls='fm-button')=>{const n=element('button',cls,label);n.type='button';n.addEventListener('click',fn);return n;};
  const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
- const regionAt=y=>y<42*16?'mountain':y>=90*16?'desert':'farm';
+ const regionAt=(y,x=0)=>window.FarmOpenWorld?.regionAt(x/16,y/16)||(y<42*16?'mountain':y>=90*16?'desert':'farm');
  function read(){
   if(typeof scenes==='undefined'||!scenes.main||typeof player==='undefined')return null;
   const main=scenes.main,scene=typeof currentScene==='string'?currentScene:'main',inside=scene!=='main';
@@ -22,7 +22,7 @@
   const actors=window.FarmStoryIntegration?.read?.().npcs||main.objects.filter(o=>o.type==='story_npc');
   return {main,scene,inside,x:Number(position.x)||0,y:Number(position.y)||0,dir:Number(position.dir)||0,
    width:main.MW*TS,height:main.MH*TS,tileSize:TS,npcs:actors,season:typeof currentSeason==='string'?currentSeason:'hot',
-   region:regionAt(Number(position.y)||0),active:typeof gameStarted!=='undefined'&&gameStarted&&!player.dead};
+   region:regionAt(Number(position.y)||0,Number(position.x)||0),active:typeof gameStarted!=='undefined'&&gameStarted&&!player.dead};
  }
  function canOpen(){
   if(adapter.canOpen)return !!adapter.canOpen();
@@ -51,18 +51,22 @@
    ['lookout','Mirante','fx_lookout','Caminho sul da fazenda'],['weather','Estação meteorológica','fx_weather','Pomar, além do rio']
   ];
   places=[];
-  for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y),number:places.length+1});}
+  for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y,o.x),number:places.length+1});}
   const fruit=objects.find(o=>o.type==='fx_fruittree'&&o.x>45*TS);
-  if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y),number:places.length+1});
+  if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y,fruit.x),number:places.length+1});
+  for(const p of window.FarmOpenWorld?.landmarks||[])places.push({id:'place:'+p.id,name:p.title,kind:'place',x:p.x,y:p.y,description:p.description,region:p.region,number:places.length+1});
   const farm=window.FarmLife?.snapshot?.();
   for(const station of farm?.stations||[]){
-   places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y),number:places.length+1});
+   places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y,station.x),number:places.length+1});
   }
-  for(const clue of farm?.clues||[]){if(clue.found)places.push({id:'clue:'+clue.id,name:clue.title,kind:'place',x:clue.x,y:clue.y,description:'Pista encontrada · releia o registro',region:regionAt(clue.y),number:places.length+1});}
+  for(const clue of farm?.clues||[]){if(clue.found)places.push({id:'clue:'+clue.id,name:clue.title,kind:'place',x:clue.x,y:clue.y,description:'Pista encontrada · releia o registro',region:regionAt(clue.y,clue.x),number:places.length+1});}
  }
  function ensureBase(info){
   if(base&&baseMap===info.main.map&&baseObjects===info.main.objects&&baseSeason===info.season)return;
   baseMap=info.main.map;baseObjects=info.main.objects;baseSeason=info.season;
+  // Mantém a escala dos rótulos quando o mundo cresce, preservando sua proporção.
+  const mapWidth=600,mapHeight=Math.round(mapWidth*info.main.MH/info.main.MW);
+  if(fullCanvas&&(fullCanvas.width!==mapWidth||fullCanvas.height!==mapHeight)){fullCanvas.width=mapWidth;fullCanvas.height=mapHeight;}
   base=document.createElement('canvas');base.width=info.main.MW*8;base.height=info.main.MH*8;const g=base.getContext('2d');
   for(let y=0;y<info.main.MH;y++)for(let x=0;x<info.main.MW;x++){
    g.fillStyle=terrainColor(info.main.map[y]?.[x],info.season==='cold');g.fillRect(x*8,y*8,8,8);
@@ -80,7 +84,7 @@
  }
  function markers(info){
   const cast=window.FarmStoryWorld?.characters||[];
-  return places.concat(info.npcs.map(n=>({id:'npc:'+n.npcId,name:cast.find(c=>c.id===n.npcId)?.name||n.npcId,kind:'npc',x:n.x,y:n.y,description:n.routineDescription||'Morador do vale',region:regionAt(n.y)})));
+  return places.concat(info.npcs.map(n=>({id:'npc:'+n.npcId,name:cast.find(c=>c.id===n.npcId)?.name||n.npcId,kind:'npc',x:n.x,y:n.y,description:n.routineDescription||'Morador do vale',region:regionAt(n.y,n.x)})));
  }
  function target(info){return selected?(selected.kind==='point'?selected:markers(info).find(m=>m.id===selected.id)||null):null;}
  function distanceText(info,point){
@@ -101,7 +105,8 @@
   const factor=base.width/info.width;g.drawImage(base,view.x*factor,view.y*factor,view.w*factor,view.h*factor,0,0,w,h);
   if(full){
    g.textAlign='center';g.font='bold 19px Georgia';g.fillStyle='rgba(29,61,53,.75)';
-   for(const [name,y]of [['MONTANHA',5*TS],['FAZENDA',44*TS],['OÁSIS',96*TS]])g.fillText(name,w/2,y/info.height*h);
+   for(const [name,y]of [['MONTANHA',5*TS],['FAZENDA',44*TS],['OÁSIS',96*TS]])g.fillText(name,30*TS/info.width*w,y/info.height*h);
+   g.font='bold 15px Georgia';for(const region of Object.values(window.FarmOpenWorld?.regions||{}))g.fillText(region.mapLabel,region.mapX*TS/info.width*w,region.mapY*TS/info.height*h);
   }
   const chosen=target(info),pos=pointOnMap(info,view,w,h);
   if(chosen){const p=pointOnMap(chosen,view,w,h);g.strokeStyle='#f9dc85';g.lineWidth=full?3:2;g.setLineDash([8,7]);g.beginPath();g.moveTo(pos.x,pos.y);g.lineTo(p.x,p.y);g.stroke();g.setLineDash([]);}
@@ -147,7 +152,8 @@
   const available=overlay?.querySelector('.fm-body')?.clientHeight||window.innerHeight-245;
   const legendHeight=overlay?.querySelector('.fm-map-key')?.getBoundingClientRect().height||18;
   const height=mobile?Math.min(390,Math.max(220,window.innerHeight-280)):Math.min(600,Math.max(150,available-legendHeight-18));
-  fullCanvas.style.width=Math.min(mobile?width-72:300,height*60/124)+'px';fullCanvas.style.height='auto';
+  const info=lastInfo||read(),ratio=info?info.width/info.height:60/124;
+  fullCanvas.style.width=Math.min(mobile?width-72:300,height*ratio)+'px';fullCanvas.style.height='auto';
  }
  function resize(){if(opened)refresh();else layoutMap();}
  function focusables(){return Array.from(overlay.querySelectorAll('button,[tabindex="0"]')).filter(n=>!n.disabled&&!n.hidden&&n.getClientRects().length);}
@@ -178,7 +184,7 @@
   overlay=element('div');overlay.id='worldMapOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','worldMapTitle');
   const card=element('section','fm-card'),header=element('header','fm-header'),labels=element('div');labels.append(element('span','fm-eyebrow','Encontre seu caminho'));
   const titleFull=element('h2','','Mapa do Vale');titleFull.id='worldMapTitle';currentLabel=element('p','fm-current');labels.append(titleFull,currentLabel);header.append(labels,button('Fechar · Esc',close,'fm-button fm-close'));card.append(header);
-  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro e oásis ao sul. Escolha um local na lista para marcar o destino.');
+  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro, oásis ao sul e mata e veredas a leste. Escolha um local na lista para marcar o destino.');
   const key=element('div','fm-map-key');key.append(element('span','fm-key-player','▲ Você'),element('span','fm-key-npc','● Moradores'),element('span','fm-key-pin','⚑ Destino'));mapColumn.append(fullCanvas,key);list=element('section','fm-list');body.append(mapColumn,list);card.append(body);
   const footer=element('footer','fm-footer'),description=element('div');selectionLabel=element('p','fm-selection');selectionLabel.setAttribute('aria-live','polite');description.append(selectionLabel,element('p','fm-map-note','Marcar um lugar ajuda a se orientar. O percurso é feito caminhando.'));
   const controls=element('div','fm-footer-controls');clearButton=button('Limpar marca',()=>{selected=null;refresh();});clearButton.id='worldMapClear';clearButton.hidden=true;controls.append(clearButton);footer.append(description,controls);card.append(footer);overlay.append(card);document.body.append(mini,overlay);

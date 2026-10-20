@@ -33,6 +33,8 @@
       routine:{day:'Tenta descobrir o que mudou na horta.',night:'Anota ideias para testar no dia seguinte.'}}
   ];
   const byId=Object.fromEntries(characters.map(c=>[c.id,c]));
+  const originalCharacters=clone(characters);let publicCharacters=originalCharacters,frontierCharacters=null;
+  function characterCatalogue(){const extra=window.FarmFrontierStory?.characters;if(extra&&extra!==frontierCharacters){frontierCharacters=extra;publicCharacters=originalCharacters.concat(extra);}return publicCharacters;}
   const letter={title:'A carta de Rosa',text:'Meu bem,\n\nEncontrei uma semente no bolso do avental que você usava aqui. Ela ainda estava embrulhada naquele papel com três riscos. Você dizia que eram os três ventos do vale.\n\nA Casa das Sementes fechou depois que uma ventania soltou a placa e apagou nossas marcas da trilha. Consertamos o caminho, mas a mesa continuou vazia. Cada um ficou esperando uma ocasião melhor. Eu também.\n\nLia guarda perguntas, Tomás guarda ferramentas, Inês conhece a montanha, Caio cuida do oásis e Nico desenhou uma placa maior do que ele. Nenhum deles tem sozinho a história inteira.\n\nVenha plantar alguma coisa comigo. Não precisa resolver tudo no primeiro dia. Desta vez, não vamos esperar que a casa esteja perfeita para convidar as pessoas.\n\nGuardei uma cadeira.\nRosa'};
   const obj=(id,label,event,goal=1,match={})=>({id,text:label,event,goal,match});
   const chapters=[
@@ -300,7 +302,7 @@
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});emit('onDialogue',null);return null;}
+  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});emit('onDialogue',null);return null;}
   // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
   // save da nova investigação permanecem separados dos seis capítulos legados.
   function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
@@ -369,12 +371,13 @@
         status:q.status==='offered'?'available':q.status,completed:q.status==='completed',accepted:q.acceptedAt!==null,objectives:list,
         progress:list.reduce((n,o)=>n+o.n,0),goal:list.reduce((n,o)=>n+o.goal,0),coins:d.coins};
     });
-    return {version:VERSION,chapter:chapterView,quests,friendships:clone(state.friendships),memories:clone(state.memories),
+    const frontier=window.FarmFrontierStory?.diaryView?.();
+    return {version:VERSION,chapter:chapterView,quests:frontier?quests.concat(frontier.quests):quests,friendships:{...clone(state.friendships),...frontier?.friendships},memories:frontier?clone(state.memories).concat(frontier.memories):clone(state.memories),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letterView()),
       coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
-      discoveries:discoveryViews(),discoveryTotal:Object.keys(loreById).length,
+      discoveries:frontier?discoveryViews().concat(frontier.discoveries):discoveryViews(),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0),
       relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
-        discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length}))};
+        discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length})).concat(frontier?.relationships||[])};
   }
   function grant(def,data,kind){
     if(data.paid || data.status!=='ready') return false;
@@ -446,6 +449,8 @@
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
     if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
+    const frontierResponse=window.FarmFrontierStory?.conversationResponse?.(npcId);
+    if(frontierResponse)message+='\n\n'+frontierResponse;
     const activity=text(s.activities[npcId],180);
     if(!preamble){
       const echo=decisionEcho(npcId),notice=noticeLines[npcId];
@@ -478,18 +483,20 @@
     return show(npcId,message,'menu',choices);
   }
   function interact(npcId){
+    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
     if(npcId==='letter'){const savedLetter=letterView();return show('rosa',savedLetter.text,'letter',[{id:'close',label:'Guardar a carta'}],savedLetter.title);}
     if(!byId[npcId])return null;
     window.FarmValleySaga?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
     state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
-    record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});
+    record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});window.FarmFrontierStory?.record?.('talk',{npcId});
     return menu(npcId,first?(window.FarmValleySaga?.greeting?.(npcId,{first:true})||chats[npcId].first):undefined);
   }
   function choose(choiceId){
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
+    if(choiceId.startsWith('frontier:'))return window.FarmFrontierStory?.choose?.(choiceId)||currentDialogue();
     if(choiceId==='back')return menu(npcId);
     if(choiceId.startsWith('saga:')){
       if(choiceId==='saga:back'){window.FarmValleySaga?.close?.({silent:true});return menu(npcId);}
@@ -635,7 +642,7 @@
   }
   state=fresh(ctx({season:'hot',region:'farm'}));
   window.FarmStoryWorld={
-    characters:clone(characters),chapters:clone(chapters),
+    get characters(){return characterCatalogue();},chapters:clone(chapters),
     init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh(ctx());initialized=true;}return snapshot();},
     interact,currentDialogue,choose,advance,close,presentSaga,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
     serialize:()=>clone(state),restore,

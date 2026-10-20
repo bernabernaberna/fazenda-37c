@@ -60,7 +60,7 @@ Object.assign(box,{FarmStoryWorld:j.story,TS:16,T,scenes:{main},currentScene:'ma
  resumeGame(){},closeShop(){},toggleInventory(){},toggleJournal(){},toggleSkinView(){},nearObj(){return null;},
  renderInv(){},renderShop(){},showToast(){},flashFx(){},saveGame(){},queueMicrotask(){},performance:{now:()=>0},
  document:{getElementById:()=>({tabIndex:-1,classList:{contains:()=>false},focus(){}})},
- FarmStoryUI:{init(){},refresh(){},showDialogue(){},close(){j.story.close();}},
+ FarmStoryUI:{init(){},refresh(){},showDialogue(){},close(){j.story.close();},isOpen(){return j.story.isOpen();}},
  FarmBiomes:{addObjectToMain:o=>main.objects.push(o),registerObjectDrawer(){},registerInteraction(){}},
 });
 box.window.FarmStoryUI=box.FarmStoryUI;box.window.FarmWorldDepth={isBlocked:blocked,navigationVersion:1};
@@ -69,7 +69,9 @@ const actors=()=>integration.read().npcs;
 function tick(seconds){for(let i=0;i<Math.ceil(seconds/.05);i++)integration.update(.05);}
 check('Moradores mudam de lugar conforme a rotina, com passo por distância percorrida',()=>{
  tick(.1);const before=actors().map(o=>({x:o.x,y:o.y,anim:o.anim}));box.timeOfDay=13;integration.update(.05);
- let moved=0;actors().forEach((o,i)=>{const d=Math.hypot(o.x-before[i].x,o.y-before[i].y);if(d>.01){moved++;assert.ok(Math.abs(o.anim-before[i].anim-d*Math.PI*2/36)<1e-8);}else assert.equal(o.moving,false);});assert.ok(moved>=4);
+ // O ciclo de passada atual percorre24px; o contrato de movimento continua
+ // ligado à distância física, inclusive quando um caminho termina neste tick.
+ let moved=0;actors().forEach((o,i)=>{const d=Math.hypot(o.x-before[i].x,o.y-before[i].y);if(d>.01){moved++;assert.ok(Math.abs(o.anim-before[i].anim-d*Math.PI*2/24)<1e-8);}else assert.equal(o.moving,false);});assert.ok(moved>=4);
  tick(15);assert.ok(actors().every(o=>o.routineDescription.length>8));assert.ok(actors().some(o=>o.npcActivity==='rest'));
 });
 check('Proximidade interrompe trajeto e gesto sem arrastar os pés',()=>{

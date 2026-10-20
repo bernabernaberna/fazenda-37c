@@ -4024,6 +4024,8 @@ body.hud-game #legend{display:none !important;}
       routine:{day:'Tenta descobrir o que mudou na horta.',night:'Anota ideias para testar no dia seguinte.'}}
   ];
   const byId=Object.fromEntries(characters.map(c=>[c.id,c]));
+  const originalCharacters=clone(characters);let publicCharacters=originalCharacters,frontierCharacters=null;
+  function characterCatalogue(){const extra=window.FarmFrontierStory?.characters;if(extra&&extra!==frontierCharacters){frontierCharacters=extra;publicCharacters=originalCharacters.concat(extra);}return publicCharacters;}
   const letter={title:'A carta de Rosa',text:'Meu bem,\n\nEncontrei uma semente no bolso do avental que você usava aqui. Ela ainda estava embrulhada naquele papel com três riscos. Você dizia que eram os três ventos do vale.\n\nA Casa das Sementes fechou depois que uma ventania soltou a placa e apagou nossas marcas da trilha. Consertamos o caminho, mas a mesa continuou vazia. Cada um ficou esperando uma ocasião melhor. Eu também.\n\nLia guarda perguntas, Tomás guarda ferramentas, Inês conhece a montanha, Caio cuida do oásis e Nico desenhou uma placa maior do que ele. Nenhum deles tem sozinho a história inteira.\n\nVenha plantar alguma coisa comigo. Não precisa resolver tudo no primeiro dia. Desta vez, não vamos esperar que a casa esteja perfeita para convidar as pessoas.\n\nGuardei uma cadeira.\nRosa'};
   const obj=(id,label,event,goal=1,match={})=>({id,text:label,event,goal,match});
   const chapters=[
@@ -4291,7 +4293,7 @@ body.hud-game #legend{display:none !important;}
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});emit('onDialogue',null);return null;}
+  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});emit('onDialogue',null);return null;}
   // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
   // save da nova investigação permanecem separados dos seis capítulos legados.
   function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
@@ -4360,12 +4362,13 @@ body.hud-game #legend{display:none !important;}
         status:q.status==='offered'?'available':q.status,completed:q.status==='completed',accepted:q.acceptedAt!==null,objectives:list,
         progress:list.reduce((n,o)=>n+o.n,0),goal:list.reduce((n,o)=>n+o.goal,0),coins:d.coins};
     });
-    return {version:VERSION,chapter:chapterView,quests,friendships:clone(state.friendships),memories:clone(state.memories),
+    const frontier=window.FarmFrontierStory?.diaryView?.();
+    return {version:VERSION,chapter:chapterView,quests:frontier?quests.concat(frontier.quests):quests,friendships:{...clone(state.friendships),...frontier?.friendships},memories:frontier?clone(state.memories).concat(frontier.memories):clone(state.memories),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letterView()),
       coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
-      discoveries:discoveryViews(),discoveryTotal:Object.keys(loreById).length,
+      discoveries:frontier?discoveryViews().concat(frontier.discoveries):discoveryViews(),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0),
       relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
-        discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length}))};
+        discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length})).concat(frontier?.relationships||[])};
   }
   function grant(def,data,kind){
     if(data.paid || data.status!=='ready') return false;
@@ -4437,6 +4440,8 @@ body.hud-game #legend{display:none !important;}
       if((s.timeOfDay>=19||s.timeOfDay<6))message+='\n\n'+chats[npcId].night;
     }
     if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
+    const frontierResponse=window.FarmFrontierStory?.conversationResponse?.(npcId);
+    if(frontierResponse)message+='\n\n'+frontierResponse;
     const activity=text(s.activities[npcId],180);
     if(!preamble){
       const echo=decisionEcho(npcId),notice=noticeLines[npcId];
@@ -4469,18 +4474,20 @@ body.hud-game #legend{display:none !important;}
     return show(npcId,message,'menu',choices);
   }
   function interact(npcId){
+    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
     if(npcId==='letter'){const savedLetter=letterView();return show('rosa',savedLetter.text,'letter',[{id:'close',label:'Guardar a carta'}],savedLetter.title);}
     if(!byId[npcId])return null;
     window.FarmValleySaga?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
     state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
-    record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});
+    record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});window.FarmFrontierStory?.record?.('talk',{npcId});
     return menu(npcId,first?(window.FarmValleySaga?.greeting?.(npcId,{first:true})||chats[npcId].first):undefined);
   }
   function choose(choiceId){
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
+    if(choiceId.startsWith('frontier:'))return window.FarmFrontierStory?.choose?.(choiceId)||currentDialogue();
     if(choiceId==='back')return menu(npcId);
     if(choiceId.startsWith('saga:')){
       if(choiceId==='saga:back'){window.FarmValleySaga?.close?.({silent:true});return menu(npcId);}
@@ -4626,7 +4633,7 @@ body.hud-game #legend{display:none !important;}
   }
   state=fresh(ctx({season:'hot',region:'farm'}));
   window.FarmStoryWorld={
-    characters:clone(characters),chapters:clone(chapters),
+    get characters(){return characterCatalogue();},chapters:clone(chapters),
     init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh(ctx());initialized=true;}return snapshot();},
     interact,currentDialogue,choose,advance,close,presentSaga,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
     serialize:()=>clone(state),restore,
@@ -4818,8 +4825,8 @@ body.hud-game #legend{display:none !important;}
   }
   function closeDialogue(){story()?.close();}
   function mapCanvas(){
-    const c=el('canvas','vale-map');c.width=180;c.height=372;c.setAttribute('aria-label','Mapa do vale com sua posição e os seis moradores');
-    const g=c.getContext('2d'),info=state();g.imageSmoothingEnabled=false;
+    const info=state(),c=el('canvas','vale-map');c.width=180;c.height=Math.round(180*(info.worldHeight||1984)/(info.worldWidth||960));c.setAttribute('aria-label','Mapa do vale com sua posição e os moradores');
+    const g=c.getContext('2d');g.imageSmoothingEnabled=false;
     adapter.drawMap?.(g,c.width,c.height);
     const w=info.worldWidth||960,h=info.worldHeight||1984;
     const house=info.community;if(house){g.fillStyle='#ac6d42';g.fillRect(Math.round(house.x/w*c.width)-4,Math.round(house.y/h*c.height)-4,9,8);g.strokeStyle='#fff0bf';g.strokeRect(Math.round(house.x/w*c.width)-4,Math.round(house.y/h*c.height)-4,9,8);}
@@ -4834,7 +4841,7 @@ body.hud-game #legend{display:none !important;}
     return n;
   }
   function location(def,info){
-    const n=(info.npcs||[]).find(x=>x.npcId===def.id);const names={farm:'Fazenda',mountain:'Montanha',desert:'Oásis'};
+    const n=(info.npcs||[]).find(x=>x.npcId===def.id);const names={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul'};
     if(!n)return names[def.region]||'Vale';
     const dx=n.x-(info.x||0),dy=n.y-(info.y||0),tiles=Math.round(Math.hypot(dx,dy)/16);
     const direction=Math.abs(dx)>Math.abs(dy)?(dx<0?'oeste':'leste'):(dy<0?'norte':'sul');
@@ -4860,7 +4867,7 @@ body.hud-game #legend{display:none !important;}
     const active=(s.quests||[]).filter(q=>q.accepted&&!q.completed);
     if(active.length){main.append(el('h3','','Pedidos em andamento'));active.forEach(q=>main.append(questBlock(q)));}
     main.append(button('Ler a carta de Rosa',()=>{closeBook(false);story().interact('letter');}));
-    aside.append(el('span','vale-kicker','Norte · montanha / Sul · oásis'),mapCanvas(),el('p','','O ponto branco é você. Aproxime-se dos moradores e pressione E para conversar.'));
+    aside.append(el('span','vale-kicker','Norte · montanha / Sul · oásis / Leste · mata e veredas'),mapCanvas(),el('p','','O ponto branco é você. Aproxime-se dos moradores e pressione E para conversar.'));
     grid.append(main,aside);card.append(grid,el('h3','','Quem vive no vale'));
     const people=el('div','vale-residents');
     for(const def of cast()){
@@ -4924,7 +4931,7 @@ body.hud-game #legend{display:none !important;}
 (function(){
   'use strict';
   let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
-  let cinematicReady=false,lastStory=null,lastSaga=null;
+  let cinematicReady=false,lastStory=null,lastSaga=null,lastFrontier=null;
   const cinematicQueue=[];
   const chapterScenes={1:'horta',2:'rio',3:'abrigo',4:'oasis'};
   const actors=[];
@@ -4965,6 +4972,8 @@ body.hud-game #legend{display:none !important;}
     activities:activityLines,community:{...community}});
   const expandedRead=()=>({...read(),player,coins:player.coins,active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen(),story:window.FarmStoryWorld?.snapshot?.(),saga:window.FarmValleySaga?.snapshot?.()});
   const farmRead=()=>({...read(),player,objects:scenes.main.objects,mainCrops:currentScene==='main'?crops:scenes.main.crops,active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen()});
+  // A exploração é atualizada a cada quadro; não precisa clonar os diários.
+  const frontierRead=()=>({...read(),active:gameStarted,paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen()});
   function canOpenReading(){return gameStarted&&!player.dead&&!cutsceneActive&&!window.FarmStoryCinematics?.isOpen?.()&&!histologyMissionOpen&&!tutorialActive
     &&!(typeof _pendingTutorialAfterCutscene!=='undefined'&&_pendingTutorialAfterCutscene)&&!document.getElementById('tutorialOverlay')?.classList.contains('show');}
   function safePoint(x,y){
@@ -5013,7 +5022,7 @@ body.hud-game #legend{display:none !important;}
   function record(type,payload={}){
     if(!active||!gameStarted||player.dead)return false;
     // Eventos novos (estudo, oficina, produção) também chegam à saga quando o legado não os usa.
-    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);return true;
+    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);window.FarmFrontierStory?.record?.(type,payload);return true;
   }
   function reward(event){
     const coins=Math.floor(Number(event.coins)||0);if(coins<=0||coins>1000)return;
@@ -5042,15 +5051,24 @@ body.hud-game #legend{display:none !important;}
       queueScene(lastSaga.cinematicId);
     lastSaga=current;
   }
+  function observeFrontier(snapshot){
+    const completed=new Set((snapshot?.arcs||[]).flatMap(a=>a.missions||[]).filter(m=>m.completed).map(m=>m.id));
+    if(lastFrontier&&gameStarted&&!restoring)for(const scene of window.FarmFrontierStory?.cinematicScenes?.()||[]){
+      const id='frontier:'+scene.frontierMission;
+      if(completed.has(id)&&!lastFrontier.has(id))queueScene(scene.id);
+    }
+    lastFrontier=completed;
+  }
   function initializeCinematics(){
     if(cinematicReady||!window.FarmStoryCinematics)return;cinematicReady=true;
-    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
+    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),frontier:window.FarmFrontierStory?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
       beforeOpen(){window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();beforeOpen();},
       onClose(){document.getElementById('game')?.focus({preventScroll:true});refreshNarrative();},
       onChange(){refreshNarrative();scheduleSave();},
       drawWorld(g,view){return window.drawCinematicWorld?.(g,view)===true;}
     });
     if(window.FarmValleySaga?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmValleySaga.cinematicScenes());
+    if(window.FarmFrontierStory?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmFrontierStory.cinematicScenes());
   }
   function visualUpdate(dt){
     if(!active||!gameStarted||document.hidden)return;initializeCinematics();
@@ -5118,11 +5136,17 @@ body.hud-game #legend{display:none !important;}
       openSkin(){toggleSkinView();},
       onTransaction(result){if(result?.ok){renderInv();window.synthSfx?.chimeOk?.();}else window.synthSfx?.cancel?.();}
     });
+    window.FarmFrontierStory?.init?.({readState:frontierRead,reward,
+      onDialogue(d){FarmStoryWorld.presentSaga?.(d);},
+      onChange(snapshot){observeFrontier(snapshot);refreshNarrative();scheduleSave();}
+    });
+    observeFrontier(window.FarmFrontierStory?.snapshot?.());
     for(const def of FarmStoryWorld.characters)place(def);
     observeStory(FarmStoryWorld.snapshot());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());initializeCinematics();
     rebuildNavigation();
     FarmBiomes.registerObjectDrawer('story_npc',drawNPC);
     FarmBiomes.registerInteraction('story_npc',o=>{if(!gameStarted||player.dead)return false;FarmStoryWorld.interact(o.npcId);return true;});
+    FarmBiomes.registerInteraction('open_world_landmark',o=>{if(!gameStarted||player.dead)return false;return window.FarmFrontierStory?.inspect?.(o.landmarkId)!==false;});
     document.getElementById('game').tabIndex=-1;
     FarmStoryUI.refresh();
   }
@@ -5169,8 +5193,8 @@ body.hud-game #legend{display:none !important;}
   }
   function destination(o,index,world){
     const band=timeOfDay<6||timeOfDay>=20?3:timeOfDay<11?0:timeOfDay<15?1:2;
-    const normal=routines[o.npcId][band],home=homes[o.npcId];
-    if(world.gathering||world.sagaGathering){
+    const normal=(routines[o.npcId]||window.FarmFrontierStory?.routines?.[o.npcId]||routines.rosa)[band],home=homes[o.npcId];
+    if((world.gathering||world.sagaGathering)&&index<6){
       // Lugares ao redor da praça; espaço entre corpos e frente da porta livres.
       const seats=[[-48,16],[-16,32],[16,32],[48,16],[48,48],[-48,48]],seat=seats[index];
       return {key:'gather:'+community.x+':'+community.y,x:community.x+seat[0],y:community.y+seat[1],
@@ -5188,7 +5212,7 @@ body.hud-game #legend{display:none !important;}
   }
   function update(dt){
     if(!active||!gameStarted||player.dead||document.hidden||!Number.isFinite(dt)||dt<=0||isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen())return;
-    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);
+    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);window.FarmFrontierStory?.update?.(dt,frontierRead());
     const sagaWorld=window.FarmValleySaga?.worldState?.(),world={...FarmStoryWorld.worldState(),sagaGathering:!!sagaWorld?.festival&&timeOfDay>=16&&timeOfDay<20};
     // Rotinas também avançam ao entrar em casa; não somem nem teleportam na volta.
     for(let i=0;i<actors.length;i++){
@@ -5215,7 +5239,7 @@ body.hud-game #legend{display:none !important;}
       }
       const gaitTarget=o.moving?1:0;
       o.gaitBlend=(o.gaitBlend||0)+(gaitTarget-(o.gaitBlend||0))*(1-Math.exp(-dt/(gaitTarget ? .045 : .065)));
-      o.region=o.y<42*TS?'mountain':o.y>=90*TS?'desert':'farm';
+      o.region=window.FarmOpenWorld?.regionAt(o.x/TS,o.y/TS)||(o.y<42*TS?'mountain':o.y>=90*TS?'desert':'farm');
     }
     // Durante a aula, quem já chegou acompanha o outro morador com o olhar.
     // As rotas continuam físicas; nenhuma chegada teleporta o elenco.
@@ -5231,8 +5255,8 @@ body.hud-game #legend{display:none !important;}
     if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.y))return false;
     community={x:point.x,y:point.y};navigation=null;for(const o of actors)o._routineKey='';return true;
   }
-  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
-  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
+  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
+  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());observeFrontier(window.FarmFrontierStory?.snapshot?.());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
   function isOpen(){return !!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()||!!window.FarmValleyPanels?.isOpen?.();}
   window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,conversationPose,
     cinematicQueue:()=>cinematicQueue.slice(),
@@ -5251,13 +5275,13 @@ body.hud-game #legend{display:none !important;}
  let adapter={},ready=false,opened=false,previousFocus=null,timer=0,selected=null;
  let mini,miniCanvas,miniRegion,miniTarget,overlay,fullCanvas,currentLabel,selectionLabel,clearButton,list;
  let base=null,baseMap=null,baseObjects=null,baseSeason='',places=[],lastInfo=null,lastMiniView=null;
- const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis'};
+ const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul'};
  const ROOM_NAMES={house:'Casa',barn:'Celeiro',greenhouse:'Estufa'};
  const COLORS={ink:'#213f36',paper:'#f4ecd7',gold:'#ffdc67',teal:'#60d0bd',pin:'#bb537b',water:'#3c8790'};
  const element=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
  const button=(label,fn,cls='fm-button')=>{const n=element('button',cls,label);n.type='button';n.addEventListener('click',fn);return n;};
  const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
- const regionAt=y=>y<42*16?'mountain':y>=90*16?'desert':'farm';
+ const regionAt=(y,x=0)=>window.FarmOpenWorld?.regionAt(x/16,y/16)||(y<42*16?'mountain':y>=90*16?'desert':'farm');
  function read(){
   if(typeof scenes==='undefined'||!scenes.main||typeof player==='undefined')return null;
   const main=scenes.main,scene=typeof currentScene==='string'?currentScene:'main',inside=scene!=='main';
@@ -5267,7 +5291,7 @@ body.hud-game #legend{display:none !important;}
   const actors=window.FarmStoryIntegration?.read?.().npcs||main.objects.filter(o=>o.type==='story_npc');
   return {main,scene,inside,x:Number(position.x)||0,y:Number(position.y)||0,dir:Number(position.dir)||0,
    width:main.MW*TS,height:main.MH*TS,tileSize:TS,npcs:actors,season:typeof currentSeason==='string'?currentSeason:'hot',
-   region:regionAt(Number(position.y)||0),active:typeof gameStarted!=='undefined'&&gameStarted&&!player.dead};
+   region:regionAt(Number(position.y)||0,Number(position.x)||0),active:typeof gameStarted!=='undefined'&&gameStarted&&!player.dead};
  }
  function canOpen(){
   if(adapter.canOpen)return !!adapter.canOpen();
@@ -5296,18 +5320,22 @@ body.hud-game #legend{display:none !important;}
    ['lookout','Mirante','fx_lookout','Caminho sul da fazenda'],['weather','Estação meteorológica','fx_weather','Pomar, além do rio']
   ];
   places=[];
-  for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y),number:places.length+1});}
+  for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y,o.x),number:places.length+1});}
   const fruit=objects.find(o=>o.type==='fx_fruittree'&&o.x>45*TS);
-  if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y),number:places.length+1});
+  if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y,fruit.x),number:places.length+1});
+  for(const p of window.FarmOpenWorld?.landmarks||[])places.push({id:'place:'+p.id,name:p.title,kind:'place',x:p.x,y:p.y,description:p.description,region:p.region,number:places.length+1});
   const farm=window.FarmLife?.snapshot?.();
   for(const station of farm?.stations||[]){
-   places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y),number:places.length+1});
+   places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y,station.x),number:places.length+1});
   }
-  for(const clue of farm?.clues||[]){if(clue.found)places.push({id:'clue:'+clue.id,name:clue.title,kind:'place',x:clue.x,y:clue.y,description:'Pista encontrada · releia o registro',region:regionAt(clue.y),number:places.length+1});}
+  for(const clue of farm?.clues||[]){if(clue.found)places.push({id:'clue:'+clue.id,name:clue.title,kind:'place',x:clue.x,y:clue.y,description:'Pista encontrada · releia o registro',region:regionAt(clue.y,clue.x),number:places.length+1});}
  }
  function ensureBase(info){
   if(base&&baseMap===info.main.map&&baseObjects===info.main.objects&&baseSeason===info.season)return;
   baseMap=info.main.map;baseObjects=info.main.objects;baseSeason=info.season;
+  // Mantém a escala dos rótulos quando o mundo cresce, preservando sua proporção.
+  const mapWidth=600,mapHeight=Math.round(mapWidth*info.main.MH/info.main.MW);
+  if(fullCanvas&&(fullCanvas.width!==mapWidth||fullCanvas.height!==mapHeight)){fullCanvas.width=mapWidth;fullCanvas.height=mapHeight;}
   base=document.createElement('canvas');base.width=info.main.MW*8;base.height=info.main.MH*8;const g=base.getContext('2d');
   for(let y=0;y<info.main.MH;y++)for(let x=0;x<info.main.MW;x++){
    g.fillStyle=terrainColor(info.main.map[y]?.[x],info.season==='cold');g.fillRect(x*8,y*8,8,8);
@@ -5325,7 +5353,7 @@ body.hud-game #legend{display:none !important;}
  }
  function markers(info){
   const cast=window.FarmStoryWorld?.characters||[];
-  return places.concat(info.npcs.map(n=>({id:'npc:'+n.npcId,name:cast.find(c=>c.id===n.npcId)?.name||n.npcId,kind:'npc',x:n.x,y:n.y,description:n.routineDescription||'Morador do vale',region:regionAt(n.y)})));
+  return places.concat(info.npcs.map(n=>({id:'npc:'+n.npcId,name:cast.find(c=>c.id===n.npcId)?.name||n.npcId,kind:'npc',x:n.x,y:n.y,description:n.routineDescription||'Morador do vale',region:regionAt(n.y,n.x)})));
  }
  function target(info){return selected?(selected.kind==='point'?selected:markers(info).find(m=>m.id===selected.id)||null):null;}
  function distanceText(info,point){
@@ -5346,7 +5374,8 @@ body.hud-game #legend{display:none !important;}
   const factor=base.width/info.width;g.drawImage(base,view.x*factor,view.y*factor,view.w*factor,view.h*factor,0,0,w,h);
   if(full){
    g.textAlign='center';g.font='bold 19px Georgia';g.fillStyle='rgba(29,61,53,.75)';
-   for(const [name,y]of [['MONTANHA',5*TS],['FAZENDA',44*TS],['OÁSIS',96*TS]])g.fillText(name,w/2,y/info.height*h);
+   for(const [name,y]of [['MONTANHA',5*TS],['FAZENDA',44*TS],['OÁSIS',96*TS]])g.fillText(name,30*TS/info.width*w,y/info.height*h);
+   g.font='bold 15px Georgia';for(const region of Object.values(window.FarmOpenWorld?.regions||{}))g.fillText(region.mapLabel,region.mapX*TS/info.width*w,region.mapY*TS/info.height*h);
   }
   const chosen=target(info),pos=pointOnMap(info,view,w,h);
   if(chosen){const p=pointOnMap(chosen,view,w,h);g.strokeStyle='#f9dc85';g.lineWidth=full?3:2;g.setLineDash([8,7]);g.beginPath();g.moveTo(pos.x,pos.y);g.lineTo(p.x,p.y);g.stroke();g.setLineDash([]);}
@@ -5392,7 +5421,8 @@ body.hud-game #legend{display:none !important;}
   const available=overlay?.querySelector('.fm-body')?.clientHeight||window.innerHeight-245;
   const legendHeight=overlay?.querySelector('.fm-map-key')?.getBoundingClientRect().height||18;
   const height=mobile?Math.min(390,Math.max(220,window.innerHeight-280)):Math.min(600,Math.max(150,available-legendHeight-18));
-  fullCanvas.style.width=Math.min(mobile?width-72:300,height*60/124)+'px';fullCanvas.style.height='auto';
+  const info=lastInfo||read(),ratio=info?info.width/info.height:60/124;
+  fullCanvas.style.width=Math.min(mobile?width-72:300,height*ratio)+'px';fullCanvas.style.height='auto';
  }
  function resize(){if(opened)refresh();else layoutMap();}
  function focusables(){return Array.from(overlay.querySelectorAll('button,[tabindex="0"]')).filter(n=>!n.disabled&&!n.hidden&&n.getClientRects().length);}
@@ -5423,7 +5453,7 @@ body.hud-game #legend{display:none !important;}
   overlay=element('div');overlay.id='worldMapOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','worldMapTitle');
   const card=element('section','fm-card'),header=element('header','fm-header'),labels=element('div');labels.append(element('span','fm-eyebrow','Encontre seu caminho'));
   const titleFull=element('h2','','Mapa do Vale');titleFull.id='worldMapTitle';currentLabel=element('p','fm-current');labels.append(titleFull,currentLabel);header.append(labels,button('Fechar · Esc',close,'fm-button fm-close'));card.append(header);
-  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro e oásis ao sul. Escolha um local na lista para marcar o destino.');
+  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro, oásis ao sul e mata e veredas a leste. Escolha um local na lista para marcar o destino.');
   const key=element('div','fm-map-key');key.append(element('span','fm-key-player','▲ Você'),element('span','fm-key-npc','● Moradores'),element('span','fm-key-pin','⚑ Destino'));mapColumn.append(fullCanvas,key);list=element('section','fm-list');body.append(mapColumn,list);card.append(body);
   const footer=element('footer','fm-footer'),description=element('div');selectionLabel=element('p','fm-selection');selectionLabel.setAttribute('aria-live','polite');description.append(selectionLabel,element('p','fm-map-note','Marcar um lugar ajuda a se orientar. O percurso é feito caminhando.'));
   const controls=element('div','fm-footer-controls');clearButton=button('Limpar marca',()=>{selected=null;refresh();});clearButton.id='worldMapClear';clearButton.hidden=true;controls.append(clearButton);footer.append(description,controls);card.append(footer);overlay.append(card);document.body.append(mini,overlay);
@@ -7158,7 +7188,7 @@ body.hud-game #legend{display:none !important;}
   'use strict';
   const P=Object.freeze({ink:'#183b36',edge:'#28554a',sage:'#66805a',leaf:'#a8b97a',
     amber:'#e3b86b',cream:'#f2dfb4',terra:'#ad6650',soil:'#705348',snow:'#d2e3de'});
-  const keys=Object.freeze(['rosa','lia','tomas','ines','caio','nico']);
+  const keys=Object.freeze(['rosa','lia','tomas','ines','caio','nico','helena','davi','bia']);
   const profiles={
     rosa:{name:'Rosa',role:'Guardiã das sementes',skin:'#d7a982',skinHi:'#efc7a1',skinSh:'#ab765e',
       hair:'#b8bcb0',hairHi:'#e1dfc9',hairSh:'#778a7b',shirt:'#ad6650',shirtHi:'#d78a65',shirtSh:'#794b43',
@@ -7177,7 +7207,16 @@ body.hud-game #legend{display:none !important;}
       pants:'#847454',pantsHi:'#b09a6a',trim:'#d4a84d',style:'wrap',hairStyle:'headwrap',expression:'warm'},
     nico:{name:'Nico',role:'Aprendiz curioso',skin:'#e3b382',skinHi:'#f4cc99',skinSh:'#c9906b',
       hair:'#875734',hairHi:'#b88142',hairSh:'#5e4432',shirt:'#66805a',shirtHi:'#a8b97a',shirtSh:'#435f49',
-      pants:'#6a715f',pantsHi:'#929b79',trim:'#e3b86b',style:'patch',hairStyle:'messy',expression:'curious'}
+      pants:'#6a715f',pantsHi:'#929b79',trim:'#e3b86b',style:'patch',hairStyle:'messy',expression:'curious'},
+    helena:{name:'Helena',role:'Companheira de estrada',skin:'#bd9b73',skinHi:'#dcc19b',skinSh:'#937451',
+      hair:'#634839',hairHi:'#926d4c',hairSh:'#443b30',shirt:'#795363',shirtHi:'#a67983',shirtSh:'#533e50',
+      pants:'#505f59',pantsHi:'#758274',trim:'#7096a0',style:'traveler',hairStyle:'shortBraid',expression:'steady'},
+    davi:{name:'Davi',role:'Zelador dos canais',skin:'#80563f',skinHi:'#ac805d',skinSh:'#5c3c32',
+      hair:'#7b847c',hairHi:'#bbc0ad',hairSh:'#505d55',shirt:'#a6654c',shirtHi:'#ca8964',shirtSh:'#764b40',
+      pants:'#566258',pantsHi:'#7d8771',trim:'#d4b478',style:'channel',hairStyle:'cropped',expression:'warm'},
+    bia:{name:'Bia',role:'Cultivadora de variedades',skin:'#b1825b',skinHi:'#d9ac7b',skinSh:'#825b44',
+      hair:'#253b34',hairHi:'#4c6050',hairSh:'#182e2b',shirt:'#b69a4d',shirtHi:'#d9bb6d',shirtSh:'#83713e',
+      pants:'#62694d',pantsHi:'#899174',trim:'#6d8054',style:'grower',hairStyle:'bob',expression:'bright'}
   };
   const heroM={name:'Você',role:'Explorador do vale',skin:'#d2a17b',skinHi:'#edc29b',skinSh:'#ac765b',
     hair:'#634839',hairHi:'#936745',hairSh:'#443b30',shirt:'#66805a',shirtHi:'#a8b97a',shirtSh:'#435f49',
@@ -7195,10 +7234,14 @@ body.hud-game #legend{display:none !important;}
   const expressions=Object.freeze(['neutral','warm','thoughtful','concerned','joyful','resolved','surprised']);
   const armGestures=Object.freeze(['explain','invite','point','reflect','reassure','shrug']);
   const heldProps=Object.freeze(['seed','notebook','sign','ribbon','crate','vessel']);
+  const actionKinds=Object.freeze(['plant','water','harvest','collect','feed','fish']);
+  const actionBend=Object.freeze({plant:[0,0,1,2,4,5,5,4,3,2,1,0],water:[0,0,0,1,1,1,1,1,1,0,0,0],
+    harvest:[0,0,1,3,5,5,4,3,2,1,0,0],collect:[0,0,1,2,3,3,2,1,1,0,0,0],feed:[0,0,0,1,2,2,2,1,1,0,0,0],fish:[0,0,-1,-1,0,0,0,0,0,0,0,0]});
   // Rosa acompanha a fala com calma; Nico começa rápido e logo espera. Os
   // tempos pertencem à identidade, sem sorteio ou estado persistente extra.
   const acting=Object.freeze({rosa:[4.9,1.12,.20],lia:[3.8,.95,.09],tomas:[5.3,1.22,.27],
-    ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],player:[4.4,1,.12]});
+    ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],helena:[5.1,1.13,.22],
+    davi:[5.7,1.18,.18],bia:[4.0,.94,.08],player:[4.4,1,.12]});
   const syllables=Object.freeze(['0121031200103200012010300','01321003001210300121000','01200132000130121000300']);
   const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
@@ -7254,16 +7297,22 @@ body.hud-game #legend{display:none !important;}
     const job=!hero&&!actor.moving&&!speech.conversing&&({sort:'sort',observe:'book',work:'work',route:'map',water:'water',plant:'plant'}[actor.npcActivity]||'');
     const activity=((Number(actor.activityPhase)||0)%6.4+6.4)%6.4;
     const npcAction=job&&activity<2.4;
-    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&!opts.reducedMotion&&!speech.conversing;
+    const requested=actionKinds.includes(opts.actionKind)?opts.actionKind:actor.actionType;
+    const action=(hero?actor.actionTimer>0:npcAction)&&!actor.dead&&!rest&&(!opts.reducedMotion||hero)&&!speech.conversing;
+    const heroAction=!!(hero&&action&&actionKinds.includes(requested));
+    const target=opts.actionTarget,hasTarget=heroAction&&Number.isFinite(target?.x)&&Number.isFinite(target?.y);
+    const dx=hasTarget?target.x-actor.x:0,dy=hasTarget?target.y-actor.y-FEET_Y:0;
+    const aim=hasTarget&&Math.hypot(dx,dy)>2?(Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0)):dirOf(actor.dir);
+    const progress=Math.max(0,Math.min(1,Number.isFinite(opts.actionProgress)?opts.actionProgress:1-actor.actionTimer/.35));
     // A simulação conserva a fase ao parar. A amplitude recolhe a passada até
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:restWalking?8:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving&&!restWalking?blend(actor.gaitRunBlend,actor.running?1:0):0;
-    return {dir:dirOf(restWalking?opts.restWalkDir:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
+    return {dir:dirOf(restWalking?opts.restWalkDir:heroAction?aim:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
       moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
       heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
-      action:action?(hero?(['water','plant','harvest'].includes(actor.actionType)?actor.actionType:'work'):job):'',
-      actionFrame:action?Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8))):0,
+      action:action?(hero?(heroAction?requested:'work'):job):'',heroAction,actionReach:hasTarget&&Math.hypot(dx,dy)>18?1:0,
+      actionFrame:action?(heroAction?(opts.reducedMotion?6:Math.min(11,Math.floor(progress*12))):Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8)))):0,
       blink:speech.conversing?speech.speechBlink:!!actor.dead||(!moving&&!action&&!opts.reducedMotion&&(clock(opts)%5200)>5050),
       hat:hero&&!!actor.hat,coat:hero&&!!actor.coatEquipped,scarf:hero&&!!actor.scarf,
       boots:hero&&!!actor.boots,gloves:hero&&!!actor.glovesEquipped,
@@ -7271,6 +7320,7 @@ body.hud-game #legend{display:none !important;}
   }
   function paintAction(g,d,s,hand,behind){
     if(!s.action||(s.dir===3)!==behind)return;
+    if(s.heroAction){paintHeroAction(g,d,s,hand,behind);return;}
     const f=s.actionFrame,side=s.dir===1||s.dir===2,back=s.dir===3;
     const reach=[0,-1,1,3,4,3,2,0][f],drop=[0,-1,0,2,3,2,1,0][f];
     // A mão direita alcança o chão na direção observada; de costas, ferramenta
@@ -7309,6 +7359,83 @@ body.hud-game #legend{display:none !important;}
       limb(g,P.soil,0,0,side?5:0,tip,1);rect(g,P.cream,side?4:-2,tip,side?4:5,2);rect(g,'#82b6aa',side?4:-2,tip,side?4:5,1);
     }
     g.restore();
+  }
+  function actionGeometry(s){
+    const f=s.actionFrame,side=s.dir===1||s.dir===2,back=s.dir===3,bend=actionBend[s.action]?.[f]||0;
+    const reach=[0,.08,.22,.52,.82,1,1,.88,.65,.38,.12,0][f],lean=side&&f>=3&&f<=8?1:0;
+    let endX=side?7+s.actionReach*2:back?6:2,endY=back?-10:-2;
+    if(s.action==='water'){endX=side?9:back?7:2;endY=back?-19:-10;}
+    if(s.action==='feed'){endX=side?11:back?7:6;endY=back?-16:side?-8:-4;}
+    if(s.action==='collect'){endX=side?9:back?7:3;endY=back?-14:-6;}
+    if(s.action==='fish'){endX=side?5:back?6:3;endY=-13;}
+    const startX=side?2:back?5:4,startY=back?-14:-9;
+    let hx=Math.round(startX+(endX-startX)*reach),hy=Math.round(startY+(endY-startY)*reach);
+    if((s.action==='harvest'||s.action==='collect')&&f>=6){const carry=[0,0,0,0,0,0,0,.25,.55,.8,1,1][f];hx=Math.round(hx+(2-hx)*carry);hy=Math.round(hy+(-9-hy)*carry);}
+    const rodX=side?[-5,-7,-8,3,13,20,20,20,19,15,9,4][f]:[2,1,0,3,6,8,9,9,8,7,6,5][f];
+    const rodY=[-28,-30,-33,-31,-27,-23,-21,-21,-22,-24,-27,-28][f];
+    return{f,side,back,bend,lean,hx,hy,rodX,rodY};
+  }
+  function paintHeroAction(g,d,s,hand,behind){
+    const a=actionGeometry(s),{f,side,back,bend,lean,hx,hy}=a,shirt=s.coat?'#739598':d.shirtHi;
+    g.save();if(!behind)g.translate(-lean,-bend);
+    // As mãos têm um ombro e um cotovelo. Ferramentas seguem o punho, enquanto
+    // os dois pés sustentam a flexão; o corpo nunca desliza para alcançar o alvo.
+    const sx=(side?0:5)+lean,sy=(back?-15:-13)+bend,kx=Math.round((sx+hx)/2)+(side?-1:1),ky=Math.round((sy+hy)/2)+1;
+    limb(g,shirt,sx,sy,kx,ky,3);limb(g,shirt,kx,ky,hx,hy,2);rect(g,hand,hx,hy,3,2);
+    // A mão de apoio sobe em relação ao tronco ao agachar: o saco e o cesto
+    // ficam suspensos, sem atravessar as botas nem afundar no chão.
+    const ox=side?-3:-6,oy=Math.min(-6,-8+bend);
+    limb(g,s.coat?'#2e505b':d.shirtSh,(side?-3:-7)+lean,-13+bend,ox,oy,3);rect(g,hand,ox,oy+2,3,2);
+    if(s.action==='plant'){
+      rect(g,P.edge,ox-2,oy-3,6,7);rect(g,'#b99a66',ox-1,oy-3,4,6);rect(g,P.cream,ox,oy-1,2,2);rect(g,P.soil,ox-1,oy-3,4,1);
+      if(f>=3&&f<=7){rect(g,P.amber,hx+1,hy+2,2,1);rect(g,P.cream,hx+1,hy+2,1,1);}
+    }else if(s.action==='water'){
+      const tilt=f>=4&&f<=8;
+      rect(g,P.edge,hx-3,hy-4,7,6);rect(g,'#60968a',hx-2,hy-4,5,5);rect(g,'#a6c6ad',hx-2,hy-4,4,1);
+      rect(g,P.edge,hx-5,hy-4,2,4);rect(g,P.edge,hx-4,hy-5,4,1);rect(g,hand,hx-3,hy-2,2,2);
+      if(side){limb(g,P.edge,hx+3,hy-2,hx+7,hy+(tilt?0:-4),2);rect(g,'#a6c6ad',hx+7,hy+(tilt?0:-4),2,1);}
+      else if(back){limb(g,P.edge,hx+2,hy-3,hx+3,hy-7,2);rect(g,'#a6c6ad',hx+2,hy-8,3,1);}
+      else{rect(g,P.edge,hx+1,hy+1,2,4);rect(g,'#a6c6ad',hx,hy+4,4,1);}
+    }else if(s.action==='harvest'){
+      rect(g,P.soil,ox-3,oy,9,5);rect(g,P.amber,ox-3,oy,9,1);rect(g,'#bd9450',ox-2,oy+3,7,1);
+      limb(g,P.soil,ox-2,oy,ox,oy-3,1);limb(g,P.soil,ox,oy-3,ox+4,oy,1);
+      if(f>=6){rect(g,P.terra,hx,hy-2,4,4);rect(g,P.leaf,hx+1,hy-4,2,2);rect(g,P.cream,hx,hy-2,1,1);}
+    }else if(s.action==='collect'){
+      if(f>=5){
+        const xx=hx-5,yy=hy-3;rect(g,P.edge,xx,yy,11,6);rect(g,'#a97d4d',xx,yy,10,5);
+        rect(g,'#d1a16a',xx,yy,9,1);rect(g,P.soil,xx,yy+2,10,1);rect(g,'#e0bd85',xx+8,yy,3,2);rect(g,'#e0bd85',xx+7,yy+3,3,2);
+        rect(g,hand,xx+1,yy+4,3,2);rect(g,hand,xx+7,yy+4,3,2);
+      }
+    }else if(s.action==='feed'){
+      rect(g,P.soil,ox-2,oy-1,7,5);rect(g,'#b99a66',ox-1,oy-1,5,4);rect(g,P.amber,ox-1,oy-1,5,1);
+      if(f>=2&&f<=8){for(let i=0;i<4;i++)limb(g,i%2?P.amber:P.leaf,hx-1+i,hy-1,hx+i,hy-4+(i%2),1);rect(g,hand,hx,hy+1,4,1);}
+    }else if(s.action==='fish'){
+      limb(g,P.ink,hx,hy+1,a.rodX,a.rodY,2);limb(g,'#c39a60',hx,hy,a.rodX,a.rodY,1);
+      rect(g,P.edge,hx-2,hy+1,4,4);rect(g,'#a6b7a1',hx-1,hy+2,2,2);rect(g,hand,hx,hy,3,2);
+      limb(g,shirt,ox,-12+bend,hx-3,hy+3,2);rect(g,hand,hx-3,hy+3,2,2);
+    }
+    g.restore();
+  }
+  function actionEffects(g,actor,s,p,opts){
+    if(!s.heroAction||s.rest||actor.dead)return;
+    const a=actionGeometry(s),flip=s.dir===1?-1:1,target=opts.actionTarget;
+    const finite=Number.isFinite(target?.x)&&Number.isFinite(target?.y);
+    const fallback={x:p.x+(s.dir===1?-18:s.dir===2?18:0),y:p.y+FEET_Y+(s.dir===3?-15:s.dir===0?12:0)};
+    const tx=finite?p.x+target.x-actor.x:fallback.x,ty=finite?p.y+target.y-actor.y:fallback.y;
+    if(Math.hypot(tx-p.x,ty-p.y)>112)return;
+    const px=x=>Math.round(p.x+x*flip),py=y=>Math.round(p.y+FEET_Y+y),f=a.f;
+    if(s.action==='fish'){
+      const cast=[0,0,.08,.3,.7,1,1,1,1,.75,.3,0][f],rx=px(a.rodX),ry=py(a.rodY);
+      const endX=Math.round(rx+(tx-rx)*cast),endY=Math.round(ry+(ty-ry)*cast+4*(1-cast));
+      const middleX=Math.round((rx+endX)/2),middleY=Math.round((ry+endY)/2+(opts.reducedMotion?1:3));
+      limb(g,'#d1d3ad',rx,ry,middleX,middleY,1);limb(g,'#d1d3ad',middleX,middleY,endX,endY,1);
+      rect(g,P.terra,endX-1,endY-2,3,2);rect(g,P.cream,endX-1,endY-3,3,1);
+    }else if(!opts.reducedMotion&&s.action==='water'&&f>=4&&f<=8){
+      const sx=px(a.hx+(a.side?8:a.back?3:1)),sy=py(a.hy+(a.side?1:a.back?-7:5));
+      for(let i=0;i<3;i++){const t=(i+(f%3)/3)/3,x=Math.round(sx+(tx-sx)*t),y=Math.round(sy+(ty-sy)*t-2*Math.sin(t*Math.PI));rect(g,i%2?'#82b6aa':P.snow,x,y,1,2);}
+    }else if(!opts.reducedMotion&&s.action==='plant'&&f>=5&&f<=7){
+      const t=(f-4)/4,x=Math.round(px(a.hx+1)+(tx-px(a.hx+1))*t),y=Math.round(py(a.hy+2)+(ty-py(a.hy+2))*t);rect(g,P.amber,x,y,1,1);
+    }
   }
   // Cabeça compartilhada: equipamentos e identidade continuam iguais em pé,
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
@@ -7362,6 +7489,16 @@ body.hud-game #legend{display:none !important;}
         for(let i=0;i<4;i++){rect(g,d.hair,side?-6:5,-23+i*2,3,2);rect(g,d.hairHi,side?-6:5,-23+i*2,1,1);}
         rect(g,d.trim,side?-6:5,-15,2,1);
       }else{rect(g,d.hair,side?-7:5,-24,3,8);rect(g,d.hairHi,side?-7:5,-24,1,6);rect(g,d.trim,side?-7:5,-24,2,1);}
+    }else if(d.hairStyle==='shortBraid'){
+      rect(g,d.hairHi,-4,-26,5,1);
+      for(let i=0;i<3;i++){rect(g,d.hair,side?-7:5,-23+i*2,3,2);rect(g,d.hairHi,side?-7:5,-23+i*2,1,1);}
+      rect(g,d.trim,side?-7:5,-17,2,1);
+    }else if(d.hairStyle==='cropped'){
+      rect(g,d.hair,-5,-27,10,3);rect(g,d.hairHi,-4,-27,6,1);
+      rect(g,d.hairHi,side?-4:-5,-23,2,3);if(!side)rect(g,d.hairHi,4,-23,1,3);
+    }else if(d.hairStyle==='bob'){
+      rect(g,d.hair,side?-6:-7,-26,side?4:3,10);rect(g,d.hairSh,side?-6:5,-23,side?2:3,7);
+      rect(g,d.hairHi,side?-5:-6,-25,1,7);rect(g,d.hair,-4,-25,8,2);rect(g,d.hair,-4,-23,3,2);
     }else if(d.hairStyle==='messy'){
       rect(g,d.hair,-5,-28,3,2);rect(g,d.hair,0,-29,3,3);rect(g,d.hairHi,0,-28,1,1);
       rect(g,d.hair,4,-27,2,3);
@@ -7370,6 +7507,10 @@ body.hud-game #legend{display:none !important;}
       rect(g,'#9b793d',-7,-29,14,3);rect(g,P.amber,-6,-30,12,3);rect(g,P.cream,-6,-30,5,1);
       rect(g,P.edge,-7,-27,14,1);rect(g,'#bd9450',-9,-26,18,2);rect(g,P.amber,-9,-26,16,1);
       rect(g,P.cream,-8,-26,5,1);rect(g,'#9b793d',6,-25,3,1);
+    }
+    if(d.style==='traveler'){
+      rect(g,d.trim,side?-4:-5,-17,side?8:10,2);rect(g,'#a3b7b3',side?-3:-4,-17,side?5:7,1);
+      rect(g,d.trim,side?2:3,-15,2,4);rect(g,'#496c7a',side?3:4,-14,1,3);
     }
     if(s.scarf){
       rect(g,P.terra,side?-4:-5,-17,side?8:10,2);rect(g,'#d78a65',side?-4:-5,-17,side?8:10,1);
@@ -7481,7 +7622,7 @@ body.hud-game #legend{display:none !important;}
     if(!bed&&s.dir===1)g.scale(-1,1);
     const side=!bed&&(s.dir===1||s.dir===2),back=!bed&&s.dir===3;
     const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
-    const hand=s.gloves?'#b79562':d.skin,boot=s.boots?'#40534a':P.soil;
+    const hand=s.gloves?'#b79562':d.skin,boot=s.boots?'#40534a':d.style==='channel'?'#43534c':P.soil;
     if(bed){
       // Âncora fornecida pela integração: pés = margem inferior do colchão-5.
       // A cabeça repousa no travesseiro, e a manta cobre as pernas sem sombra
@@ -7517,6 +7658,18 @@ body.hud-game #legend{display:none !important;}
         if(d.style==='field'&&!s.coat){rect(g,P.soil,side?-4:-6,top+5,3,3);rect(g,P.amber,side?-4:-6,top+5,3,1);}
         if(d.style==='patch'){rect(g,d.trim,3,top+4,2,2);}
       }
+      // A pausa conserva os pertences e a roupa dos novos moradores.
+      if(d.style==='traveler'){
+        if(back||side){rect(g,P.soil,side?-7:-5,top+1,side?4:10,7);rect(g,'#9a7d5d',side?-7:-4,top+2,side?3:8,5);rect(g,P.amber,side?-7:-4,top+2,side?3:8,1);rect(g,P.cream,side?-7:-4,top+5,2,2);}
+        else{for(let i=0;i<5;i++)rect(g,P.soil,3-i,top+1+i,2,1);rect(g,P.soil,-6,top+5,3,3);rect(g,P.cream,-6,top+6,2,1);}
+      }else if(d.style==='channel'){
+        if(!back){rect(g,P.cream,side?-1:-2,top+2,side?2:4,5);rect(g,d.shirtSh,side?2:3,top+2,2,5);}
+        const rx=side?-5:-6;rect(g,d.trim,rx,top+2,1,6);for(let i=0;i<3;i++)rect(g,P.soil,rx,top+2+i*2,1,1);
+      }else if(d.style==='grower'){
+        if(back){rect(g,d.trim,-4,top+1,2,6);rect(g,d.trim,3,top+1,2,6);}
+        else{rect(g,d.trim,side?-2:-4,top+2,side?6:8,5);rect(g,'#8d9b68',side?-2:-4,top+2,2,5);}
+        const bx=side?-5:-7;rect(g,P.soil,bx,top+4,4,4);rect(g,'#9b895b',bx,top+5,3,2);rect(g,P.cream,bx,top+4,1,2);rect(g,'#a8c4aa',bx+2,top+4,1,2);
+      }
       // Antebraços desenhados sobre as coxas: mãos soltas apoiadas no colo.
       if(side){limb(g,shirtHi,-1,top+2,1,top+6,3);limb(g,shirtHi,1,top+6,5,-5,2);rect(g,hand,5,-5,3,2);}
       else{limb(g,shirtSh,-7,top+2,-5,-6,3);limb(g,shirtHi,5,top+2,3,-6,3);rect(g,hand,-4,-5,3,2);rect(g,hand,1,-5,3,2);}
@@ -7538,11 +7691,17 @@ body.hud-game #legend{display:none !important;}
     const gaitX=f=>walkX[f]+(runX[f]-walkX[f])*run;
     const gaitY=f=>(walkY[f]+(runY[f]-walkY[f])*run)*strength;
     const careful=['book','map','sort'].includes(s.action);
-    const lift=s.rest?5:(s.action?(careful?[0,0,0,-1,-1,0,0,0]:[0,-1,0,2,3,2,1,0])[s.actionFrame]:Math.round(-strength*(run>.5?[0,0,0,0,0,0,1,1]:[0,0,1,1,1,1,0,0])[s.frame%8]));
-    const boot=s.boots?'#40534a':P.soil,sole=P.ink;
+    const lift=s.heroAction?actionBend[s.action][s.actionFrame]:s.rest?5:(s.action?(careful?[0,0,0,-1,-1,0,0,0]:[0,-1,0,2,3,2,1,0])[s.actionFrame]:Math.round(-strength*(run>.5?[0,0,0,0,0,0,1,1]:[0,0,1,1,1,1,0,0])[s.frame%8]));
+    const boot=s.boots?'#40534a':d.style==='channel'?'#43534c':P.soil,sole=P.ink;
     const shirt=s.coat?'#426d72':d.shirt,shirtHi=s.coat?'#739598':d.shirtHi,shirtSh=s.coat?'#2e505b':d.shirtSh;
     const hand=s.gloves?'#b79562':d.skin;
-    if(s.rest){
+    if(s.heroAction){
+      for(const rear of [true,false]){
+        const foot=side?(rear?-4:1):(rear?-5:2),hip=side?-2:(rear?-4:3),knee=foot+(side?Math.min(3,Math.max(0,lift)):Math.sign(foot)*Math.min(2,Math.max(0,lift))),hy=-8+Math.round(Math.max(0,lift)*.6);
+        limb(g,rear?d.pants:d.pantsHi,hip,hy,knee,-4,3);limb(g,rear?d.pants:d.pantsHi,knee,-4,foot,-3,3);
+        rect(g,boot,foot-1,-2,5,2);rect(g,sole,foot-1,-1,5,1);if(s.boots)rect(g,P.amber,foot,-2,2,1);
+      }
+    }else if(s.rest){
       rect(g,d.pants,-7,-5,6,4);rect(g,d.pantsHi,-7,-5,6,1);
       rect(g,d.pants,1,-4,6,3);rect(g,d.pantsHi,1,-4,5,1);
       rect(g,boot,-8,-2,4,2);rect(g,boot,5,-2,4,2);
@@ -7577,13 +7736,13 @@ body.hud-game #legend{display:none !important;}
     paintSpeechGesture(g,d,s,hand,true);
     // Na corrida o peito avança um pixel sobre o apoio; cabeça e roupa seguem
     // o mesmo volume, sem sacudir os pés ou deslocar a sombra.
-    g.translate(side?Math.round(run*strength):0,lift);
+    g.translate(side?(s.heroAction?actionGeometry(s).lean:Math.round(run*strength)):0,lift);
     // Manga posterior e mãos alternam com a perna oposta.
     const swing=Math.round((gaitX(s.frame)+1)*.28*strength*(back?1:-1));
     if(side){
       const arm=(gaitX(s.frame)+1)*(.45+run*.1)*strength;
       const rearHand=Math.round(arm),frontHand=Math.round(-arm),handY=-7-Math.round(run*2);
-      if(!(bothSpeechArms(s))){
+      if(!(bothSpeechArms(s))&&!s.heroAction){
         limb(g,shirtSh,-2,-15,Math.round(rearHand*.45)-2,-11,3);
         limb(g,shirtSh,Math.round(rearHand*.45)-2,-11,rearHand-1,handY-1,2);rect(g,hand,rearHand,handY,2,2);
       }
@@ -7593,7 +7752,7 @@ body.hud-game #legend{display:none !important;}
         limb(g,shirtHi,Math.round(frontHand*.4)-1,-10,frontHand,handY-1,2);rect(g,hand,frontHand+1,handY,2,2);
       }
     }else{
-      if(!(bothSpeechArms(s))){rect(g,shirtSh,-8,-14+swing,3,6);rect(g,hand,-8,-8+swing,2,2);}
+      if(!(bothSpeechArms(s))&&!s.heroAction){rect(g,shirtSh,-8,-14+swing,3,6);rect(g,hand,-8,-8+swing,2,2);}
       rect(g,shirt,-6,-16,12,9);rect(g,shirtHi,-6,-15,2,7);rect(g,shirtSh,4,-15,2,8);
       rect(g,shirt,-6,-7,12,1);rect(g,shirt,-6,-15,12,2);
       rect(g,shirt,-6,-15,12,2);
@@ -7609,6 +7768,26 @@ body.hud-game #legend{display:none !important;}
     }else if(d.style==='vest'&&!s.coat){
       rect(g,P.cream,side?-1:-2,-15,side?2:4,7);rect(g,d.trim,side?2:3,-12,2,2);
       if(!back){rect(g,P.soil,-4,-15,1,8);rect(g,P.amber,-4,-8,3,3);rect(g,P.soil,-4,-8,3,1);}
+    }else if(d.style==='traveler'&&!s.coat){
+      if(back||side){
+        rect(g,P.soil,side?-7:-5,-15,side?4:10,9);rect(g,'#9a7d5d',side?-7:-4,-14,side?3:8,7);
+        rect(g,P.amber,side?-7:-4,-14,side?3:8,1);rect(g,P.soil,side?-6:-1,-11,2,4);
+        rect(g,P.cream,side?-7:-4,-9,2,3);
+      }else{
+        rect(g,d.shirtSh,-4,-15,2,8);rect(g,P.cream,-2,-15,4,7);
+        for(let i=0;i<6;i++)rect(g,P.soil,3-i,-15+i,2,1);
+        rect(g,P.soil,-6,-10,3,4);rect(g,P.cream,-6,-9,2,2);
+      }
+    }else if(d.style==='channel'&&!s.coat){
+      if(!back){rect(g,P.cream,side?-1:-2,-15,side?2:4,8);rect(g,d.shirtSh,side?2:3,-15,2,8);rect(g,d.trim,side?2:3,-12,1,1);}
+      const rx=side?-5:-6;rect(g,P.soil,rx,-13,2,8);rect(g,d.trim,rx,-13,1,8);
+      for(let i=0;i<3;i++)rect(g,P.soil,rx,-11+i*2,1,1);
+      rect(g,d.shirtSh,side?1:3,-8,3,2);rect(g,d.trim,side?1:3,-8,3,1);
+    }else if(d.style==='grower'&&!s.coat){
+      if(back){rect(g,d.trim,-4,-15,2,9);rect(g,d.trim,3,-15,2,9);rect(g,d.trim,-5,-9,10,1);}
+      else{rect(g,d.trim,side?-2:-4,-14,side?6:8,9);rect(g,'#8d9b68',side?-2:-4,-14,side?2:3,8);rect(g,P.cream,side?-1:-3,-9,2,2);}
+      const bx=side?-5:-7;rect(g,P.soil,bx,-10,4,5);rect(g,'#9b895b',bx,-9,3,3);
+      rect(g,P.cream,bx,-10,1,3);rect(g,'#a8c4aa',bx+2,-10,1,3);rect(g,d.trim,bx+2,-10,1,1);
     }else if(d.style==='wrap'&&!s.coat){
       rect(g,d.trim,side?-3:-5,-15,side?6:10,2);rect(g,'#a07839',side?2:3,-13,2,5);
       rect(g,P.cream,side?-3:-5,-7,side?7:10,1);
@@ -7675,7 +7854,9 @@ body.hud-game #legend{display:none !important;}
     if(!g||!actor) return false;const p=position(actor,opts),s=state(actor,opts,hero);
     g.save();g.imageSmoothingEnabled=false;if(s.restMode!=='bed')shadow(g,p.x,p.y+FEET_Y,s.rest);
     if(actor.dead) g.globalAlpha*=0.65;
+    if(s.dir===3)actionEffects(g,actor,s,p,opts);
     drawSprite(g,id,actor.gender==='f'?'f':'m',s,p.x-AX,p.y+FEET_Y-AY);
+    if(s.dir!==3)actionEffects(g,actor,s,p,opts);
     if(hero&&!opts.reducedMotion&&!actor.dead&&s.restMode!=='bed'){
       const phase=Math.floor(clock(opts)/180)%4;
       if(opts.winter&&actor.temp<36.2&&s.dir!==3){
@@ -7750,6 +7931,23 @@ body.hud-game #legend{display:none !important;}
       rect(g,d.trim,24,10,3,11);rect(g,'#a07839',26,12,1,9);rect(g,P.amber,24,12,1,6);
       rect(g,d.hairSh,12,19,10,2);rect(g,d.hair,13,20,8,3);rect(g,d.skin,16,19,3,1);
       rect(g,P.cream,16,20,3,1);rect(g,d.trim,10,25,14,2);rect(g,'#a07839',21,27,2,3);
+    }else if(d.hairStyle==='shortBraid'){
+      rect(g,d.hair,9,8,3,8);rect(g,d.hairHi,10,8,1,6);rect(g,d.hair,10,7,12,3);
+      for(let i=0;i<4;i++){rect(g,d.hairSh,23+(i%2),16+i*2,3,2);rect(g,d.hairHi,23+(i%2),16+i*2,1,1);}
+      rect(g,d.trim,24,24,2,1);rect(g,d.trim,11,24,12,3);rect(g,'#a3b7b3',12,24,8,1);
+      rect(g,d.trim,20,27,3,3);rect(g,'#496c7a',22,27,1,3);
+      rect(g,P.soil,9,26,2,4);rect(g,P.cream,10,28,3,2);
+    }else if(d.hairStyle==='cropped'){
+      rect(g,d.hair,10,6,13,4);rect(g,d.hairHi,11,6,10,1);rect(g,d.hairHi,10,10,2,5);rect(g,d.hairHi,22,11,2,4);
+      rect(g,d.hairSh,10,9,2,1);rect(g,d.hairSh,21,9,2,1);
+      rect(g,d.skinSh,11,18,2,1);rect(g,d.skinSh,21,18,2,1);
+      rect(g,P.cream,14,25,6,5);rect(g,d.shirtSh,10,25,3,5);rect(g,d.shirtSh,21,25,3,5);
+      rect(g,d.trim,24,23,2,7);for(let i=0;i<3;i++)rect(g,P.soil,25,24+i*2,1,1);
+    }else if(d.hairStyle==='bob'){
+      rect(g,d.hair,8,8,4,12);rect(g,d.hairHi,9,9,1,8);rect(g,d.hairSh,23,10,3,10);
+      rect(g,d.hair,10,6,13,5);rect(g,d.hairHi,11,6,6,1);rect(g,d.hair,11,10,5,3);
+      rect(g,d.trim,12,25,2,5);rect(g,d.trim,21,25,2,5);rect(g,d.trim,12,28,11,2);
+      rect(g,P.soil,7,27,4,3);rect(g,P.cream,7,26,1,3);rect(g,'#a8c4aa',9,26,1,3);
     }else if(d.hairStyle==='messy'){
       rect(g,d.hair,9,5,5,4);rect(g,d.hair,15,3,5,5);rect(g,d.hair,21,5,3,4);
       rect(g,d.hairHi,16,4,3,1);rect(g,d.hairHi,10,6,3,1);rect(g,d.hair,12,10,3,2);
@@ -7835,10 +8033,11 @@ body.hud-game #legend{display:none !important;}
     target.setAttribute?.('role','img');target.setAttribute?.('aria-label','Retrato de '+(opts.name||profile(id,gender).name));return true;
   }
   window.FarmCharacterArt=Object.freeze({
-    keys,definitions,palette:P,gestures,expressions,heldProps,anchor:Object.freeze({x:AX,y:AY,feetOffsetY:FEET_Y,width:W,height:H}),
+    keys,definitions,palette:P,gestures,expressions,heldProps,actionKinds,anchor:Object.freeze({x:AX,y:AY,feetOffsetY:FEET_Y,width:W,height:H}),
     drawPlayer(g,p,opts={}){return draw(g,p,'player',opts,true);},
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
+    actionInfo(actor,opts={}){const s=state(actor,opts,true);return{kind:s.action,frame:s.actionFrame,direction:s.dir,active:s.heroAction,reach:s.actionReach};},
     // Diagnóstico de baixo custo para integração; não revela nem altera saves.
     cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,speechBanks:speechBanks.size,maxSprites:MAX_SPRITES,maxPortraits:MAX_PORTRAITS,maxSpeechBanks:MAX_SPEECH_BANKS};}
   });
@@ -8790,7 +8989,7 @@ body.hud-game #legend{display:none !important;}
    pela barreira de leitura do jogo. As cenas aguardam avanço do jogador. */
 (function(){
   'use strict';
-  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',player:'Você'};
+  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',helena:'Helena',davi:'Davi',bia:'Bia',player:'Você'};
   const shot=(speaker,line,expression='warm',gesture='explain',focus=0)=>({speaker,line,expression,gesture,focus});
   const films=[
     {id:'carta',title:'Uma cadeira guardada',chapter:0,region:'farm',scene:'main',focusX:264,focusY:920,
@@ -8841,15 +9040,17 @@ body.hud-game #legend{display:none !important;}
   function registerScenes(definitions){
     if(!Array.isArray(definitions))return 0;let count=0;
     for(const def of definitions.slice(0,16)){
-      if(!def||!/^saga-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(!def||!/^(saga|frontier)-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(def.id.startsWith('frontier-')&&(typeof def.frontierMission!=='string'||!/^helena-[a-z-]+$/.test(def.frontierMission)))continue;
       if(!def.shots.every(s=>s&&names[s.speaker]&&typeof s.line==='string'&&s.line.length<1800))continue;
-      const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.slice(5)};
+      const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.startsWith('saga-')?def.id.slice(5):null};
       films.push(film);byId.set(film.id,film);count++;
     }
     return count;
   }
   function available(film){
     if(seen.has(film.id))return true;
+    if(film.frontierMission)return !!read().frontier?.arcs?.some(a=>a.missions?.some(m=>m.id==='frontier:'+film.frontierMission&&m.completed));
     if(!film.sagaEpisode)return film.chapter<=chapterIndex();
     const saga=read().saga;
     return !!saga?.episodes?.some(e=>e.id===film.sagaEpisode&&(e.completed||e.status==='completed'));
@@ -8878,7 +9079,7 @@ body.hud-game #legend{display:none !important;}
     install();safely(adapter.beforeOpen);previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';root.setAttribute('aria-hidden','false');reduced=isReduced();
   }
   function play(id,opts={}){
-    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||film.sagaEpisode&&!available(film))return false;
+    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||(film.sagaEpisode||film.frontierMission)&&!available(film))return false;
     showOverlay();const state=read();active={kind:'film',film,index:0,elapsed:0,speech:0,reveal:0,replay:!!opts.replay,player:{name:typeof state.name==='string'?state.name.slice(0,40):'Você',gender:state.gender==='f'?'f':'m'},backdrop:null};
     root.querySelector('.vc-gallery').hidden=true;stage.hidden=false;root.querySelector('.vc-dialogue').hidden=false;root.querySelector('.vc-controls').hidden=false;root.querySelector('.vc-skip').textContent='Pular cena';
     heading.textContent=film.title;subheading.textContent='Uma lembrança do vale · avance no seu ritmo';enterShot();nextButton.focus({preventScroll:true});return true;
@@ -9145,9 +9346,49 @@ body.hud-game #legend{display:none !important;}
       choices:[decision('Uma casa de encontros e experiências, aberta a quem chegar.','Prepare três produtos para a mesa. Vamos receber quem vem com sementes e quem vem só com perguntas. A casa não cobra uma história pronta para oferecer uma cadeira.','A Casa se torna um ponto aberto de encontros; os moradores mantêm projetos pessoais e convidam Alex a participar.','Ficar não será virar perfeito. Será ter a coragem modesta de ser encontrado amanhã.',[obj('produce','Recolha 3 produções novas para o encontro','produce',3)]),
         decision('Uma casa de trabalho e trocas, com encontros regulares.','Entregue três encomendas. A mesa vai acompanhar o que entra, o que sai e quem precisa de ajuda. Não faremos da festa uma despedida do cuidado.','A Casa organiza trocas regulares; o vale mantém projetos, produção e encomendas após a investigação.','Talvez eu seja bom em começar. Quero descobrir se consigo ser bom em continuar.',[obj('order','Entregue 3 encomendas da fazenda','order',3)])],
       finalChoice:true,
-      resolution:'Rosa põe o envelope no centro. Tomás vira a placa para mostrar o verso. Lia abre a página com a pergunta ainda incompleta. Inês traz a fita; Caio, a caixa de duas etiquetas; Nico, um mapa agora assinado por ele.\n\n“Eu fui embora achando que deixar de atrapalhar era ajudar”, você diz. “Não quero fazer isso outra vez. Se eu precisar partir, aviso. Se ficar difícil, peço ajuda. E se prometi demais, vocês podem me lembrar.”\n\nTomás ergue a sobrancelha. “Essa última parte nós já fazíamos.” Nico ri primeiro. Rosa não fecha o arquivo.\n\nA reserva voltou a circular. A fazenda continua. Cada morador ainda tem um problema, uma vontade e trabalho para amanhã. Você tem lugar entre eles, sem precisar ocupar todos os lugares.',
       inner:'O vento não guardou um tesouro. A gente guardou outra tentativa. Hoje também guardei a chave da minha casa — e parei de tratá-la como bilhete de volta.',focus:{x:608,y:1212},cut:[['player','Não prometo ser a pessoa que resolve tudo. Prometo avisar quando não souber.','thoughtful','explain'],['tomas','Já é uma melhoria enorme no seu antigo sistema de desaparecer com uma tábua.','warm','nod'],['nico','E podemos pôr seu nome no mapa sem escrever “talvez”?','joyful','invite'],['player','Pode. Deixa espaço para errar a letra. Pretendo estar aqui para lixar depois.','joyful','nod']]}
   ];
+  // O ato final já pede seis conversas. Cada uma apresenta a proposta escolhida
+  // e uma condição do morador; as contagens e os IDs continuam os mesmos.
+  const tableAgreements=[{
+    summary:'Rosa divide a acolhida. Lia conduz as perguntas, sem precisar ter todas as respostas. Tomás confere os reparos por etapas. Inês combina horários com retorno seguro. Caio escolhe o que traz do oásis. Nico apresenta sua própria experiência. Você cuida da sua parte e avisa quando precisar de ajuda.',
+    response:{
+      rosa:'Uma casa aberta a quem chegar: quero isso. Mas abrir a porta não pode virar obrigação sua ou minha todo dia. Eu recebo o pessoal e combino quem me substitui. Você traz sua pergunta, Alex; não precisa chegar com seis cadeiras nas costas.',
+      lia:'Topo a casa de encontros e experiências. Fico com a roda de perguntas, com uma condição: uma dúvida pode sair daqui ainda aberta. Você traz o que observou, eu mostro como conferir; nenhum de nós precisa inventar certeza para merecer a cadeira.',
+      tomas:'A casa pode receber gente antes do último reparo, sim. Eu confiro as cadeiras e escolho o serviço que cabe no dia. Se quiser ajudar, combinamos qual peça é sua. Não apareça prometendo uma oficina inteira em meu nome.',
+      ines:'Quero participar desses encontros. Só peço que a hora permita voltar da montanha com calma. Eu confiro a rota e aviso quando precisar mudar. Você pode guardar minha cadeira; não precisa sair para me buscar sempre que eu me atrasar.',
+      caio:'Aceito vir à casa aberta, inclusive num dia em que eu não trouxer caixa. Quero poder escolher o que compartilho do oásis. Eu preparo minha viagem; você me pergunta do que preciso antes de separar ajuda. Assim eu também consigo dizer não.',
+      nico:'Na casa de experiências eu quero mostrar meu canteiro, com a parte que saiu torta. Pode ficar perto se eu travar? Perto, sem terminar minha frase. Eu preparo a página e apresento. Você fica com suas próprias perguntas difíceis.'
+    },
+    echo:{
+      rosa:'Hoje combinei quem abre a porta depois de mim. A casa aberta que escolhemos também precisa permitir que a gente saia um pouco.',
+      lia:'Nossa roda de experiências ganhou uma pergunta que ficou sem resposta. Deixei marcada para voltar a ela, como combinamos.',
+      tomas:'Conferi as cadeiras do encontro. A prateleira espera a próxima etapa. Você não prometeu terminá-la por mim; eu reparei.',
+      ines:'O encontro termina a tempo de eu conferir o retorno. A cadeira guardada ajudou; o horário combinado ajudou também.',
+      caio:'Vim ao encontro sem uma entrega para justificar a visita. Ainda conferi a caixa por costume. Depois deixei em casa.',
+      nico:'Na nossa roda, apresentei minha página antes de pedir sua ajuda. Minha voz saiu meio fina. A história conseguiu sair junto.'
+    },
+    alex:'“Eu fui embora achando que deixar de atrapalhar era ajudar”, você diz. “Agora quase prometi fazer tudo para compensar. Fico com minha horta e com uma pergunta para a roda. Lia conduz a conversa; Nico conta a parte dele. Eu pergunto antes de pegar o trabalho de vocês. Se eu prometer demais de novo, podem me lembrar.”'
+  },{
+    summary:'Rosa confere as entradas com outra pessoa. Lia registra produtos e condições, sem transformar a produção em disputa. Tomás combina prazos que caibam no dia. Inês avisa saída e retorno das rotas. Caio mantém o direito de negociar cada troca. Nico registra somente o que acompanhou. Você assume suas entregas, sem assinar as dos outros.',
+    response:{
+      rosa:'Uma casa de trabalho e trocas regulares pode continuar depois da festa. Eu confiro as entradas com outra pessoa, para a lista não virar segredo de gaveta. Você assume suas entregas, Alex. Se faltar alguma coisa, a gente combina quem pode ajudar; não põe tudo no seu nome.',
+      lia:'Topo acompanhar a casa de trabalho e trocas. Registro o produto e as condições em que foi feito; não quero uma disputa de quem produziu mais. Traga seus números e suas dificuldades. Eu cuido da comparação, sem decidir por você o que precisa fazer amanhã.',
+      tomas:'Aceito o trabalho regular se o prazo for combinado antes da promessa. Deixo no quadro o que consigo fazer e aviso quando a lista encher. Você responde pelas suas entregas; não por todos os atrasos do vale. Uma folga na agenda também sustenta a oficina.',
+      ines:'As trocas precisam de ida e volta, não de alguém sempre disponível na trilha. Eu anoto saída e retorno e aviso se a rota mudar. Combine suas entregas com esse tempo. Se eu adiar uma viagem, quero que a mesa reorganize o trabalho, não que você saia correndo no meu lugar.',
+      caio:'Entro nas trocas regulares, com uma condição: cada lado pode recusar ou propor outra coisa. Eu confiro a reserva do oásis e digo o que posso levar. Você não garante minha parte antes de perguntar. Gosto de um acordo em que a minha voz chega antes da caixa.',
+      nico:'Quero ajudar no registro das trocas. Posso começar pelas caixas que eu realmente conferir? Eu escrevo quem trouxe e pergunto quando não souber. Se você preencher a lista inteira antes de mim, vai ficar bonita, mas eu continuo sem aprender a fazer a minha parte.'
+    },
+    echo:{
+      rosa:'A lista das trocas tem outra letra ao lado da minha. Ficou menos uniforme. Ficou mais fácil sair da mesa para fazer outra coisa.',
+      lia:'Na nossa lista de trocas, uma colheita menor veio com a anotação de uma pausa. Mantive as duas informações; números sozinhos escondem trabalho.',
+      tomas:'Uma encomenda passou para outro dia. Avisei no quadro. Sua parte continuou na sua linha; obrigado por não prometer meu prazo por mim.',
+      ines:'Deixei o retorno da próxima troca anotado. Se a rota mudar, aviso. A mesa já sabe reorganizar o trabalho sem transformar atraso em corrida.',
+      caio:'Propus outra quantidade para a próxima troca. A conversa continuou. A regra de poder discordar já encontrou serviço.',
+      nico:'Conferi uma caixa e escrevi uma linha na lista. Só uma, mas eu consigo explicar cada palavra dela. A próxima espera sua vez.'
+    },
+    alex:'“Eu fui embora achando que deixar de atrapalhar era ajudar”, você diz. “Na primeira lista de trocas, quase pus meu nome em todas as viagens. Risquei. Assumo minhas entregas e aviso se não conseguir. Tomás combina os prazos; Inês e Caio decidem suas rotas. Nico confere sua linha antes de assinar. Se eu prometer demais de novo, podem me lembrar.”'
+  }];
   const arcs={
     rosa:{title:'Uma chave para mais de uma mão',agenda:'Preservar sementes e permitir que a próxima geração transforme a casa.',flaw:'Confunde guardar objetos com proteger pessoas; custa a dividir a responsabilidade.',unlock:0,
       stages:[{title:'A caixa que Rosa não oferece',coins:12,offer:'Guardo a melhor amostra esperando uma estação ideal. É uma maneira elegante de nunca colocá-la em risco. Quero separar um lote novo depois de duas colheitas. Você olha a caixa comigo e escolhe como vamos tratar essa espera.',objectives:[obj('clue','Releia o envelope da caixa','inspect',1,{clueId:'carta-perdida'}),obj('harvest','Faça 2 colheitas depois do combinado','harvest',2)],choices:[decision('Compartilhar a amostra com quem está começando.','Vou separar amostras pequenas para outras mãos. A caixa na varanda ganha a etiqueta “primeira tentativa”.','Rosa expõe uma caixa de primeira tentativa e passa a convidar novatos.','Uma boa semente fora da minha mão ainda pode ser uma boa semente.'),decision('Manter uma referência e plantar o restante.','Vou guardar uma amostra pequena, com registro, e liberar o resto. Se eu tentar reservar a caixa inteira de novo, pode apontar para a etiqueta.','Rosa mantém uma referência identificada e deixa o restante circular.','Guardar uma parte é cuidado. Guardar tudo também pode ser medo.')],resolution:'A caixa ficou mais leve. Eu também. Agora entendi por que você olhava tanto para ela: parecia importante demais para uma primeira tentativa. Obrigada por não aceitar minha desculpa de esperar a estação perfeita.'},
@@ -9265,13 +9506,14 @@ body.hud-game #legend{display:none !important;}
   function offer(npcId,type,key,step){if(!validTarget(type,key,step))return menu(npcId);const def=definition(type,key,step),data=dataFor(type,key,step)||freshRecord(),prefix='saga:'+targetId(type,key,step);
     const choices=data.status==='offered'?(def.choices?.length?def.choices.map((c,i)=>({id:prefix+':accept:'+i,label:c.label})):[{id:prefix+':accept:0',label:'Aceitar o próximo combinado'}]):data.status==='ready'?[{id:prefix+':deliver',label:def.finalChoice?'Voltar à mesa e firmar o acordo':'Concluir o combinado e contar o resultado'}]:[];
     choices.push({id:'saga:menu',label:'Voltar aos projetos deste morador'},{id:'saga:close',label:'Vou pensar; até depois'});
-    const message=data.status==='offered'?def.offer||def.description:data.status==='ready'?readyLine(npcId,type,key)+'\n\n'+objectiveLine(objectiveViews(def,data)):data.status==='completed'?def.resolution:((type==='episode'?investigationBeats[Number(key)]?.active[data.choice]:null)||def.choices?.[data.choice]?.reply||'Nosso combinado está em andamento.')+'\n\n'+objectiveLine(objectiveViews(def,data));
+    const message=data.status==='offered'?def.offer||def.description:data.status==='ready'?readyLine(npcId,type,key)+'\n\n'+objectiveLine(objectiveViews(def,data)):data.status==='completed'?resolutionFor(def,data):((type==='episode'?investigationBeats[Number(key)]?.active[data.choice]:null)||def.choices?.[data.choice]?.reply||'Nosso combinado está em andamento.')+'\n\n'+objectiveLine(objectiveViews(def,data));
     return show(npcId,message,'saga-quest',choices,def.title);
   }
   function latestConsequence(npcId){for(let i=1;i>=0;i--){const r=state.arcs[npcId][i];if(r.status==='completed')return arcs[npcId].stages[i].choices[r.choice]?.consequence||'';}for(let i=Math.min(state.episodeIndex-1,7);i>=0;i--)if(episodes[i].npcId===npcId){const r=state.episodes[i];return episodes[i].choices[r.choice]?.consequence||'';}return'';}
   function readyLine(npcId,type,key){if(type==='episode')return investigationBeats[Number(key)]?.ready.replace(/Alex/g,context().playerName)||'Vamos conferir o que encontramos.';
     return{rosa:'Separei duas cadeiras. A caixa também veio; hoje ela espera enquanto você me conta.',lia:'Trouxe a página aberta. Mostre o que percebeu antes de eu começar a tomar notas.',tomas:'Terminado? Vamos conferir juntos. Guardei uma pergunta sobre como você fez.',ines:'Você voltou com o combinado pronto. Quero ouvir também como foi o caminho.',caio:'Aqui está nossa lista. Vamos conferir dos dois lados antes de guardar.',nico:'Terminamos essa parte! Vou deixar o lápis parado um instante para ouvir você. Um instante de verdade.'}[npcId];}
   function greeting(npcId,options={}){
+    const agreement=tableConversation(npcId);if(agreement)return agreement;
     const base=baseGreeting(npcId,options);if(!base||options.first)return base;
     const delivery=window.FarmLife?.deliveryMemory?.(npcId);if(!delivery)return base;
     const episode=episodes[state.episodeIndex],record=state.episodes[state.episodeIndex],step=arcStep(npcId);
@@ -9280,6 +9522,12 @@ body.hud-game #legend{display:none !important;}
     // compromisso em andamento. Depois ela volta como lembrança ocasional.
     if(delivery.recent)return delivery.line+(pending?'\n\n'+base:'');
     return !pending&&!options.night&&Math.max(1,num(options.visit))%4===2?delivery.line:base;
+  }
+  function tableConversation(npcId){
+    const r=state.episodes[7];if(!IDS.includes(npcId)||state.episodeIndex!==7||r.acceptedAt===null||!['active','ready'].includes(r.status)||!tableAgreements[r.choice])return'';
+    // Também vale na primeira visita de um save antigo e depois da última
+    // conversa tornar a etapa pronta. Só ler/reler não emite nenhum evento.
+    return tableAgreements[r.choice].response[npcId].replace(/Alex/g,context().playerName)+(npcId==='rosa'&&r.status==='ready'?'\n\n'+readyLine('rosa','episode',7):'');
   }
   function baseGreeting(npcId,options={}){if(!IDS.includes(npcId))return'';const name=context().playerName;
     const welcome={rosa:name+'. Trouxe as mesmas botas e uma cara nova de quem ensaiou explicações na estrada. Deixe as duas na porta por um instante. Guardei sua cadeira; a Casa das Sementes ainda precisa de gente, e eu senti sua falta.',
@@ -9297,6 +9545,7 @@ body.hud-game #legend{display:none !important;}
     if(visit%3===0){for(let i=state.clues.length-1;i>=0;i--){const reaction=clueReactions[state.clues[i]]?.[npcId];if(reaction)return reaction;}}
     if(visit%3===1){for(let i=1;i>=0;i--){const personal=state.arcs[npcId][i];if(personal.status==='completed')return personalEchoes[npcId][i][personal.choice];}}
     if(options.night===true)return voice.night;
+    if(state.episodeIndex===8&&visit%4===0)return tableAgreements[state.episodes[7].choice]?.echo[npcId]||voice.settled[0];
     let band=state.episodeIndex>=8?'settled':state.episodeIndex>=7?'archive':state.episodeIndex>=3?'middle':'early';
     if(band==='archive'&&!state.clues.includes('arquivo-casa'))band='middle';
     if(band==='middle'&&!state.clues.includes(voiceClues[npcId]))band='early';
@@ -9359,14 +9608,18 @@ body.hud-game #legend{display:none !important;}
     return show(npcId,(choice?.reply||'Combinado. Faça estas ações a partir de agora e volte para conversarmos sobre o resultado.')+'\n\n'+objectiveLine(objectiveViews(def,data)),'saga-quest',[{id:'saga:menu',label:'Ver meus outros projetos'},{id:'saga:close',label:'Vou começar'}],def.title);
   }
   function deliver(npcId,type,key,step){if(!validTarget(type,key,step))return menu(npcId);const def=definition(type,key,step),data=dataFor(type,key,step);if(!data||data.status!=='ready'||data.paid)return menu(npcId);
-    if(def.finalChoice)return show(npcId,'As seis pessoas ouviram a proposta. O arquivo explica a reserva; só uma conversa entre vocês pode decidir o próximo capítulo.\n\nVocê quer firmar este acordo com o vale?\n\n'+(def.choices[data.choice]?.consequence||''),'saga-decision',[{id:'saga:episode:'+key+':confirm',label:'Ficar, pedir ajuda e cumprir o novo acordo'},{id:'saga:menu',label:'Quero conversar mais antes de assinar'},{id:'saga:close',label:'Volto quando estiver pronto'}],def.title);
+    if(def.finalChoice)return show(npcId,'Trouxe os combinados para a mesa. Antes de firmar, confira o que cada um assumiu:\n\n'+tableAgreements[data.choice].summary+'\n\nVocê quer firmar este acordo com o vale?\n\n'+(def.choices[data.choice]?.consequence||''),'saga-decision',[{id:'saga:episode:'+key+':confirm',label:'Ficar, pedir ajuda e cumprir o novo acordo'},{id:'saga:menu',label:'Quero conversar mais antes de assinar'},{id:'saga:close',label:'Volto quando estiver pronto'}],def.title);
     return grant(npcId,type,key,step,def,data);
   }
   function grant(npcId,type,key,step,def,data){if(data.paid||data.status!=='ready')return menu(npcId);data.paid=true;data.status='completed';state.trust[npcId]=Math.min(100,state.trust[npcId]+(type==='episode'?6:type==='arc'?8:2));
     if(type==='episode')state.episodeIndex++;
     state.coinsEarned=Math.min(LIMIT,state.coinsEarned+def.coins);const id=targetId(type,key,step),choice=def.choices?.[data.choice];journal('finish:'+id,def.title,def.inner||choice?.inner||'Cumpri o combinado e voltei para contar. O vale continua amanhã.',npcId);
     changed();emit('reward',{kind:'saga-'+type,id:'saga:'+id+(type==='recurring'?':'+state.cycleId:''),npcId,coins:def.coins,label:def.title});
-    return show(npcId,(def.resolution||'Nosso novo combinado foi cumprido. Na próxima estação podemos escolher outra tentativa, sem apagar o que já fizemos.')+(choice?.consequence?'\n\nO que mudou: '+choice.consequence:''),def.finalChoice?'saga-final':'saga-response',[{id:'saga:menu',label:state.episodeIndex===8?'A fazenda continua · ver projetos':'Continuar a investigação e os projetos'},{id:'saga:close',label:'Guardar este momento'}],def.title);
+    return show(npcId,(resolutionFor(def,data)||'Nosso novo combinado foi cumprido. Na próxima estação podemos escolher outra tentativa, sem apagar o que já fizemos.')+(choice?.consequence?'\n\nO que mudou: '+choice.consequence:''),def.finalChoice?'saga-final':'saga-response',[{id:'saga:menu',label:state.episodeIndex===8?'A fazenda continua · ver projetos':'Continuar a investigação e os projetos'},{id:'saga:close',label:'Guardar este momento'}],def.title);
+  }
+  function resolutionFor(def,data){
+    if(!def.finalChoice)return def.resolution;
+    return 'Rosa põe o envelope no centro. Tomás vira a placa para mostrar o verso. Lia abre a página com a pergunta ainda incompleta. Inês traz a fita; Caio, a caixa de duas etiquetas; Nico, um mapa agora assinado por ele.\n\n'+tableAgreements[data.choice].alex+'\n\nTomás ergue a sobrancelha. “Essa última parte nós já fazíamos.” Nico ri primeiro. Rosa não fecha o arquivo.\n\nA reserva voltou a circular. A fazenda continua. Cada morador ainda tem um problema, uma vontade e trabalho para amanhã. Você tem lugar entre eles, sem precisar ocupar todos os lugares.';
   }
   function choose(choiceId){if(!dialogue||!dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();const npcId=dialogue.npcId;
     if(choiceId==='saga:close'||choiceId==='saga:back')return close();if(choiceId==='saga:menu')return menu(npcId);
@@ -10102,6 +10355,535 @@ body.hud-game #legend{display:none !important;}
     ctx.restore();
   }
   window.drawGrassSway=drawGrassSway;
+})();
+
+/* ================================
+   src/modules/41-player-actions.js
+   ================================ */
+/* Encenação das atividades. O resultado continua pertencendo à interação;
+   alvo, duração e fase são transitórios e nunca entram no save. */
+(()=>{
+ 'use strict';
+ const durations=Object.freeze({plant:.50,water:.68,harvest:.56,collect:.55,feed:.62,fish:1.05});
+ const contact=Object.freeze({plant:.52,water:.55,harvest:.55,collect:.55,feed:.58,fish:.58});
+ let current=null;
+ function reset(actor){
+  const a=actor||current?.actor;
+  if(a){a.actionTimer=0;a.actionType=null;}
+  current=null;
+ }
+ function begin(actor,scene,kind,target){
+  const duration=durations[kind]||.35;
+  const valid=target&&Number.isFinite(target.x)&&Number.isFinite(target.y);
+  current={actor,scene,kind,duration,target:valid?target:null};
+  return duration;
+ }
+ function matches(actor,scene){
+  return current&&current.actor===actor&&current.scene===scene&&actor.actionTimer>0&&!actor.dead&&!actor.resting;
+ }
+ function progress(actor){return Math.max(0,Math.min(1,1-actor.actionTimer/current.duration));}
+ function pose(actor,scene){
+  if(!matches(actor,scene))return {};
+  const t=current.target;
+  // O animal pode terminar de acomodar o corpo; a mão acompanha o alvo vivo.
+  const target=t&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Math.hypot(t.x-actor.x,t.y-actor.y)<96?{x:t.x,y:t.y}:null;
+  return{actionKind:current.kind,actionProgress:progress(actor),actionTarget:target};
+ }
+ function update(actor,scene){
+  if(current&&!matches(actor,scene))reset(actor);
+ }
+ function cancelForMove(actor,scene,reducedMotion){
+  if(!matches(actor,scene))return false;
+  // Depois do contato, andar tem prioridade sobre terminar a pose de retorno.
+  if(!reducedMotion&&progress(actor)<(contact[current.kind]||.55))return false;
+  reset(actor);return true;
+ }
+ function waterTarget(spot,map,tiles,size){
+  const ox=Math.floor(spot.x/size),oy=Math.floor(spot.y/size);
+  let best=null;
+  for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
+   if(![tiles.WATER,tiles.RIVER,tiles.OASIS].includes(map[oy+dy]?.[ox+dx]))continue;
+   const x=(ox+dx+.5)*size,y=(oy+dy+.5)*size,distance=Math.hypot(x-spot.x,y-spot.y),score=Math.abs(distance-24);
+   if(!best||score<best.score)best={x,y,score};
+  }
+  return best?{x:best.x,y:best.y}:null;
+ }
+ window.FarmPlayerActions=Object.freeze({begin,pose,update,reset,cancelForMove,waterTarget,
+  info(){return current?{kind:current.kind,scene:current.scene,duration:current.duration,progress:progress(current.actor),active:!!matches(current.actor,current.scene)}:null;}});
+})();
+
+/* ============================
+   src/modules/42-water-life.js
+   ============================ */
+/* Água viva em pixels inteiros. Só desenha: a margem de oito vizinhos,
+   o mapa físico, os objetos de interação e os saves continuam intactos. */
+(function(){
+  (window.__farmBiomes=window.__farmBiomes||[]).push(function(API){
+    'use strict';
+    const T=API.T,TS=API.TS,masks=new Map(),anchors=new Map();
+    let sourceMap=null,groups=0;
+    const wet=t=>t===T.WATER||t===T.RIVER||t===T.OASIS||t===T.ICE;
+    const liquid=t=>t===T.OASIS||((t===T.WATER||t===T.RIVER)&&!API.isFrio());
+    const reduced=()=>typeof motionOk==='function'&&!motionOk();
+    const hash=(x,y)=>(Math.imul(x^7919,73856093)^Math.imul(y^104729,19349663))>>>0;
+    const rect=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
+    function sync(){
+      const next=API.scenes[API.rawScene]?.map;
+      if(next!==sourceMap){sourceMap=next;masks.clear();anchors.clear();}
+    }
+    function mask(tx,ty){
+      sync();
+      const t=API.tileAt(tx,ty);if(!wet(t))return null;
+      const key=ty*65536+tx;let rows=masks.get(key);if(rows)return rows;
+      rows=new Uint16Array(TS);
+      // A margem estática ocupa até seis pixels, incluindo a linha úmida.
+      // Reservar essa faixa e as quatro quinas evita pintar sobre qualquer
+      // recorte da arte, sem ler pixels do canvas ou recalcular seu cache.
+      const n=!wet(API.tileAt(tx,ty-1)),e=!wet(API.tileAt(tx+1,ty)),
+        s=!wet(API.tileAt(tx,ty+1)),w=!wet(API.tileAt(tx-1,ty));
+      const nw=!wet(API.tileAt(tx-1,ty-1)),ne=!wet(API.tileAt(tx+1,ty-1)),
+        sw=!wet(API.tileAt(tx-1,ty+1)),se=!wet(API.tileAt(tx+1,ty+1));
+      for(let y=0;y<TS;y++)for(let x=0;x<TS;x++){
+        const right=TS-1-x,bottom=TS-1-y;
+        if((n&&y<6)||(s&&bottom<6)||(w&&x<6)||(e&&right<6))continue;
+        if((nw&&x<6&&y<6)||(ne&&right<6&&y<6)||(sw&&x<6&&bottom<6)||(se&&right<6&&bottom<6))continue;
+        rows[y]|=1<<x;
+      }
+      masks.set(key,rows);return rows;
+    }
+    function surfaceAt(x,y){
+      x=Math.floor(x);y=Math.floor(y);
+      const tx=Math.floor(x/TS),ty=Math.floor(y/TS),rows=mask(tx,ty);
+      return !!(rows&&(rows[y-ty*TS]&(1<<(x-tx*TS))));
+    }
+    function waterRect(g,c,x,y,w=1,h=1){
+      g.fillStyle=c;
+      for(let j=0;j<h;j++)for(let i=0;i<w;i++)if(surfaceAt(x+i,y+j))g.fillRect(x+i,y+j,1,1);
+    }
+    function anchor(o,kind){
+      sync();const old=anchors.get(o);
+      if(old&&old.kind===kind&&old.ox===o.x&&old.oy===o.y)return old.point;
+      let point=null,score=Infinity;
+      const ox=Math.floor(o.x/TS),oy=Math.floor(o.y/TS),fish=kind==='fish';
+      const lilies=(API.scenes[API.rawScene]?.objects||[]).filter(item=>item.type==='river_lily');
+      const previous=fish?lilies:lilies.slice(0,Math.max(0,lilies.indexOf(o)));
+      const reserved=previous.map(item=>anchor(item,'lily')).filter(Boolean);
+      const clear=(x,y)=>reserved.every(p=>Math.abs(p.x-x)>=15||Math.abs(p.y-y)>=8);
+      if(!fish){
+        // A mesma ordem do mundo resolve o grupo inteiro, mesmo quando a
+        // câmera só enxerga sua última folha. Evita fundir lírios na margem.
+        for(let dy=-32;dy<=32;dy+=2)for(let dx=-32;dx<=32;dx+=2){
+          const x=Math.round(o.x)+dx,y=Math.round(o.y)+dy,d=dx*dx+dy*dy;
+          if(d>=score||!clear(x,y))continue;
+          if(![-7,0,7].every(a=>[-4,0,4].every(b=>surfaceAt(x+a,y+b))))continue;
+          score=d;point=Object.freeze({x,y});
+        }
+      }
+      if(fish)for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
+        const tx=ox+dx,ty=oy+dy,t=API.tileAt(tx,ty);
+        if(t!==T.RIVER&&t!==T.WATER&&t!==T.OASIS)continue;
+        const x=tx*TS+TS/2,y=ty*TS+TS/2,d=Math.hypot(x-o.x,y-o.y);
+        if(d>48||!surfaceAt(x,y)||!clear(x,y))continue;
+        let edge=0;
+        for(const [a,b]of [[-6,-3],[6,-3],[-6,3],[6,3]])if(!surfaceAt(x+a,y+b))edge++;
+        const cost=(fish?Math.abs(d-24):d)+edge*12;
+        if(cost<score){score=cost;point=Object.freeze({x,y});}
+      }
+      if(anchors.size>=64)anchors.delete(anchors.keys().next().value);
+      anchors.set(o,{kind,ox:o.x,oy:o.y,point});return point;
+    }
+    function fishingTarget(o){return o&&Number.isFinite(o.x)&&Number.isFinite(o.y)?anchor(o,'fish'):null;}
+    function ripple(g,x,y,phase,color){
+      const r=3+phase,ry=1+Math.floor(phase/2);
+      waterRect(g,color,x-r+2,y-ry,r*2-3);
+      waterRect(g,color,x-r+1,y-ry+1,1);
+      waterRect(g,color,x+r-1,y-ry+1,1);
+      if(ry>1){waterRect(g,color,x-r,y,1);waterRect(g,color,x+r,y,1);}
+      waterRect(g,color,x-r+2,y+ry,r*2-3);
+    }
+    function drawSurface(g,camX,camY,visW,visH){
+      groups=0;if(API.rawScene!=='main'||reduced())return;
+      const time=performance.now()/1000;
+      // Uma crista a cada célula de 32px; distribuição fixa no mundo.
+      // A cor vem da água, sem estrelas brancas nem uma grade piscando.
+      for(let cy=Math.floor(camY/32);cy<=Math.floor((camY+visH)/32);cy++)
+        for(let cx=Math.floor(camX/32);cx<=Math.floor((camX+visW)/32);cx++){
+          const seed=hash(cx,cy);if(seed%5===0)continue;
+          const x=cx*32+7+seed%18,y=cy*32+7+(seed>>>8)%18;
+          const tile=API.tileAt(Math.floor(x/TS),Math.floor(y/TS));
+          if(!liquid(tile)||!surfaceAt(x,y))continue;
+          const phase=Math.floor(time*.9+seed%17)%4,dy=phase===3?1:0;
+          const color=phase===0?'#508e87':phase===3?'#4b8983':'#629d93';
+          waterRect(g,color,x,y+dy,3+(seed>>>16)%4);
+          if(phase===1)waterRect(g,'#538f87',x+2,y-1,2);
+          groups++;
+        }
+    }
+    function drawLily(o,g){
+      const p=anchor(o,'lily');if(!p)return;
+      const cold=API.isFrio(),sway=reduced()||cold?0:Math.round(Math.sin(performance.now()/1700+o.x)*.65);
+      const x=p.x+sway,y=p.y;
+      // Folha recortada e nervura curta; os pixels de contato têm cor da água.
+      waterRect(g,'#36675c',x-4,y+3,9);
+      waterRect(g,cold?'#5d8170':'#3e6651',x-4,y-3,8);
+      waterRect(g,cold?'#6f927e':'#527752',x-6,y-2,12,4);
+      waterRect(g,cold?'#789b83':'#6b8a5b',x-4,y-2,7,3);
+      waterRect(g,cold?'#6f927e':'#527752',x-4,y+2,8);
+      waterRect(g,'#3e6651',x+1,y,4);
+      waterRect(g,'#367b78',x+4,y+1,2);
+      const flower=o.kind==='pink';
+      waterRect(g,flower?'#b97979':'#c9cda6',x-1,y-3,3,2);
+      waterRect(g,flower?'#d6a0a0':'#e5dfbc',x,y-4,1,2);
+      waterRect(g,'#d8b773',x,y-3,1);
+      if(!cold)waterRect(g,'#5b9a90',x-6,y+4,4);
+    }
+    function drawCattail(o,g){
+      const x=Math.round(o.x),y=Math.round(o.y),seed=hash(x,y),cold=API.isFrio();
+      const sway=reduced()||cold?0:Math.round(Math.sin(performance.now()/1500+seed%31)*.75);
+      waterRect(g,'#376b65',x,y+4,1,3);
+      rect(g,cold?'#668777':'#476548',x,y-8,1,9);
+      rect(g,cold?'#779383':'#68805a',x+sway,y-12,1,5);
+      rect(g,'#57453c',x+sway-1,y-13,2,5);
+      rect(g,'#886548',x+sway-1,y-12,1,3);
+      rect(g,cold?'#779383':'#68805a',x+sway,y-15,1,2);
+      rect(g,cold?'#668777':'#476548',x-2,y-2,1,5);
+      rect(g,cold?'#779383':'#68805a',x-3,y-5,1,4);
+      rect(g,cold?'#668777':'#476548',x+2,y-1,1,4);
+      rect(g,cold?'#779383':'#68805a',x+3,y-4,1,4);
+    }
+    function drawFishing(o,g){
+      const p=fishingTarget(o),still=reduced(),time=still?0:performance.now();
+      if(p&&!API.isFrio()){
+        const phase=Math.floor(time/420)%4;
+        ripple(g,p.x,p.y,phase,phase===3?'#598d85':'#85b2a0');
+        waterRect(g,'#395e57',p.x-1,p.y,3);
+        if(phase===0)waterRect(g,'#acc5ad',p.x,p.y-1,1);
+      }
+      // Mesmo texto, distância e posição de interação. Apenas a oscilação
+      // deixa de acontecer quando o jogador pede redução de movimento.
+      if(API.player&&Math.hypot(API.player.x-o.x,API.player.y-o.y)<28){
+        const pulse=still?1:(Math.sin(time/300)+1)/2;
+        g.save();g.font='bold 8px Trebuchet MS, monospace';g.textAlign='center';
+        g.fillStyle=`rgba(255,217,138,${.75+.25*pulse})`;g.fillText('[E] Pescar',o.x,o.y-8);g.restore();
+      }
+    }
+    API.registerObjectDrawer('river_lily',drawLily);
+    API.registerObjectDrawer('river_cattail',drawCattail);
+    API.registerObjectDrawer('fishing_spot',drawFishing);
+    window.FarmWaterLife=Object.freeze({drawSurface,fishingTarget,surfaceAt,
+      info:()=>({tileMasks:masks.size,maskBytes:masks.size*TS*2,anchors:anchors.size,maxAnchors:64,groups})});
+  });
+})();
+
+/* ============================
+   src/modules/43-open-world.js
+   ============================ */
+/* Expansão contígua a leste. As primeiras60colunas ficam intactas:
+   nenhum objeto, porta, coordenada, cultivo ou tile antigo é deslocado.
+   expand roda depois dos carimbos originais e antes do snapshot da partida. */
+(function(){
+ (window.__farmBiomes=window.__farmBiomes||[]).push(function(API){
+  'use strict';
+  const T=API.T,S=API.TS,ORIGINAL_WIDTH=60,WIDTH=96,HEIGHT=124;
+  const clamp=v=>Math.max(0,Math.min(1,v)),smooth=v=>{v=clamp(v);return v*v*(3-2*v);};
+  const hash=(x,y)=>(Math.imul(x^8191,73856093)^Math.imul(y^131071,19349663))>>>0;
+  const pixel=(x,y)=>({x:x*S+8,y:y*S+8});
+  const regions=Object.freeze({
+   forest:Object.freeze({id:'forest',name:'Mata das Nascentes',mapLabel:'MATA DAS NASCENTES',label:'mata',tempDelta:-.012,hydDelta:-.04,sweatBoost:0,thermalCause:'ar fresco da mata',mapX:78,mapY:46}),
+   wetland:Object.freeze({id:'wetland',name:'Veredas do Sul',mapLabel:'VEREDAS DO SUL',label:'veredas',tempDelta:.025,hydDelta:-.22,sweatBoost:.8,thermalCause:'calor úmido das veredas',mapX:78,mapY:109})
+  });
+  const landmarks=Object.freeze([
+   Object.freeze({id:'open_spring',...pixel(78,35),title:'Marcas da nascente',region:'forest',description:'Compare as marcas d’água e acompanhe a nascente.'}),
+   Object.freeze({id:'open_seed_memory',...pixel(78,58),title:'Banco de sementes da mata',region:'forest',description:'Revise os recipientes e registre o cuidado com as sementes.'}),
+   Object.freeze({id:'open_water_gauge',...pixel(85,96),title:'Régua das veredas',region:'wetland',description:'Leia o nível da água e acompanhe o canal.'})
+  ]);
+  const npcSpawns=Object.freeze({helena:Object.freeze(pixel(77,36)),bia:Object.freeze(pixel(77,59)),davi:Object.freeze(pixel(84,97))});
+  const routes=Object.freeze([
+   [[60,58],[67,58],[71,51],[76,46],[76,36],[76,29],[83,25],[89,23]],
+   [[76,36],[78,36],[78,35]],
+   [[67,58],[78,59],[88,60],[90,74],[85,83],[84,97],[88,109],[92,116]],
+   [[67,58],[66,74],[71,84],[72,98],[76,111],[88,109]],
+   [[71,84],[85,83]],[[72,98],[84,97]],[[78,59],[78,58]],[[84,97],[85,96]]
+  ]);
+  function blendWeights(x,y,base){
+   if(!Number.isFinite(x)||x<60||x>=WIDTH||y<28||y>=HEIGHT)return base;
+   const east=smooth((x-60)/6),north=smooth((y-28)/10),south=smooth((y-78)/10),weight=east*north;
+   if(weight<=0)return base;
+   const combined=base.map(([id,w])=>[id,w*(1-weight)]).filter(([,w])=>w>1e-9);
+   const forest=weight*(1-south),wetland=weight*south;
+   if(forest>1e-9)combined.push(['forest',forest]);if(wetland>1e-9)combined.push(['wetland',wetland]);
+   return combined;
+  }
+  function regionAt(x,y){
+   if(x<60||x>=WIDTH||y<28||y>=HEIGHT)return null;
+   return y<83?'forest':'wetland';
+  }
+  function expand(main){
+   if(!main||main._openWorldV67)return main?.MW||ORIGINAL_WIDTH;
+   if(main.MW!==ORIGINAL_WIDTH||main.MH!==HEIGHT)throw Error('A expansão espera o mundo original60×124.');
+   const m=main.map.map((row,y)=>{
+    const next=row.slice();
+    for(let x=ORIGINAL_WIDTH;x<WIDTH;x++){
+     const n=(Math.sin(x*.29+y*.14)+Math.cos(x*.17-y*.21)+2)/4;
+     const east=smooth((x-60)/6),thaw=smooth((y-34)/8)*(1-east)+smooth((y-28)/10)*east;
+     let t=y<42?(n<thaw?T.GRASS:T.SNOW):T.GRASS;
+     // A areia do antigo extremo sul entra como línguas no campo úmido.
+     if(y>=82&&x<67&&n>smooth((x-60)/7))t=y<90?T.CRACKED:T.SAND;
+     else if(y>=80&&n>.76)t=T.SAND;
+     else if(t===T.GRASS&&n<.37)t=T.GRASS2;
+     if(y<3)t=T.SNOWROCK;
+     next.push(t);
+    }return next;
+   });
+   const paint=(x,y,t)=>{if(x>=ORIGINAL_WIDTH&&x<WIDTH&&y>=0&&y<HEIGHT)m[y][x]=t;};
+   const pond=(cx,cy,rx,ry,t)=>{for(let y=Math.floor(cy-ry);y<=cy+ry;y++)for(let x=Math.floor(cx-rx);x<=cx+rx;x++){
+    const edge=1+.07*Math.sin(x*1.4+y*.7);if(((x-cx)/rx)**2+((y-cy)/ry)**2<edge)paint(x,y,t);
+   }};
+   pond(86,34,5.5,4,T.WATER);pond(87,94,6,5,T.WATER);pond(73,107,6.5,4,T.WATER);
+   for(let y=36;y<124;y++){
+    const x=Math.round(83+Math.sin((y-36)/11)*4+Math.sin(y/23)*2);
+    paint(x,y,T.RIVER);paint(x+1,y,T.RIVER);
+    if(y>85&&y%11<5)paint(x-1,y,T.RIVER);
+   }
+   // Circuitos caminháveis com passagens em madeira nos cruzamentos d’água.
+   // Largura de três tiles: duas pessoas podem conversar sem bloquear a rota.
+   const wetBeforeTrails=m.map(row=>row.map(t=>t===T.WATER||t===T.RIVER||t===T.OASIS));
+   const trail=new Set();
+   for(const points of routes)for(let p=1;p<points.length;p++){
+    const a=points[p-1],b=points[p],steps=Math.max(Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1]));
+    for(let i=0;i<=steps;i++){
+     const x=Math.round(a[0]+(b[0]-a[0])*i/steps),y=Math.round(a[1]+(b[1]-a[1])*i/steps);
+     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const xx=x+dx,yy=y+dy;if(xx<60||xx>=WIDTH||yy<0||yy>=HEIGHT)continue;
+      const water=wetBeforeTrails[yy][xx];paint(xx,yy,water?T.WOOD:T.PATH);trail.add(xx+','+yy);
+     }
+    }
+   }
+   const clear=[...landmarks,...Object.values(npcSpawns)];
+   for(const p of clear){const tx=Math.floor(p.x/S),ty=Math.floor(p.y/S);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){paint(tx+dx,ty+dy,wetBeforeTrails[ty+dy][tx+dx]?T.WOOD:T.PATH);trail.add((tx+dx)+','+(ty+dy));}}
+   // As tábuas atravessam toda a largura da trilha e se apoiam em terra.
+   // Dilatar somente sobre a trilha mantém uma passarela única, em vez de
+   // pequenas lascas de madeira na borda diagonal de uma poça.
+   const crossings=[...trail].map(k=>k.split(',').map(Number)).filter(([x,y])=>wetBeforeTrails[y][x]);
+   for(const [x,y]of crossings)for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)if(trail.has((x+dx)+','+(y+dy)))paint(x+dx,y+dy,T.WOOD);
+   main.map=m;main.MW=WIDTH;
+   const added=[],add=o=>{o._world=true;o._openWorld=true;added.push(o);main.objects.push(o);};
+   // Grupos pequenos deixam clareiras e linhas de visão; nenhum volume nas trilhas.
+   const room=(tx,ty,r=2)=>{
+    if(tx<62||tx>93||ty<6||ty>120)return false;
+    for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++)if(trail.has(x+','+y)||[T.WATER,T.RIVER,T.WOOD].includes(m[y]?.[x]))return false;
+    return clear.every(p=>Math.hypot(p.x/S-tx,p.y/S-ty)>4);
+   };
+   for(let y=10;y<80;y+=6)for(let x=64;x<95;x+=6){
+    const seed=hash(x,y),tx=x+(seed%3)-1,ty=y+((seed>>>4)%3)-1;
+    if(seed%5===0||!room(tx,ty))continue;
+    add({type:ty<34?'mtn_pine':'tree',x:tx*S+8,y:ty*S+12,shadeR:26+(seed%3),s:1});
+   }
+   for(const [x,y]of [[65,88],[69,91],[92,88],[92,103],[83,115],[64,110],[79,119]])if(room(x,y))add({type:'des_palm',x:x*S+8,y:y*S+12});
+   for(let y=83;y<120;y+=5)for(const x of [69,78,90]){
+    if(trail.has(x+','+y)||!room(x,y,0)||[T.WATER,T.RIVER,T.WOOD].includes(m[y][x]))continue;
+    add({type:'river_cattail',x:x*S+8,y:y*S+10});
+   }
+   for(const [x,y]of [[84,33],[86,94],[72,107]])if([T.WATER,T.RIVER].includes(m[y][x]))add({type:'river_lily',x:x*S+8,y:y*S+8,kind:y===94?'pink':'white'});
+   // Recursos de forrageio usam a atividade renovável já existente.
+   for(const [x,y]of [[65,54],[74,64],[88,79]])if(room(x,y,1))add({type:'fx_berry',x:x*S+8,y:y*S+12,_pickT:0});
+   for(const landmark of landmarks)add({type:'open_world_landmark',landmarkId:landmark.id,x:landmark.x,y:landmark.y,interactionHint:landmark.title});
+   main._openWorldV67={width:WIDTH,originalWidth:ORIGINAL_WIDTH,addedObjects:added.length};
+   return main.MW;
+  }
+  const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
+  API.registerTileDrawer(T.WOOD,(g,px,py,x,y)=>{
+   if(API.rawScene!=='main'||x<ORIGINAL_WIDTH){API.drawBaseTile(g,px,py,x,y,T.WOOD);return;}
+   // Tábuas contínuas e gastas no cache estático. A antiga textura de piso
+   // interno formava tijolos laranja e repetia nós em cada quadrado de16px.
+   R(g,'#87745d',px,py,S,S);
+   for(let yy=0;yy<S;yy+=4){R(g,'#6d5d4c',px,py+yy+3,S,1);R(g,'#9a876b',px,py+yy,S,1);}
+   if((x+y)%3===0)R(g,'#514d41',px+3,py+5,1,1);
+   if(API.tileAt(x-1,y)!==T.WOOD){R(g,'#514d41',px,py,2,S);R(g,'#b39a72',px+2,py,1,S);}
+   if(API.tileAt(x+1,y)!==T.WOOD){R(g,'#514d41',px+S-2,py,2,S);R(g,'#a08b69',px+S-3,py,1,S);}
+   if(API.tileAt(x,y-1)!==T.WOOD)R(g,'#b39a72',px,py,S,2);
+   if(API.tileAt(x,y+1)!==T.WOOD)R(g,'#514d41',px,py+S-2,S,2);
+  });
+  API.registerObjectDrawer('open_world_landmark',(o,g)=>{
+   const x=Math.round(o.x),y=Math.round(o.y),cold=API.isFrio();
+   R(g,'rgba(24,59,54,.18)',x-8,y+3,16,2);
+   if(o.landmarkId==='open_spring'){
+    // Pedra de referência gravada: três marcas de água em tons gastos.
+    R(g,'#4f625d',x-7,y-5,14,8);R(g,cold?'#a0bebc':'#74817a',x-5,y-8,10,10);
+    R(g,'#a3b0a0',x-4,y-8,7,2);R(g,'#5b9386',x-3,y-4,6,1);R(g,'#669a8e',x-3,y-1,4,1);
+   }else if(o.landmarkId==='open_seed_memory'){
+    // Uma caixa baixa de latas, sem nova construção ou área de colisão.
+    R(g,'#57453c',x-9,y-4,18,8);R(g,'#886548',x-8,y-3,16,5);R(g,'#b99161',x-9,y-5,18,2);
+    R(g,'#74817a',x-6,y-10,5,7);R(g,'#a8b5a0',x-6,y-10,5,2);R(g,'#ad6650',x+1,y-8,5,5);
+    R(g,'#eee2b8',x-5,y-6,3,2);R(g,'#d0b98c',x+2,y-8,3,1);
+   }else{
+    R(g,'#57453c',x-2,y-18,4,22);R(g,'#b99161',x-1,y-17,2,19);
+    R(g,'#eee2b8',x-1,y-15,2,1);R(g,'#eee2b8',x-1,y-11,2,1);R(g,'#eee2b8',x-1,y-7,2,1);
+    R(g,'#5b9386',x-2,y-3,4,2);R(g,'#74817a',x-4,y+3,8,2);
+   }
+  });
+  window.FarmOpenWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,npcSpawns,routes,
+   dimensions:Object.freeze({originalWidth:ORIGINAL_WIDTH,width:WIDTH,height:HEIGHT})});
+ });
+})();
+
+/* ================================
+   src/modules/44-frontier-story.js
+   ================================ */
+/* Caminhos da água: expansão aditiva. O estado não altera os seis moradores,
+   os atos da saga nem o inventário. Diálogos usam a apresentação já existente. */
+(function(){
+  'use strict';
+  const VERSION=1,LIMIT=1000000,IDS=['helena','davi','bia'],REGIONS=['farm','mountain','desert','forest','wetland'];
+  const clone=v=>JSON.parse(JSON.stringify(v)),plain=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+  const number=(v,max=LIMIT)=>Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
+  const text=(v,max=100)=>typeof v==='string'?v.slice(0,max):'';
+  const characters=Object.freeze([
+    Object.freeze({id:'helena',name:'Helena',role:'Cartógrafa dos caminhos da água',region:'forest',tileX:77,tileY:36,appearance:'Pele oliva, trança castanha, jaqueta ameixa, lenço azul gasto e caderno de estrada.',routine:{day:'Compara marcas na nascente e revê seu caderno.',night:'Guarda as medições e deixa uma página para amanhã.'}}),
+    Object.freeze({id:'davi',name:'Davi',role:'Zelador dos canais da vereda',region:'wetland',tileX:84,tileY:97,appearance:'Homem negro de cabelo grisalho curto, colete terracota, botas de várzea e régua de madeira.',routine:{day:'Confere a régua de água e os caminhos secos.',night:'Anota o último nível antes de guardar as ferramentas.'}}),
+    Object.freeze({id:'bia',name:'Bia',role:'Cultivadora da clareira',region:'forest',tileX:77,tileY:59,appearance:'Pele morena, cabelo preto curto, roupa mostarda, avental musgo e bolsa de amostras.',routine:{day:'Cuida do banco de sementes e compara os canteiros.',night:'Separa etiquetas sem apagar os nomes antigos.'}})
+  ]);
+  const byId=Object.fromEntries(characters.map(c=>[c.id,c]));
+  const routines={
+    helena:[{dx:0,dy:0,activity:'observe',label:'Comparando a nascente',line:'O risco azul fica mais fácil de ler de lado. O meu caderno, infelizmente, não.'},{dx:-16,dy:16,activity:'rest',label:'Pausa na mata',line:'Deixei a próxima medição para depois da pausa. A água não exige que eu fique olhando.'},{dx:16,dy:0,activity:'route',label:'Conferindo a margem',line:'Vou só até a próxima marca. Dessa vez escrevi onde pretendo voltar.'},{dx:0,dy:16,activity:'rest',label:'Fechando o caderno',line:'As medidas de hoje já estão guardadas. Agora consigo ouvir uma história sem tentar desenhá-la.'}],
+    davi:[{dx:0,dy:0,activity:'observe',label:'Lendo a régua de água',line:'Primeiro leio o nível. Depois conto o causo. Se inverter, a manhã acaba.'},{dx:-16,dy:0,activity:'rest',label:'Pausa na vereda',line:'Esta sombra é boa até para quem garante que não estava cansado.'},{dx:16,dy:16,activity:'work',label:'Conferindo os apoios',line:'A régua continua firme. O encaixe de baixo é que gosta de atenção.'},{dx:0,dy:16,activity:'rest',label:'Guardando as ferramentas',line:'A última anotação está feita. Amanhã eu descubro qual ferramenta deixei na mão.'}],
+    bia:[{dx:0,dy:0,activity:'plant',label:'Separando as sementes',line:'Esta fileira é minha. A outra foi da vizinha. As etiquetas precisam contar essa diferença.'},{dx:-16,dy:16,activity:'observe',label:'Comparando tentativas',line:'Duas plantas parecidas podem ter histórias diferentes. Estou conferindo os nomes antes de juntar as caixas.'},{dx:16,dy:0,activity:'sort',label:'Organizando o banco',line:'Tem lugar nesta caixa para uma tentativa que não deu certo. Ela também ensina o próximo plantio.'},{dx:0,dy:16,activity:'rest',label:'Guardando as etiquetas',line:'A etiqueta em branco fica para amanhã. Não vou inventar uma certeza só para fechar a tampa.'}]
+  };
+  const landmarks=[
+    {id:'open_spring',npcId:'helena',title:'Os dois riscos da nascente',x:1256,y:568,action:'Medir a vazão entre as marcas',text:'Na pedra há um risco azul gasto e outro mais recente, acompanhado de uma data. Um desenho de Alex aponta a trilha pelo risco de cima; na margem, a letra de Helena diz “conferir com a água baixa”. As duas pessoas anotaram momentos diferentes, mas só uma legenda foi copiada para o mapa.',result:'Você acompanha a passagem da água entre as referências e anota a condição de hoje. O registro recebe uma data; o risco anterior continua visível para comparação.'},
+    {id:'open_seed_memory',npcId:'bia',title:'A caixa de nomes diferentes',x:1256,y:936,action:'Revisar o banco de sementes',text:'O recipiente da clareira tem três etiquetas, sem nenhuma cobrir a outra: “recebido”, “plantado” e “separado para a próxima tentativa”. Há nomes diferentes nas linhas. Na última estação, algumas amostras chegaram pela vereda e foram plantadas aqui. Não são uma caixa perdida: são tentativas novas, com origem anotada.',result:'Você confere as etiquetas com os compartimentos, recoloca a amostra na divisão correta e registra a revisão. O nome de quem plantou permanece ao lado do de quem trouxe a semente.'},
+    {id:'open_water_gauge',npcId:'davi',title:'A régua que não mede caminhos',x:1368,y:1544,action:'Registrar o nível da vereda',text:'A estaca possui marcas azuis com datas antigas e recentes. Elas medem água; não garantem que a mesma passagem continue seca. Uma seta no verso aponta a nascente. Davi anotou: “copiar a data junto com o risco”. No desenho antigo de Alex, a seta está lá. A data não.',result:'Você lê a água em relação à marca fixa e registra a condição da passagem. A anotação fica ao lado da anterior, sem transformar um nível antigo numa promessa sobre a rota de hoje.'}
+  ];
+  const landmarkById=Object.fromEntries(landmarks.map(d=>[d.id,d]));
+  const goal=(id,label,event,amount=1,match={})=>({id,text:label,event,goal:amount,match});
+  const choice=(label,reply,extra,ending,echo)=>({label,reply,objectives:extra||[],ending,echo});
+  const missions=[
+    {id:'helena-riscos',npcId:'helena',title:'Dois riscos, uma legenda',coins:16,
+      offer:'Você ainda desenha setas como se elas fossem ordens, Alex? Guardei um mapa nosso. Ele manda seguir o risco azul até uma passagem que hoje termina na água. O risco parece novo. O nosso desenho, decididamente, não.\n\nVamos medir a nascente antes de acusar o mapa de mentira. Depois quero outra pessoa conferindo a legenda. Você escolhe a comparação; eu fico com a medição seguinte.',
+      objectives:[goal('forest','Entre na Mata das Nascentes após aceitar','visit',1,{region:'forest'}),goal('spring','Meça a vazão no marco da nascente','survey',1,{landmarkId:'open_spring'})],
+      choices:[choice('Comparar as anotações com Lia.','Leve a pergunta a Lia. Diga que temos duas datas, não duas respostas rivais. Eu separo o mapa da anotação de margem.',[goal('lia','Ouça Lia depois do combinado','talk',1,{npcId:'lia'})],'Lia pediu a condição de cada observação. Você marcou a passagem num dia seco; eu anotei o nível depois. Quando copiamos o mapa, a minha legenda ficou de fora. A tinta nova ainda é outra pergunta. Davi cuida das marcas da vereda.','Lia deixou espaço entre medida e conclusão. Copiei esse espaço para o nosso mapa.'),choice('Conferir o relato da rota com Inês.','Pergunte a Inês o que uma marca de água pode prometer a quem caminha. Eu não vou discutir com ela usando uma seta de anos atrás.',[goal('ines','Ouça Inês depois do combinado','talk',1,{npcId:'ines'})],'Inês reconheceu o problema: o risco guarda um nível, não uma garantia de passagem. Eu fiz a segunda medição, mas ela ficou na margem da folha. Você copiou só a seta. A tinta recente deve ser de Davi; ele confere a vereda.','Inês tinha razão sobre levar a data junto com a rota. Nosso mapa ganhou as duas.')],
+      alex:'“Minha seta era muito convincente”, você diz. Helena vira o caderno. “Sua letra também. Foi por isso que eu conferi.” Você ri antes de tentar se defender.'},
+    {id:'helena-recado',npcId:'helena',title:'O recado que ficou na estrada',coins:20,
+      offer:'Eu podia ter enviado a legenda depois. Escrevi o começo do recado três vezes e achei três trabalhos mais urgentes. Você prometeu avisar de onde estava. Também não avisou.\n\nQuero conferir a régua com Davi e parar na volta. Depois podemos falar daquela viagem. Sem você tentar consertar anos de silêncio carregando o meu caderno.',
+      objectives:[goal('gauge','Leia a régua de água na vereda','inspect',1,{clueId:'open_water_gauge'}),goal('davi','Converse com Davi sobre as marcas','talk',1,{npcId:'davi'}),goal('rest','Complete uma pausa protegida','rest',1,{safe:true})],
+      choices:[choice('Contar por que não mandei o aviso.','Pode contar quando voltar. Não estou pedindo a versão em que você já entendeu tudo. Fale com Rosa antes, se precisar organizar a primeira frase.',[goal('rosa','Converse com Rosa antes de retornar','talk',1,{npcId:'rosa'})],'Davi renova a tinta, com a data junto. Era manutenção, não um caminho secreto. Sobre a nossa viagem: fiquei magoada porque esperei uma mensagem, não porque você escolheu voltar. Você podia ter dito que não sabia quando seguiria. Isso eu teria entendido.','Quando você não souber o dia, escreva que ainda não sabe. Um recado pequeno chega mais longe que uma explicação ensaiada.'),choice('Perguntar o que Helena fez depois da viagem.','Então escute a parte em que você não estava. Vá até as Veredas do Sul antes de voltar: foi ali que eu decidi ficar por uma estação.',[goal('wetland','Visite as Veredas do Sul após o aceite','visit',1,{region:'wetland'})],'Davi refez as marcas porque o registro precisava continuar. Eu fiquei na vereda porque gostei do trabalho, Alex. Senti sua falta e fiz uma vida ao mesmo tempo. Às vezes você conta a estrada como se, quando saísse de um lugar, o lugar parasse de acontecer.','Hoje eu tenho uma história de que você não participa. Posso contar mesmo assim. Essa parte da amizade também me interessa.')],
+      alex:'“Eu achei que precisava explicar tudo antes de escrever”, você diz. “Acabei não dizendo nem onde estava.” Helena fecha a folha, sem afastar a cadeira. “Da próxima vez, comece por onde você está.”'},
+    {id:'helena-margem',npcId:'helena',title:'Uma margem para voltar',coins:24,
+      offer:'Bia achou nossa marca numa etiqueta da clareira. Agora sei por que o mapa parecia interrompido: eu desenhei por onde passávamos; ela precisa registrar o que fica e cresce.\n\nLeia a caixa com ela e faça uma colheita nova. Quero propor outra folha, com espaço para as pessoas mudarem de ideia. Eu continuo trabalhando aqui. Você não precisa abandonar sua horta para provar que vai voltar.',
+      objectives:[goal('box','Leia a caixa de nomes da clareira','inspect',1,{clueId:'open_seed_memory'}),goal('bia','Ouça Bia depois de aceitar','talk',1,{npcId:'bia'}),goal('harvest','Faça 3 colheitas novas','harvest',3)],
+      choices:[choice('Fazer uma folha comum com datas e autores.','Traga uma produção nova para a conversa. Eu copio as rotas e deixo uma margem larga. Quem mudar a anotação escreve seu nome e a condição do dia.',[goal('produce','Recolha 1 produção nova','produce')],'A folha comum está aberta. Meu nome está nas medidas, o de Bia nas tentativas e o seu na cópia que podemos corrigir. Ninguém precisou apagar a viagem anterior para desenhar a próxima.','A folha comum ganhou outra letra. Desta vez eu conferi a data antes de implicar com a seta.'),choice('Manter cadernos locais e combinar a comparação.','Prepare um item na oficina para o trabalho continuar. Eu guardo a folha da nascente; Bia mantém as etiquetas dela. A comparação tem dia, sem precisar transformar todos os registros num só.',[goal('craft','Fabrique 1 item depois do combinado','craft')],'Cada lugar ficou com seu caderno. Escrevemos quando comparar as páginas, e também como avisar se a data mudar. Gostei de poder discordar da sua legenda sem precisar devolver o mapa inteiro.','Meu caderno ficou aqui, o seu seguiu com você. A próxima comparação não depende de nenhum dos dois adivinhar o que o outro anotou.')],
+      alex:'“Posso vir na próxima comparação?” Helena levanta uma sobrancelha. Você acrescenta: “Vou anotar. E aviso se precisar mudar.” Ela estende o lápis. “Agora parece um plano nosso.”'},
+    {id:'davi-azul',npcId:'davi',title:'Azul de segunda-feira',coins:16,
+      offer:'Se veio perguntar pela tinta fresca, o culpado está segurando o pincel. Refaço o risco porque alguém precisa conseguir ler a régua. Só não esperava encontrar gente usando aquilo como promessa de chão seco.\n\nRegistre o nível, traga duas madeiras novas para os apoios e faça uma pausa. Depois decidimos como deixar claro que uma medida tem data.',
+      objectives:[goal('gauge','Registre o nível no marco da vereda','survey',1,{landmarkId:'open_water_gauge'}),goal('wood','Colete 2 madeiras novas','collect',2,{item:'wood'}),goal('rest','Complete uma pausa protegida','rest',1,{safe:true})],
+      choices:[choice('Conferir o encaixe e preservar as marcas antigas.','Pergunte a Tomás como manter o apoio sem lixar o registro. Eu separo a madeira firme. Nem todo risco é defeito de acabamento.',[goal('tomas','Converse com Tomás sobre o apoio','talk',1,{npcId:'tomas'})],'Tomás encontrou o encaixe sem apagar uma estação inteira. Deixei a marca anterior visível e a data da revisão ao lado. Seu mapa não estava inventando um risco; estava esquecendo quando ele foi medido.','A marca antiga continua aqui. O apoio ficou novo sem fingir que a água começou ontem.'),choice('Conferir como indicar a volta segura.','Converse com Inês. Eu sei ler água, mas ela escuta as perguntas de quem vai caminhar. Prefiro pedir isso agora a consertar uma legenda depois.',[goal('ines','Converse com Inês sobre a indicação','talk',1,{npcId:'ines'})],'Inês pediu data, condição e indicação de retorno. Parece óbvio depois que alguém diz. Escrevi as três. O risco continua uma medida; a rota agora admite que pode precisar mudar.','A indicação de retorno está na anotação. Quem resolve voltar não precisa discutir com uma seta orgulhosa.')],
+      alex:'“Eu segui um risco velho com muita segurança”, você admite. Davi olha as botas. “Percebi. Elas trouxeram um argumento inteiro de lama.”'},
+    {id:'davi-curva',npcId:'davi',title:'A curva que levou sementes',coins:20,
+      offer:'A caixa da clareira passou por mim na última estação. Não veio boiando, antes que a história melhore demais. Levei pela parte seca depois de conferir a água. Bia plantou; eu continuei chamando aquilo de “a caixa que eu trouxe”.\n\nLeia os registros da nascente e da clareira, prepare duas produções e compare a história com quem cuida do outro trecho. Talvez o meu causo esteja terminando cedo demais.',
+      objectives:[goal('spring','Leia o marco da nascente','inspect',1,{clueId:'open_spring'}),goal('box','Leia as etiquetas da clareira','inspect',1,{clueId:'open_seed_memory'}),goal('produce','Recolha 2 produções novas','produce',2)],
+      choices:[choice('Pedir a Bia que conte a parte do cultivo.','Vá ouvi-la. Eu vou praticar não completar a frase quando ela chegar na parte em que peguei a caixa.',[goal('bia','Ouça Bia sobre o cultivo','talk',1,{npcId:'bia'})],'Bia nomeou cada tentativa que veio depois da entrega. Minha viagem era o primeiro pedaço, não o título da história inteira. A caixa agora leva a origem e o nome de quem cultivou. A próxima pessoa pode acrescentar a sua parte.','Bia contou o cultivo sem eu anunciar a viagem antes. Foi difícil. O causo ficou melhor.'),choice('Comparar a sequência com as anotações de Lia.','Leve as três datas a Lia. Eu confiro a da entrega, sem arredondar para o dia em que a história fica mais bonita.',[goal('lia','Ouça Lia sobre a sequência','talk',1,{npcId:'lia'})],'As datas se encaixaram: medição, entrega, plantio. Não havia uma caixa desaparecendo de um lado e reaparecendo do outro. Havia trabalho mudando de mão. Coloquei o nome de cada pessoa junto da etapa que fez.','As três datas ficaram no registro. O relato perdeu uma coincidência misteriosa e ganhou três pessoas reais.')],
+      alex:'“Eu também costumava terminar a história quando a estrada acabava para mim.” Davi vira a régua entre as mãos. “Então vamos deixar a próxima pessoa contar mais um pedaço.”'},
+    {id:'davi-turno',npcId:'davi',title:'O serviço depois do causo',coins:24,
+      offer:'Falar em dividir trabalho é agradável até chegar a primeira tarde em que outra pessoa confere a régua. Eu costumo aparecer para “dar uma olhada”. Acabo fazendo tudo e chamando isso de ajuda.\n\nFabrique dois itens, entregue uma encomenda e volte à vereda. Quero deixar um combinado que continue quando eu estiver de folga. Você pode ajudar a começar; não vai virar meu substituto permanente.',
+      objectives:[goal('craft','Fabrique 2 itens novos','craft',2),goal('order','Entregue 1 encomenda da fazenda','order'),goal('wetland','Retorne às Veredas do Sul','visit',1,{region:'wetland'})],
+      choices:[choice('Combinar revisões em dupla com Helena.','Converse com Helena. Deixo a referência e aceito que outra pessoa escolha a ordem da leitura. Se eu aparecer com uma quarta régua, pode mandar guardar.',[goal('helena','Combine a revisão com Helena','talk',1,{npcId:'helena'})],'Helena leu, eu conferi a data e guardei o pincel. Na próxima rodada trocamos a ordem. Sua ajuda deixou o primeiro serviço pronto; não deixou uma dívida pendurada no seu nome.','Hoje a primeira leitura foi de Helena. Eu consegui esperar pelo resultado sem fazer outra por cima.'),choice('Ensinar Bia a revisar e aceitar outra letra.','Ouça Bia e veja se ela quer aprender essa parte. Eu ofereço a referência, não uma obrigação disfarçada de elogio.',[goal('bia','Converse com Bia sobre a revisão','talk',1,{npcId:'bia'})],'Bia topou aprender uma leitura por vez. A letra dela não parece com a minha. A água não reclamou. Deixei os passos anotados e fui terminar um serviço que gosto, sem levar a régua escondida.','Bia anotou a leitura com a letra dela. Quando fui corrigir o tamanho do número, lembrei de conferir o número primeiro.')],
+      alex:'Você procura onde assinar a próxima ronda. Davi cobre a linha com a mão. “A sua ajuda de hoje já valeu. Agora combine a sua folga também.”'},
+    {id:'bia-nomes',npcId:'bia',title:'O nome de quem plantou',coins:18,
+      offer:'Davi trouxe a primeira caixa. Toda vez que alguém chega, ouço a viagem de novo. Gosto do causo. Só queria que a história sobrevivesse até a parte em que plantei e nada nasceu na primeira tentativa.\n\nRevise as etiquetas comigo, plante três sementes e faça três regas novas. Depois escolhemos como registrar a origem sem apagar quem cuidou.',
+      objectives:[goal('bank','Revise o banco de sementes da clareira','survey',1,{landmarkId:'open_seed_memory'}),goal('plant','Plante 3 sementes novas','plant',3),goal('water','Regue 3 plantas novas pela primeira vez','water',3)],
+      choices:[choice('Registrar uma linha para cada pessoa e etapa.','Escrevo quem trouxe, quem plantou e quem observou. Você pode mostrar uma tentativa sua com nome e data; não precisa escolher só a mais bonita.',[],'As etiquetas agora separam origem e cuidado. Meu nome ficou na etapa que fiz, inclusive na primeira tentativa que falhou. Não precisei tomar a história de Davi para caber nela.','A etiqueta tem a origem e o nome de quem plantou. Hoje uma pessoa leu os dois antes de me perguntar pela caixa.'),choice('Fazer uma folha coletiva com assinaturas.','Deixo uma folha ao lado das divisões. Cada pessoa assina o que acrescentar. Se alguém contar o resultado como se tivesse feito tudo, a folha pode ajudar a memória.',[],'A folha tem nomes diferentes e espaço entre as anotações. O seu ficou na nova rodada; o meu, nas comparações. Um trabalho coletivo consegue guardar autoria, se a gente não tiver pressa de dar um nome só.','A folha coletiva ganhou uma assinatura. Deixei a anotação da tentativa que falhou; ela explica por que mudamos o plantio.')],
+      alex:'“Posso escrever a parte em que reguei o lugar errado?” você pergunta. Bia empurra a folha. “Pode. Talvez poupe a próxima pessoa de achar que só ela erra.”'},
+    {id:'bia-mesa',npcId:'bia',title:'A experiência sai da clareira',coins:24,
+      offer:'A caixa já tem nome. Agora falta deixá-la sair daqui sem eu explicar cada etiqueta antes de alguém tocar. Quero levar uma experiência inteira: o começo, o que mudou e a colheita.\n\nFaça três colheitas, separe duas produções e ouça Helena e Davi. A conversa pode terminar com uma pergunta nova. Isso não estraga a apresentação.',
+      objectives:[goal('harvest','Faça 3 colheitas novas','harvest',3),goal('produce','Recolha 2 produções novas','produce',2),goal('helena','Ouça Helena sobre a próxima comparação','talk',1,{npcId:'helena'}),goal('davi','Ouça Davi sobre o caminho','talk',1,{npcId:'davi'})],
+      choices:[choice('Convidar Rosa para uma troca de tentativas.','Fale com Rosa. Eu levo a página e duas perguntas. Não quero que a clareira vire uma extensão da gaveta dela; quero poder voltar trazendo uma ideia diferente.',[goal('rosa','Convide Rosa para comparar as tentativas','talk',1,{npcId:'rosa'})],'Rosa pediu uma cópia, não a caixa inteira. Guardei a referência aqui e deixei a outra página circular. Quando ela discordou de uma rega, tive vontade de explicar tudo de novo. Perguntei o motivo. A conversa continuou.','Rosa devolveu a cópia com uma pergunta na margem. Gosto mais disso que de uma folha sem nenhuma marca.'),choice('Pedir a Lia uma comparação com perguntas abertas.','Converse com Lia. Vou mostrar os passos e perguntar o que ela mediria numa próxima rodada. Preciso de uma comparação, não de uma nota para pendurar no avental.',[goal('lia','Combine a comparação com Lia','talk',1,{npcId:'lia'})],'Lia perguntou pelas condições antes de comentar a colheita. Mostrei a tentativa ruim também. Agora temos uma pergunta que cabe no próximo plantio. A clareira pode receber gente sem prometer uma resposta pronta.','Lia voltou à pergunta da nossa página. Eu já tinha uma vontade enorme de trocar tudo. Desta vez vou mudar uma coisa e observar.')],
+      alex:'Você começa a apresentar Bia, mas para antes da primeira frase sobre a caixa de Davi. Ela sorri. “Obrigada. Eu conto de onde comecei.” Você afasta a cadeira para que ela passe.'}
+  ];
+  const missionById=Object.fromEntries(missions.map(d=>[d.id,d])),arcs=Object.fromEntries(IDS.map(id=>[id,missions.filter(d=>d.npcId===id)]));
+  // Estas respostas acompanham os objetivos de conversa. Chegar antes da
+  // medição traz orientação, sem fingir que o interlocutor já viu um resultado.
+  const talkResponses={
+    'helena-riscos':{lia:'Sobre o mapa de Helena: compare a data e a condição de cada marca antes de escolher uma como certa. Uma observação diferente pode completar a primeira.',ines:'Sobre a passagem de Helena: uma marca de água não promete chão seco. Leve a data junto da rota e procure a indicação de retorno.'},
+    'helena-recado':{davi:'A tinta recente é minha. Renovo a marca com a data, sem apagar a anterior. Helena já sabe ler esta régua; o mapa antigo é que deixou uma parte da legenda na outra folha.',rosa:'Se quer escrever a Helena, comece dizendo onde você está. Não transforme a primeira frase numa promessa de resolver o resto da vida.'},
+    'helena-margem':{bia:'No mapa novo, deixe espaço para quem ficou plantando depois da passagem de vocês. Eu consigo conferir a origem e contar o que aconteceu com a amostra aqui.'},
+    'davi-azul':{tomas:'No apoio de Davi, procure o encaixe antes de lixar. Dá para firmar a madeira sem apagar as marcas que a régua precisa guardar.',ines:'Diga a Davi que a anotação precisa da data e de um jeito de voltar. Quem encontrar água na passagem não tem de provar coragem à legenda.'},
+    'davi-curva':{bia:'Davi trouxe a caixa. Eu fiz o primeiro plantio e ele falhou. Separei outra tentativa, anotei a mudança e cuidei dela. Pode contar a viagem; só deixe a história chegar até aqui.',lia:'Separe medição, entrega e plantio. Três datas diferentes não são uma contradição. Elas mostram que o trabalho continuou quando a caixa mudou de mãos.'},
+    'davi-turno':{helena:'Topo revisar a régua com Davi, alternando quem lê primeiro. Se ele já chegar com o resultado pronto, a dupla vira só uma plateia com botas.',bia:'Quero aprender uma leitura por vez. Peça a Davi para mostrar a referência e deixar que eu escreva. Não preciso que ele copie a minha linha depois.'},
+    'bia-mesa':{helena:'Para a comparação de Bia, posso levar as condições da nascente. Deixo as perguntas sobre o cultivo com ela. Um registro ajuda o outro sem precisar tomar o lugar dele.',davi:'O caminho da clareira passa pela vereda. Eu conto essa parte e paro na entrega da caixa. A experiência de Bia começa justamente onde meu causo costumava terminar.',rosa:'Bia pode trazer uma cópia para a nossa mesa e guardar a referência na clareira. Quero comparar as tentativas; não preciso que tudo venha morar na minha gaveta.',lia:'Quero ouvir os passos da experiência de Bia, inclusive a tentativa que falhou. Podemos escolher uma pergunta para o próximo plantio, sem transformar a conversa numa nota.'}
+  };
+  const recurring={
+    helena:{id:'ronda-helena',npcId:'helena',title:'Uma leitura, outra condição',coins:8,offer:'Quero uma medição nova na nascente e uma pausa completa de quem a fez. Começa depois deste combinado; uma leitura antiga não mostra a condição de agora.',objectives:[goal('spring','Meça novamente a vazão da nascente','survey',1,{landmarkId:'open_spring'}),goal('rest','Complete uma pausa protegida','rest',1,{safe:true})],ending:'A nova leitura ficou junto da anterior, com a condição de hoje. Obrigada por trazer o registro sem tratar a pausa como tempo perdido.'},
+    davi:{id:'ronda-davi',npcId:'davi',title:'A água e o apoio',coins:8,offer:'Para esta estação, quero uma nova leitura da vereda e uma madeira coletada para conferir o apoio. Não precisa ser feito tudo na mesma viagem.',objectives:[goal('gauge','Registre novamente o nível da vereda','survey',1,{landmarkId:'open_water_gauge'}),goal('wood','Colete 1 madeira depois do aceite','collect',1,{item:'wood'})],ending:'A leitura e a revisão do apoio ficaram registradas. Por hoje o combinado está cumprido. Vou guardar a régua antes de inventar outra exigência.'},
+    bia:{id:'ronda-bia',npcId:'bia',title:'Lugar para a próxima tentativa',coins:8,offer:'Revise o banco e faça dois plantios novos depois de combinarmos. O resultado pode esperar; hoje o trabalho é dar um começo claro à próxima tentativa.',objectives:[goal('bank','Revise novamente o banco da clareira','survey',1,{landmarkId:'open_seed_memory'}),goal('plant','Plante 2 sementes novas','plant',2)],ending:'As divisões foram conferidas e a nova rodada começou. A caixa não ficou mais cheia de promessas; ficou mais fácil saber o que fizemos.'}
+  };
+  const voices={
+    helena:{first:'Alex. Reconheci a letra antes de reconhecer as botas. Guardei um mapa da época em que viajamos juntos. Não vim cobrar a pessoa que você era; queria conversar com quem voltou. Se tiver tempo, há um risco azul na nascente que não combina com a nossa legenda.',day:['Estou comparando duas medições. Você pode ficar sem precisar ajudar. Conversar também é uma maneira boa de passar esta margem.','O seu mapa tinha uma seta enorme e uma observação minúscula. Ainda não decidi se isso era confiança ou falta de espaço.'],night:'Fechei as medições de hoje. Se quiser conversar, fico mais um pouco. Se quiser trabalho, amanhã a minha letra estará melhor.',past:'Depois de uma viagem de trabalho, Alex prometeu mandar notícia da próxima parada. Eu fiquei por aqui, gostei das nascentes e fui ficando. Senti falta do recado. Também podia ter escrito. Duas pessoas esperando não formam um correio, por mais caprichado que seja o silêncio.'},
+    davi:{first:'Davi. A régua é minha, a água não assinou nenhum compromisso. Você deve ser Alex; Helena reconheceu sua seta num mapa e fez uma cara que merecia outra legenda. Pode andar pela vereda. Só confira a passagem de hoje antes de confiar na história de ontem.',day:['Tenho um causo curto. Antes de começar, preciso avisar que a minha ideia de curto não foi aprovada por ninguém.','Bia me pediu para contar a viagem da caixa depois que ela contar o plantio. Estou praticando essa ordem.'],night:'Já registrei o último nível. O resto da noite não precisa de relatório. Pode sentar e escolher qual causo tolera ouvir.',past:'Aprendi este trabalho com uma pessoa que deixava a marca antiga ao lado da nova. Perguntei por que não apagava logo. Ela disse que a régua precisava lembrar mais do que quem segurava o pincel. Demorei para aplicar isso às histórias que conto.'},
+    bia:{first:'Bia. Se veio pela caixa de sementes, posso contar a parte depois da entrega. Plantei aqui na última estação; algumas tentativas deram certo, outras ganharam uma etiqueta comprida. Você não precisa terminar nada na fazenda para visitar a clareira.',day:['Hoje escrevi “não sei ainda” numa etiqueta. Coube melhor que a explicação que eu estava inventando.','Você trouxe uma pergunta ou veio ficar um pouco? As duas coisas cabem aqui. Só não apoie o cotovelo na amostra menor.'],night:'As caixas estão fechadas. Amanhã posso mostrar cada divisão; hoje prefiro falar sem contar sementes ao mesmo tempo.',past:'Quando cheguei, me apresentavam como quem cuidava da caixa de Davi. Ele tinha feito a viagem; eu tinha feito três plantios. Não queria tirar o nome dele. Queria acrescentar o meu. É uma diferença pequena numa etiqueta e enorme quando alguém conta a história.'}
+  };
+  let adapter={},state,dialogue=null,revision=0;
+  const freshRecord=()=>({status:'offered',acceptedAt:null,choice:null,counts:{},paid:false});
+  function context(value){const raw=plain(value)?value:adapter.readState?.()||{};return{season:raw.season==='cold'?'cold':'hot',region:REGIONS.includes(raw.region)?raw.region:'farm',scene:text(raw.scene,24)||'main',name:text(raw.playerName||raw.name,40)||'Alex',x:Number.isFinite(raw.x)?raw.x:NaN,y:Number.isFinite(raw.y)?raw.y:NaN,timeOfDay:Number.isFinite(raw.timeOfDay)?raw.timeOfDay:12,active:raw.active!==false,paused:raw.paused===true};}
+  function fresh(value){const c=context(value);return{version:VERSION,sequence:0,season:c.season,cycleId:1,missions:Object.fromEntries(missions.map(d=>[d.id,freshRecord()])),recurring:{},clues:[],met:[],visits:Object.fromEntries(IDS.map(id=>[id,0])),surveys:Object.fromEntries(landmarks.map(d=>[d.id,{rounds:0,cooldown:0}])),coinsEarned:0,recentEventIds:[],journal:[],lastRegion:null};}
+  function emit(name,value){try{adapter[name]?.(value);}catch(error){console.warn('[caminhos] '+name,error);}}
+  function changed(){revision++;emit('onChange',snapshot());}
+  function journal(id,npcId,title,message){if(state.journal.some(r=>r.id===id))return;state.journal.push({id,npcId,title,text:message,sequence:state.sequence});state.journal=state.journal.slice(-48);}
+  function objectives(def,record){return[...def.objectives,...(def.choices?.[record.choice]?.objectives||[])];}
+  function views(def,record){return objectives(def,record).map(g=>({...clone(g),n:number(record.counts[g.id],g.goal)}));}
+  function complete(def,record){return objectives(def,record).every(g=>number(record.counts[g.id],g.goal)>=g.goal);}
+  function next(npcId){return arcs[npcId]?.find(d=>state.missions[d.id].status!=='completed')||null;}
+  function objectiveLine(def,record){return views(def,record).map(g=>(g.n>=g.goal?'✓ ':'• ')+g.text+' · '+g.n+'/'+g.goal).join('\n');}
+  function display(npcId,message,choices=[],title){if(!Object.hasOwn(byId,npcId))return null;const c=byId[npcId];dialogue={npcId,speaker:c.name,role:c.role,title:title||'Conversa com '+c.name,text:message.replace(/\bAlex\b/g,context().name),kind:'frontier',choices:clone(choices),canAdvance:false,expression:npcId==='bia'?'warm':'thoughtful',gesture:'explain'};emit('onDialogue',currentDialogue());return currentDialogue();}
+  const currentDialogue=()=>dialogue?clone(dialogue):null;
+  function close(options={}){dialogue=null;if(!options.silent)emit('onDialogue',null);return null;}
+  function greeting(npcId){const voice=voices[npcId],def=next(npcId);if(!voice)return'';const r=def&&state.missions[def.id];if(r?.status==='ready')return'Você voltou com o combinado pronto. Quero ouvir o que encontrou antes de abrir outra página.\n\n'+objectiveLine(def,r);if(r?.status==='active')return def.choices[r.choice].reply+'\n\n'+objectiveLine(def,r);const finished=[...arcs[npcId]].reverse().find(d=>state.missions[d.id].status==='completed');if(finished)return finished.choices[state.missions[finished.id].choice].echo;if(state.visits[npcId]<=1)return voice.first;const hour=context().timeOfDay;return hour<6||hour>=20?voice.night:voice.day[state.visits[npcId]%voice.day.length];}
+  function conversationResponse(npcId){const lines=[];for(const def of missions){const r=state.missions[def.id];if(r.acceptedAt===null||!['active','ready'].includes(r.status))continue;if(objectives(def,r).some(g=>g.event==='talk'&&g.match.npcId===npcId)&&talkResponses[def.id]?.[npcId])lines.push(talkResponses[def.id][npcId]);}return lines.join('\n\n');}
+  function menu(npcId){if(!Object.hasOwn(byId,npcId))return null;const def=next(npcId),choices=[];if(def)choices.push({id:'frontier:mission:'+def.id+':offer',label:(state.missions[def.id].status==='ready'?'Concluir: ':'Nosso próximo passo: ')+def.title});else choices.push({id:'frontier:memory',label:'O que ficou do nosso combinado?'});const r=state.recurring[npcId],job=recurring[npcId];choices.push({id:'frontier:job:'+npcId+':offer',label:r?.status==='completed'?'Nosso pedido desta estação foi cumprido':r?.status==='ready'?'Entregar: '+job.title:'Pedido da estação: '+job.title},{id:'frontier:past',label:'Posso ouvir um pouco da sua história?'},{id:'frontier:journal',label:'Relembrar os caminhos da água'},{id:'frontier:close',label:'Até depois'});const response=conversationResponse(npcId);return display(npcId,(response?response+'\n\n':'')+greeting(npcId),choices);}
+  function interact(npcId){if(!Object.hasOwn(byId,npcId))return null;state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);if(!state.met.includes(npcId))state.met.push(npcId);record('talk',{npcId});changed();return menu(npcId);}
+  function validTarget(kind,key){if(kind==='mission'){if(!Object.hasOwn(missionById,key))return false;return next(missionById[key].npcId)?.id===key;}return kind==='job'&&Object.hasOwn(recurring,key);}
+  function target(kind,key){return kind==='mission'?{def:missionById[key],record:state.missions[key]}:{def:recurring[key],record:state.recurring[key]||freshRecord()};}
+  function offer(kind,key){if(!validTarget(kind,key))return menu(dialogue?.npcId);const {def,record:r}=target(kind,key),prefix='frontier:'+kind+':'+key,choices=[];let message=def.offer;if(r.status==='offered'){if(def.choices)def.choices.forEach((c,i)=>choices.push({id:prefix+':accept:'+i,label:c.label}));else choices.push({id:prefix+':accept:0',label:'Aceitar o pedido desta estação'});}else if(r.status==='ready'){message=objectiveLine(def,r)+'\n\nEstá pronto. Vamos conferir e concluir o combinado?';choices.push({id:prefix+':claim',label:'Concluir e contar o resultado'});}else if(r.status==='completed')message=def.ending+'\n\nNa próxima estação podemos combinar outra rodada.';else message=(def.choices?.[r.choice]?.reply||def.offer)+'\n\n'+objectiveLine(def,r);choices.push({id:'frontier:menu',label:'Voltar à conversa'},{id:'frontier:close',label:'Continuar pelo mundo'});return display(def.npcId,message,choices,def.title);}
+  function accept(kind,key,which){if(!validTarget(kind,key))return menu(dialogue?.npcId);const {def,record:r}=target(kind,key);if(r.status!=='offered'||!Number.isInteger(which)||which<0||which>=(def.choices?.length||1))return offer(kind,key);if(kind==='job')state.recurring[key]=r;r.status='active';r.acceptedAt=state.sequence;r.choice=def.choices?which:null;r.counts=Object.fromEntries(objectives(def,r).map(g=>[g.id,0]));journal('accept:'+kind+':'+key+(kind==='job'?':'+state.cycleId:''),def.npcId,def.title,'Combinei: '+(def.choices?.[which]?.label||def.title));changed();return offer(kind,key);}
+  function claim(kind,key){if(!validTarget(kind,key))return menu(dialogue?.npcId);const {def,record:r}=target(kind,key);if(r.status!=='ready'||r.paid)return offer(kind,key);r.paid=true;r.status='completed';state.coinsEarned=Math.min(LIMIT,state.coinsEarned+def.coins);const ending=def.choices?.[r.choice]?.ending||def.ending,id=kind+':'+key+(kind==='job'?':'+state.cycleId:'');journal('finish:'+id,def.npcId,def.title,ending);changed();emit('reward',{kind:'frontier-'+kind,id:'frontier:'+id,npcId:def.npcId,coins:def.coins,label:def.title});return display(def.npcId,ending+(def.alex?'\n\n'+def.alex:''),[{id:'frontier:menu',label:'Continuar a conversa'},{id:'frontier:close',label:'Voltar ao mundo'}],def.title);}
+  function landmark(id){if(!Object.hasOwn(landmarkById,id))return null;const def=landmarkById[id],placed=window.FarmOpenWorld?.landmarks?.find?.(d=>d.id===id)||window.FarmFrontierWorld?.landmarks?.find?.(d=>d.id===id);return placed?{...def,x:placed.x,y:placed.y}:def;}
+  function near(def){const c=context();return c.active&&c.scene==='main'&&Number.isFinite(c.x)&&Number.isFinite(c.y)&&Math.hypot(c.x-def.x,c.y-def.y)<=40;}
+  function inspect(id){const def=landmark(id);if(!def||!near(def))return false;record('inspect',{clueId:id});const row=state.surveys[id],choices=[{id:'frontier:survey:'+id,label:row.cooldown>0?'Nova revisão em '+Math.ceil(row.cooldown)+' s de jogo ativo':def.action},{id:'frontier:close',label:'Guardar a observação'}];display(def.npcId,def.text,choices,def.title);return true;}
+  function survey(id){const def=landmark(id);if(!def||!near(def))return false;const row=state.surveys[id];if(row.cooldown>0){display(def.npcId,'A observação anterior já está registrada. Deixe o lugar mudar antes de fazer outra revisão. Faltam '+Math.ceil(row.cooldown)+' segundos de jogo ativo.',[{id:'frontier:close',label:'Continuar a exploração'}],def.title);return false;}row.rounds=Math.min(LIMIT,row.rounds+1);row.cooldown=180;record('survey',{landmarkId:id,round:row.rounds,eventId:'frontier:survey:'+id+':'+row.rounds});changed();display(def.npcId,def.result,[{id:'frontier:close',label:'Guardar o registro e continuar'}],def.title);return true;}
+  function choose(id){if(!dialogue?.choices.some(c=>c.id===id))return currentDialogue();const npcId=dialogue.npcId;if(id==='frontier:close')return close();if(id==='frontier:menu')return menu(npcId);if(id==='frontier:past')return display(npcId,voices[npcId].past,[{id:'frontier:menu',label:'Voltar à conversa'}],'Antes deste encontro');if(id==='frontier:memory'){const def=arcs[npcId].at(-1),r=state.missions[def.id];return display(npcId,r.status==='completed'?def.choices[r.choice].ending:voices[npcId].first,[{id:'frontier:menu',label:'Voltar à conversa'}],'O que continuou');}if(id==='frontier:journal')return display(npcId,state.journal.length?state.journal.slice(-12).map(r=>r.title+'\n'+r.text).join('\n\n'):'Os caminhos estão abertos. Posso conhecer as pessoas e escolher um primeiro combinado sem terminar a investigação da fazenda.',[{id:'frontier:menu',label:'Voltar à conversa'}],'Caminhos da água');if(id.startsWith('frontier:survey:')){survey(id.slice(16));return currentDialogue();}const match=/^frontier:(mission|job):([a-z-]+):(offer|accept|claim)(?::([01]))?$/.exec(id);if(!match)return currentDialogue();return match[3]==='offer'?offer(match[1],match[2]):match[3]==='accept'?accept(match[1],match[2],Number(match[4])):claim(match[1],match[2]);}
+  function newSeason(value){const nextSeason=value.season;if(!['hot','cold'].includes(nextSeason))return false;const cycle=number(value.cycleId,Number.MAX_SAFE_INTEGER);if(nextSeason===state.season&&(!cycle||cycle<=state.cycleId))return false;state.season=nextSeason;state.cycleId=Math.min(Number.MAX_SAFE_INTEGER,Math.max(state.cycleId+1,cycle));state.recurring={};changed();return true;}
+  function progress(def,r,event,payload,amount){if(!r||r.status!=='active'||r.acceptedAt===null||state.sequence<=r.acceptedAt)return false;let dirty=false;for(const g of objectives(def,r)){if(g.event!==event||!Object.entries(g.match).every(([k,v])=>payload[k]===v))continue;const n=number(r.counts[g.id],g.goal);r.counts[g.id]=Math.min(g.goal,n+amount);dirty=dirty||r.counts[g.id]!==n;}if(dirty&&complete(def,r))r.status='ready';return dirty;}
+  function record(event,payload={}){if(!plain(payload))return false;if(event==='season')return newSeason(payload);if(!['visit','talk','inspect','survey','plant','water','harvest','collect','rest','craft','produce','order'].includes(event))return false;const amount=payload.amount===undefined?1:number(payload.amount,50);if(!amount)return false;const uid=text(payload.eventId);if(uid&&state.recentEventIds.includes(uid))return false;if(uid){state.recentEventIds.push(uid);state.recentEventIds=state.recentEventIds.slice(-128);}state.sequence=Math.min(LIMIT,state.sequence+1);let dirty=false;if(event==='inspect'&&Object.hasOwn(landmarkById,payload.clueId)&&!state.clues.includes(payload.clueId)){state.clues.push(payload.clueId);dirty=true;}for(const id of IDS){const def=next(id);if(def)dirty=progress(def,state.missions[def.id],event,payload,amount)||dirty;if(state.recurring[id])dirty=progress(recurring[id],state.recurring[id],event,payload,amount)||dirty;}if(dirty)changed();return dirty;}
+  function update(dt,value){if(!Number.isFinite(dt)||dt<=0)return;const c=context(value);if(!c.active||c.paused)return;newSeason(c);let dirty=false;for(const row of Object.values(state.surveys)){const old=row.cooldown;row.cooldown=Math.max(0,old-Math.min(dt,1));if(old>0&&row.cooldown===0)dirty=true;}if(c.scene==='main'&&c.region!==state.lastRegion){state.lastRegion=c.region;record('visit',{region:c.region});}if(dirty)changed();}
+  function view(def,r){return{id:'frontier:'+def.id,npcId:def.npcId,title:def.title,description:def.offer,status:r.status==='offered'?'available':r.status,accepted:r.acceptedAt!==null,completed:r.status==='completed',objectives:views(def,r),objective:objectiveLine(def,r),coins:def.coins,choice:r.choice,progress:views(def,r).reduce((n,g)=>n+g.n,0),goal:objectives(def,r).reduce((n,g)=>n+g.goal,0)};}
+  function diaryView(){const known=state.met,quests=[],discoveries=[];for(const id of known){const def=next(id);if(def)quests.push(view(def,state.missions[def.id]));quests.push(view(recurring[id],state.recurring[id]||freshRecord()));for(const d of arcs[id]){const r=state.missions[d.id];if(r.status==='completed')discoveries.push({id:'frontier:'+d.id,npcId:id,title:d.title,text:d.choices[r.choice].ending,response:d.alex});}}return{quests,discoveries,discoveryTotal:missions.length,friendships:Object.fromEntries(IDS.map(id=>[id,(known.includes(id)?2:0)+arcs[id].filter(d=>state.missions[d.id].paid).length*6])),memories:state.journal.map(r=>({id:r.id,npcId:r.npcId,text:r.title+' · '+r.text})),relationships:IDS.map(id=>({npcId:id,label:!state.met.includes(id)?'Por conhecer':arcs[id].every(d=>state.missions[d.id].paid)?'Caminhos compartilhados':'Um novo combinado',discoveries:arcs[id].filter(d=>state.missions[d.id].paid).length,total:arcs[id].length}))};}
+  function worldState(){return{completed:missions.every(d=>state.missions[d.id].paid),helena:state.missions['helena-margem'].paid?['shared','local'][state.missions['helena-margem'].choice]:null,davi:state.missions['davi-turno'].paid?['paired','teaching'][state.missions['davi-turno'].choice]:null,bia:state.missions['bia-nomes'].paid?['individual','collective'][state.missions['bia-nomes'].choice]:null};}
+  function cinematicScenes(){return[
+    {id:'frontier-reencontro',frontierMission:'helena-riscos',title:'A legenda que ficou na margem',description:'Depois da primeira comparação, Alex e Helena reencontram as duas vozes do mapa.',chapter:0,region:'forest',scene:'main',focusX:1240,focusY:584,cast:['helena','player'],prop:'notebook',shots:[
+      {speaker:'helena',line:'O seu risco dizia passagem. O meu dizia água depois da chuva. Escrevemos na mesma folha e quase não conversamos.',expression:'thoughtful',gesture:'point',focus:-1,duration:5.5},
+      {speaker:'player',line:'Era um mapa muito seguro para duas pessoas que não conferiam a legenda juntas.',expression:'warm',gesture:'shrug',focus:1,duration:5.5},
+      {speaker:'helena',line:'Você voltou. Não preciso que finja reconhecer tudo. Podemos conferir o que mudou.',expression:'warm',gesture:'invite',focus:-1,duration:5.5},
+      {speaker:'player',line:'Começo por ouvir a parte da viagem que você continuou sem mim.',expression:'thoughtful',gesture:'listen',focus:0,duration:5.5}]},
+    {id:'frontier-margem',frontierMission:'helena-margem',title:'Espaço para a próxima pessoa',description:'Uma folha continua a viagem sem exigir que todos escolham o mesmo caminho.',chapter:0,region:'forest',scene:'main',focusX:1240,focusY:952,cast:['helena','bia','player'],prop:'notebook',shots:[
+      {speaker:'bia',line:'Vou acrescentar a parte depois da entrega. Tem plantio, uma tentativa ruim e uma pergunta que ainda ficou comigo.',expression:'warm',gesture:'point',focus:-1,duration:5.5},
+      {speaker:'player',line:'Eu ia começar contando de quem era a caixa. Você conta de onde começou.',expression:'warm',gesture:'nod',focus:1,duration:5.5},
+      {speaker:'helena',line:'E a próxima comparação? Podemos mudar a data, desde que ninguém precise adivinhar.',expression:'thoughtful',gesture:'invite',focus:-1,duration:5.5},
+      {speaker:'player',line:'Anotei. Se eu não conseguir vir, mando notícia. A margem não vai ter de falar por mim outra vez.',expression:'resolved',gesture:'nod',focus:0,duration:5.5}]}
+  ];}
+  function snapshot(){return{version:VERSION,title:'Caminhos da água',completedMissionIds:missions.filter(d=>state.missions[d.id].paid).map(d=>d.id),arcs:IDS.map(id=>({npcId:id,name:byId[id].name,missions:arcs[id].map(d=>view(d,state.missions[d.id]))})),quests:diaryView().quests,known:state.met.slice(),clues:state.clues.map(id=>clone(landmarkById[id])),journal:clone(state.journal),surveys:clone(state.surveys),season:state.season,cycleId:state.cycleId,coinsEarned:state.coinsEarned,world:worldState()};}
+  function sanitizeRecord(raw,def,seq){const r=freshRecord();if(!plain(raw))return r;const choiceCount=def.choices?.length||0;r.choice=choiceCount&&Number.isInteger(raw.choice)&&raw.choice>=0&&raw.choice<choiceCount?raw.choice:null;if(!['active','ready','completed'].includes(raw.status)||!Number.isFinite(raw.acceptedAt)||raw.acceptedAt<0||choiceCount&&r.choice===null){r.choice=null;return r;}r.acceptedAt=Math.min(seq,number(raw.acceptedAt));r.paid=raw.status==='completed';r.counts=Object.fromEntries(objectives(def,r).map(g=>[g.id,r.paid?g.goal:number(raw.counts?.[g.id],g.goal)]));r.status=r.paid?'completed':complete(def,r)?'ready':'active';return r;}
+  function restore(saved,value){dialogue=null;state=fresh(value);if(!plain(saved)||saved.version!==VERSION){emit('onDialogue',null);changed();return false;}state.sequence=number(saved.sequence);state.season=saved.season==='cold'?'cold':'hot';state.cycleId=Math.max(1,number(saved.cycleId,Number.MAX_SAFE_INTEGER));state.coinsEarned=number(saved.coinsEarned);state.met=[...new Set((Array.isArray(saved.met)?saved.met:[]).filter(id=>IDS.includes(id)))];state.clues=[...new Set((Array.isArray(saved.clues)?saved.clues:[]).filter(id=>Object.hasOwn(landmarkById,id)))];state.lastRegion=REGIONS.includes(saved.lastRegion)?saved.lastRegion:null;state.recentEventIds=[...new Set((Array.isArray(saved.recentEventIds)?saved.recentEventIds:[]).map(v=>text(v)).filter(Boolean))].slice(-128);for(const id of IDS){state.visits[id]=number(saved.visits?.[id]);let open=true;for(const def of arcs[id]){const r=open?sanitizeRecord(saved.missions?.[def.id],def,state.sequence):freshRecord();state.missions[def.id]=r;if(r.status!=='completed')open=false;if(r.acceptedAt!==null){journal('accept:mission:'+def.id,id,def.title,'Combinei: '+def.choices[r.choice].label);if(r.paid)journal('finish:mission:'+def.id,id,def.title,def.choices[r.choice].ending);}}if(plain(saved.recurring?.[id])){state.recurring[id]=sanitizeRecord(saved.recurring[id],recurring[id],state.sequence);const r=state.recurring[id];if(r.acceptedAt!==null){journal('accept:job:'+id+':'+state.cycleId,id,recurring[id].title,'Combinei: '+recurring[id].title);if(r.paid)journal('finish:job:'+id+':'+state.cycleId,id,recurring[id].title,recurring[id].ending);}}}
+    for(const def of landmarks){const raw=saved.surveys?.[def.id];state.surveys[def.id]={rounds:number(raw?.rounds),cooldown:Number.isFinite(raw?.cooldown)?Math.max(0,Math.min(180,raw.cooldown)):0};}
+    // Mantém a ordem de entradas canônicas; texto externo nunca vira diálogo.
+    const canonical=new Map(state.journal.map(r=>[r.id,r])),ordered=[],seen=new Set();for(const r of (Array.isArray(saved.journal)?saved.journal:[]).slice(-48)){
+      if(!plain(r)||seen.has(r.id))continue;
+      // Pedidos de estações passadas já não estão em recurring. Conserva a
+      // lembrança canônica deles, sem reativar tarefas nem aceitar texto salvo.
+      const past=typeof r.id==='string'&&/^(accept|finish):job:(helena|davi|bia):([1-9][0-9]*)$/.exec(r.id);
+      if(past&&Number.isSafeInteger(Number(past[3]))&&Number(past[3])<state.cycleId&&!canonical.has(r.id)){const d=recurring[past[2]];canonical.set(r.id,{id:r.id,npcId:d.npcId,title:d.title,text:past[1]==='finish'?d.ending:'Combinei: '+d.title,sequence:0});}
+      if(!canonical.has(r.id))continue;const entry=canonical.get(r.id);ordered.push({...entry,sequence:Number.isFinite(r.sequence)&&r.sequence>=0&&r.sequence<=state.sequence?number(r.sequence):entry.sequence});seen.add(r.id);
+    }for(const entry of state.journal)if(!seen.has(entry.id))ordered.push(entry);state.journal=ordered.sort((a,b)=>a.sequence-b.sequence).slice(-48);emit('onDialogue',null);changed();return true;}
+  state=fresh();
+  window.FarmFrontierStory={characters,routines,init(api={}){adapter=plain(api)?api:{};return snapshot();},hasCharacter:id=>Object.hasOwn(byId,id),isMissionComplete:id=>Object.hasOwn(missionById,id)&&state.missions[id].paid,interact,choose,close,currentDialogue,isOpen:()=>!!dialogue,record,update,inspect,survey,snapshot,diaryView,conversationResponse,worldState,cinematicScenes,revision:()=>revision,landmarks:()=>clone(landmarks),missionCatalogue:()=>clone(missions),serialize:()=>clone(state),restore,reset(value){state=fresh(value);close();changed();return snapshot();}};
 })();
 
 /* =============================
@@ -11501,7 +12283,7 @@ body.hud-game #legend{display:none !important;}
     timer=setTimeout(()=>{timer=null;scheduleCrickets();},2100+Math.random()*2300);
   }
   function mixScene(options={}){
-    const weights={farm:0,mountain:0,desert:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
+    const weights={farm:0,mountain:0,desert:0,forest:0,wetland:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
     for(const entry of input){const id=Array.isArray(entry)?entry[0]:entry.id,w=Array.isArray(entry)?entry[1]:(entry.w??entry.weight);if(id in weights)weights[id]+=clamp(w);}
     const total=Object.values(weights).reduce((a,b)=>a+b,0)||1;for(const key of Object.keys(weights))weights[key]/=total;
     const region=Object.keys(weights).reduce((a,b)=>weights[a]>=weights[b]?a:b),tod=((Number(options.timeOfDay)||0)%24+24)%24;
@@ -11518,13 +12300,19 @@ body.hud-game #legend{display:none !important;}
       result.river=.055;result.loops.room_tone=.11;result.loops.birds_loop=night||cold?0:.009;
       result.music.indoor=true;return result;
     }
-    const field=weights.farm,mountain=weights.mountain,desert=weights.desert;
+    const forest=weights.forest,wetland=weights.wetland;
+    const field=weights.farm+forest*.7+wetland*.55,mountain=weights.mountain,desert=weights.desert;
     result.loops.farm_ambience=field*(cold?.035:(night?.055:.13));
     result.loops.birds_loop=field*(cold||night?0:tod<9?.05:tod<16?.025:.017);
     result.loops.cicadas_loop=field*(cold||night?0:(tod>=11&&tod<16?.045+heat*.035:.018));
     result.loops.cold_wind=mountain*(.28+(night?.06:0))+field*(cold?.17:.01);
     result.loops.desert_breeze=desert*(night?.19:.25);
     result.loops.fireplace=fire;result.river=water*(field*(cold?.16:.55)+mountain*.18+desert*.28);result.crickets=field*(night&&!cold?.34:0);
+    // As novas regiões usam o banco original: pássaros na mata e água/insetos
+    // nas veredas. Os pesos conservam as misturas dos três biomas antigos.
+    result.loops.birds_loop+=forest*(cold||night?0:.035);
+    result.river+=wetland*(cold?.04:.12)+forest*.025;
+    result.crickets+=wetland*(night&&!cold?.15:0);
     if(resting){
       for(const key of Object.keys(result.loops))result.loops[key]*=['birds_loop','cicadas_loop'].includes(key)?.35:.65;
       result.river*=.7;result.crickets*=.45;
@@ -12193,7 +12981,7 @@ function updateAudioState(){
     if([T.WATER,T.RIVER,T.OASIS].includes(map[yy]?.[xx]))waterDistance=Math.min(waterDistance,Math.hypot(player.x-(xx+.5)*TS,player.y-(yy+.5)*TS));
   }
   const audioWorldPosition=currentScene==='main'?player:(scenes.main._lastPlayer||player);
-  const mix=window.AmbientSynth.mixScene({weights:regionWeights(audioWorldPosition.y/TS),cold:isFrio(),timeOfDay,
+  const mix=window.AmbientSynth.mixScene({weights:regionWeights(audioWorldPosition.y/TS,audioWorldPosition.x/TS),cold:isFrio(),timeOfDay,
     indoor:isIndoor(),scene:currentScene,resting:player.resting,riverProximity:Math.max(0,1-waterDistance/70),fireVolume,heatStress,coldStress,paused});
   for(const [name,volume]of Object.entries(mix.loops))AudioManager.setLoop(name,volume,paused?.35:.08);
   window.AmbientSynth.setRiver(mix.river);window.AmbientSynth.setCrickets(mix.crickets);
@@ -12782,7 +13570,7 @@ function setSceneTo(name, spawnX, spawnY){
   } else if(s.spawn){
     player.x = s.spawn.x; player.y = s.spawn.y;
   }
-  player.moving=false;player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
+  player.moving=false;player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();window.FarmPlayerActions?.reset(player);
   // Teleporta a câmera para a nova cena (sem deslizar suavemente entre mapas)
   if(typeof snapCamera === 'function') snapCamera();
   if(s.onEnterMsg) showToast(s.onEnterMsg, 'info', 3400);
@@ -12906,10 +13694,11 @@ const player = {
   footTimer:0,
   actionTimer:0, actionType:null,   // animação curta de ação (plantar/regar/colher/pescar)
 };
-// Dispara a pose de ação do personagem (inclina/agacha por ~0.35s)
-function triggerPlayerAction(type){
-  player.actionTimer = 0.35;
+// O resultado da atividade já aconteceu; a pose só o torna visível.
+function triggerPlayerAction(type,target){
+  player.actionTimer = window.FarmPlayerActions?.begin(player,currentScene,type,target)??.35;
   player.actionType = type || 'work';
+  player.moving=false;player.running=false;
 }
 window.triggerPlayerAction = triggerPlayerAction;
 // Helper: returns "fazendeiro Nome" or "fazendeira Nome"
@@ -14109,6 +14898,7 @@ function saveGame(auto=false){
       storyWorld: window.FarmStoryWorld?.serialize(),
       storyCinematics: window.FarmStoryCinematics?.serialize(),
       valleySaga: window.FarmValleySaga?.serialize(),
+      frontierStory: window.FarmFrontierStory?.serialize(),
       farmLife: window.FarmLife?.serialize(),
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
@@ -14157,7 +14947,7 @@ function loadGameFromData(data){
     setSceneTo('main');
   }
   Object.assign(player, data.player||{});
-  player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();
+  player.resting=false;player.restTimer=0;window.FarmRestVisual?.reset();window.FarmPlayerActions?.reset(player);
   if(player.inv && !player.inv.seeds) player.inv.seeds = {tomato:player.inv.seed||0,corn:0,carrot:0,forage:0};
   // Backward-compat: older saves don't have name/gender
   if(typeof player.name !== 'string' || !player.name) player.name = 'Alex Vale';
@@ -14192,6 +14982,7 @@ function loadGameFromData(data){
   tasks = isFrio() ? coldTasks : hotTasks;
   window.FarmLearningJourney.restore(data.learningJourney,learningContext());
   window.FarmValleySaga?.restore(data.valleySaga);
+  window.FarmFrontierStory?.restore(data.frontierStory);
   window.FarmLife?.restore(data.farmLife);
   window.FarmSkinLearning?.restore(data.skinLearning);
   window.FarmStoryIntegration?.restore(data.storyWorld);
@@ -14781,7 +15572,7 @@ function updateBars(paintSkin=true){
   if(clockIcon) clockIcon.textContent = icon;
   if(dayLabel) dayLabel.textContent = seasonText();
   const biomeLabel=document.getElementById('biomeLabel');
-  if(biomeLabel)biomeLabel.textContent=currentScene==='main'?({mountain:'Montanha · Pinheiral da Névoa',desert:'Deserto · Caminho do Oásis',farm:'Fazenda · Vale dos Três Ventos'}[currentRegion()]||'Entre os biomas'):({house:'Interior · Casa',barn:'Interior · Celeiro',greenhouse:'Interior · Estufa'}[currentScene]||'Vale dos Três Ventos');
+  if(biomeLabel)biomeLabel.textContent=currentScene==='main'?({mountain:'Montanha · Pinheiral da Névoa',desert:'Deserto · Caminho do Oásis',farm:'Fazenda · Vale dos Três Ventos',forest:'Mata das Nascentes',wetland:'Veredas do Sul'}[currentRegion()]||'Entre os biomas'):({house:'Interior · Casa',barn:'Interior · Celeiro',greenhouse:'Interior · Estufa'}[currentScene]||'Vale dos Três Ventos');
   if(dayPhaseLabel) dayPhaseLabel.textContent = dayPhase();
   if(clockTime) clockTime.textContent = clockLabel();
   if(nextSeasonLabel) nextSeasonLabel.textContent = nextSeasonShort();
@@ -15511,6 +16302,7 @@ function tryInteract(){
     window.FarmStoryIntegration?.record('collect',{item:'wood',amount:1});
     tickTask('wood');
     flashFx(player.x,player.y-10,'+lenha','#d8b870');
+    triggerPlayerAction('collect',woodpile);
     sfx.harvest();
     renderInv();
     return;
@@ -15576,6 +16368,7 @@ function tryInteract(){
     flashFx(an.x,an.y-8,woolRegrew?'lã cresceu':(isFrio()?'protegido':'alimentado'),'#cfe57a');
     if(woolRegrew) showAlert('A lã da ovelha voltou a crescer depois de alimentar');
     window.synthSfx?.animal(an.kind);
+    triggerPlayerAction('feed',an);
     renderInv();
     return;
   }
@@ -15663,7 +16456,7 @@ function plantCrop(){
   tickTask('plant');
   window.FarmStoryIntegration?.record('plant',{amount:1,crop:player.selectedSeed});
   flashFx(ct.x*TS+8, ct.y*TS+8, selectedSeedDef().name,'#cfe57a');
-  triggerPlayerAction('plant');
+  triggerPlayerAction('plant',{x:ct.x*TS+8,y:ct.y*TS+8});
   sfx.plant();
   renderInv();
 }
@@ -15693,7 +16486,7 @@ function waterCrop(){
   player.en = Math.max(0, player.en-1);
   if(firstWater) tickTask('water',firstWater);
   if(firstWater) window.FarmStoryIntegration?.record('water',{amount:firstWater});
-  triggerPlayerAction('water');
+  triggerPlayerAction('water',{x:ct.x*TS+8,y:ct.y*TS+8});
   sfx.water();
 }
 
@@ -15725,7 +16518,7 @@ function harvestCrop(){
   player.en = Math.max(0, player.en-2);
   tickTask('harv');
   window.FarmStoryIntegration?.record('harvest',{amount:1,crop:cropType,product:def.product});
-  triggerPlayerAction('harvest');
+  triggerPlayerAction('harvest',{x:ct.x*TS+8,y:ct.y*TS+8});
   sfx.harvest();
   shakeCamera(2, 8);
   renderInv();
@@ -15781,10 +16574,12 @@ function checkSceneTriggers(){
 const REGION_THERMAL = {
   mountain: { tempDelta:-0.050, hydDelta: 0.00, sweatBoost:0.0, label:'montanha' },
   farm:     { tempDelta: 0.000, hydDelta: 0.00, sweatBoost:0.0, label:null },
-  desert:   { tempDelta: 0.050, hydDelta:-0.60, sweatBoost:1.4, label:'deserto' }
+  desert:   { tempDelta: 0.050, hydDelta:-0.60, sweatBoost:1.4, label:'deserto' },
+  forest:   { tempDelta:-0.012, hydDelta:-0.04, sweatBoost:0.0, label:'mata', thermalCause:'ar fresco da mata' },
+  wetland:  { tempDelta: 0.025, hydDelta:-0.22, sweatBoost:0.8, label:'veredas', thermalCause:'calor das veredas' }
 };
 // Peso de cada região na linha (em tiles) onde o jogador está.
-function regionWeights(tileY){
+function baseRegionWeights(tileY){
   const B = REGION_BANDS;
   if(tileY <= B.mountain.y1) return [['mountain',1]];
   if(tileY <= B.blendN.y1){
@@ -15798,8 +16593,13 @@ function regionWeights(tileY){
   }
   return [['desert',1]];
 }
+// Sem coluna, mantém a leitura histórica do gradiente norte/sul.
+function regionWeights(tileY,tileX){
+  const base=baseRegionWeights(tileY);
+  return Number.isFinite(tileX)&&window.FarmOpenWorld?FarmOpenWorld.blendWeights(tileX,tileY,base):base;
+}
 function currentRegion(){
-  const w = regionWeights(Math.floor(player.y/TS));
+  const w = regionWeights(Math.floor(player.y/TS),player.x/TS);
   return w.reduce((a,b)=> b[1] > a[1] ? b : a)[0];
 }
 window.currentRegion = currentRegion;
@@ -15811,7 +16611,7 @@ function getZoneThermal(){
   if(THERMAL_ZONES[currentScene]){ const z = THERMAL_ZONES[currentScene](); if(z) return z; }
   // ---- Mundo contíguo: mistura das regiões pela posição ----
   if(currentScene === 'main'){
-    const ws = regionWeights(Math.floor(player.y/TS));
+    const ws = regionWeights(Math.floor(player.y/TS),player.x/TS);
     // dentro da fazenda pura, mantém as micro-zonas de sempre (rio etc.)
     if(!(ws.length === 1 && ws[0][0] === 'farm')){
       let td=0, hd=0, sb=0;
@@ -15970,6 +16770,7 @@ function handleFeedTrough(trough){
     for(let i=0;i<fed;i++) tickTask('protect');
   }
   flashFx(player.x, player.y-12, `cocho +${want} feno · alimentou ${fed} animais`, '#e7c14a');
+  triggerPlayerAction('feed',{x:trough.x+(trough.w||0)/2,y:trough.y+(trough.h||0)/2});
   showToast(`🌾 Cocho preenchido (+${want}). ${fed} animal(is) alimentado(s).`, 'success', 2600);
   try {
     sfx.harvest && sfx.harvest();
@@ -16058,6 +16859,7 @@ function handleFishing(spot){
     return;
   }
   spot.fishCooldown = now;
+  triggerPlayerAction('fish',window.FarmWaterLife?FarmWaterLife.fishingTarget(spot):window.FarmPlayerActions?.waterTarget(spot,map,T,TS));
   // Splash for the cast
   try { window.synthSfx && synthSfx.splash(); } catch(e){}
   // 70% chance of success
@@ -16195,7 +16997,7 @@ function killPlayer(type){
   }
   player.dead = true;
   player.resting = false;
-  window.FarmRestVisual?.reset();
+  window.FarmRestVisual?.reset();window.FarmPlayerActions?.reset(player);
   player.moving = false;
   player.running = false;
   shakeCamera(8, 30);
@@ -16229,7 +17031,7 @@ function killPlayer(type){
   document.getElementById('death').classList.add('show');
 }
 window.respawnPlayer = function(){
-  window.FarmRestVisual?.reset();
+  window.FarmRestVisual?.reset();window.FarmPlayerActions?.reset(player);
   document.getElementById('death').classList.remove('show');
   player.dead = false;
   player.temp = 37.0;
@@ -16631,8 +17433,11 @@ function drawSongbirds(){
 
 function update(dt){
   if(player.dead || readingPanelOpen()){player.moving=false;player.running=false;updateAudioState();return;}
-  // Decai a pose de ação (plantar/regar/colher)
-  if(player.actionTimer > 0){ player.actionTimer = Math.max(0, player.actionTimer - dt); }
+  // O gesto espera enquanto o aluno lê a questão, assim como a ação do jogador.
+  if(!histologyMissionOpen){
+    if(player.actionTimer > 0){ player.actionTimer = Math.max(0, player.actionTimer - dt); }
+    window.FarmPlayerActions?.update(player,currentScene);
+  }
   // Animals & crows wander/fly even if histology mission is open
   updateAnimals(dt);
   updateCrows(dt);
@@ -16660,6 +17465,7 @@ function update(dt){
     if(keys['s']||keys['arrowdown']) dy+=1;
     if(keys['a']||keys['arrowleft']) dx-=1;
     if(keys['d']||keys['arrowright']) dx+=1;
+    if(dx||dy)window.FarmPlayerActions?.cancelForMove(player,currentScene,!!A11Y.reduceMotion);
     if((dx||dy)&&!(player.actionTimer>0)){
       const len=Math.hypot(dx,dy); dx/=len; dy/=len;
       const wantRun = keys['shift'] && player.en>5 && player.hyd>5;
@@ -16975,7 +17781,7 @@ function resetSandboxRun(){
   window.FarmStoryCinematics?.reset();
   window.FarmWorldMap?.reset();
   window.FarmAnimalLife?.reset();
-  window.FarmRestVisual?.reset();
+  window.FarmRestVisual?.reset();window.FarmPlayerActions?.reset(player);
   const identity={name:player.name,gender:player.gender};
   if(currentScene!=='main') setSceneTo('main');
   Object.assign(player,JSON.parse(JSON.stringify(initialSandboxRun.player)),identity);
@@ -17000,6 +17806,7 @@ function resetSandboxRun(){
   journalUnlocked.clear();journalUnlocked.add('intro');renderJournal();
   window.FarmActivityReport.close();
   window.FarmValleySaga?.reset();
+  window.FarmFrontierStory?.reset();
   window.FarmLife?.reset();
   window.FarmSkinLearning?.reset();
   window.FarmStoryIntegration?.reset();
@@ -20312,6 +21119,7 @@ function drawGHPath(o){
   ctx.fillRect(x-12, y-12, 24, 6);
 }
 function drawRiverAnimation(camX, camY, visW, visH){
+  if(window.FarmWaterLife)return FarmWaterLife.drawSurface(ctx,camX,camY,visW,visH);
   if(!map || !map[0]) return;
   const t = performance.now()/1000;
   const tx0 = Math.max(0, Math.floor(camX/TS));
@@ -21068,7 +21876,8 @@ function drawPlayer(){
     if(!A11Y.reduceMotion && isFrio() && player.temp<36.2) x+=Math.floor(Math.sin(performance.now()/35));
     const listening=window.FarmStoryIntegration?.conversationPose?.(player,true);
     const actor=listening?{...player,moving:false,running:false,gaitBlend:0,actionTimer:0}:player;
-    window.FarmCharacterArt.drawPlayer(ctx,actor,{...restPose,x,y,...listening,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
+    const actionPose=listening?{}:window.FarmPlayerActions?.pose(player,currentScene)||{};
+    window.FarmCharacterArt.drawPlayer(ctx,actor,{...restPose,...actionPose,x,y,...listening,winter:isFrio(),time:performance.now(),reducedMotion:!!A11Y.reduceMotion});
     return;
   }
   const dir = player.dir ?? 0; // 0 baixo, 1 esquerda, 2 direita, 3 cima
@@ -22039,6 +22848,7 @@ function drawCinematicWorld(g,view={}){
     for(let y=Math.max(0,Math.floor(top/TS));y<Math.min(MH,Math.ceil((top+visibleH)/TS));y++)
       for(let x=Math.max(0,Math.floor(left/TS));x<Math.min(MW,Math.ceil((left+visibleW)/TS));x++)drawTile(x,y,map[y][x],g);
     window.FarmWorldDepth?.drawGround(g);
+    window.FarmWaterLife?.drawSurface(g,left,top,visibleW,visibleH);
     for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
     const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
     for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
@@ -23187,6 +23997,12 @@ try { drainBiomeModules(); } catch(e){ console.warn('drainBiomeModules falhou:',
   };
   window.setSceneTo = setSceneTo;
 })();
+// A expansão leste é aplicada após os biomas antigos, antes de capturar o estado inicial.
+if(window.FarmOpenWorld){
+  FarmOpenWorld.expand(scenes.main);
+  MW=scenes.main.MW;MH=scenes.main.MH;map=scenes.main.map;objects=scenes.main.objects;
+  invalidateTileCache();
+}
 const initialSandboxRun={player:JSON.parse(JSON.stringify(player)),stats:JSON.parse(JSON.stringify(stats)),crops:JSON.parse(JSON.stringify(crops)),objects:JSON.parse(JSON.stringify(objects))};
 FarmOriginalAudio.prepare().catch(error=>console.warn('Pré-carga de áudio indisponível',error));
 FarmLearningJourney.init({

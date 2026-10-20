@@ -20,9 +20,10 @@ function check(nome,passou,evidencia){report.checagens.push({nome,passou:!!passo
    const buildings=m.objects.filter(o=>['house','barn','story_seed_house','mtn_cabin'].includes(o.type));
    const rows=m.objects.filter(o=>types.includes(o.type)).map(o=>{const f=FarmWorldDepth.footprint(o),tree=['tree','fx_fruittree'].includes(o.type),footY=o.y+(tree?11:0);return{type:o.type,x:o.x,y:o.y,anchor:terrain(o.x,o.y),foot:terrain(o.x,footY),overlaps:buildings.filter(b=>{const bf=FarmWorldDepth.footprint(b),cx=f.x+f.w/2,cy=f.y+f.h/2;return cx>bf.x&&cx<bf.x+bf.w&&cy>bf.y&&cy<bf.y+bf.h;}).map(b=>({type:b.type,x:b.x,y:b.y}))};});
    const moved=[['tree',728,1004,664,972],['tree',456,796,488,684],['tree',552,764,600,764],['fx_fruittree',648,1232,712,1248],['mtn_pine',248,495,248,511],['des_palm',568,1698,536,1682]].map(([type,ox,oy,x,y])=>({type,old:{x:ox,y:oy},x,y,oldAbsent:!rows.some(o=>o.type===type&&o.x===ox&&o.y===oy),present:rows.some(o=>o.type===type&&o.x===x&&o.y===y),support:[-5,0,13].flatMap(dy=>[-9,0,9].map(dx=>terrain(x+dx,y+dy))),nearInteractions:m.objects.filter(o=>!(o.x===x&&o.y===y&&o.type===type)&&Object.keys(INTERACTION_HANDLERS).includes(o.type)&&Math.hypot(x-o.x,y-o.y)<26).map(o=>o.type)}));
-   return{counts:Object.fromEntries(types.map(type=>[type,rows.filter(o=>o.type===type).length])),rows,moved};
+   // A contagem histórica cobre os 60 tiles originais; segurança cobre também a expansão.
+   return{counts:Object.fromEntries(types.map(type=>[type,rows.filter(o=>o.type===type&&o.x<60*TS).length])),rows,moved};
   });
-  check('Quantidade de árvores e palmeiras preservada',JSON.stringify(geometry.counts)===JSON.stringify({tree:56,fx_fruittree:7,mtn_pine:27,des_palm:2}),geometry.counts);
+  check('Quantidade de árvores e palmeiras originais preservada em x<60 tiles',JSON.stringify(geometry.counts)===JSON.stringify({tree:56,fx_fruittree:7,mtn_pine:27,des_palm:2}),geometry.counts);
   check('Seis implantações corrigidas sem duplicar objetos',geometry.moved.every(o=>o.oldAbsent&&o.present),geometry.moved);
   check('Troncos não nascem em água nem no lago congelado',geometry.rows.every(o=>!['WATER','RIVER','OASIS','ICE'].includes(o.anchor)&&!['WATER','RIVER','OASIS','ICE'].includes(o.foot)),geometry.rows.filter(o=>['WATER','RIVER','OASIS','ICE'].includes(o.anchor)||['WATER','RIVER','OASIS','ICE'].includes(o.foot)));
   check('Centros dos troncos ficam fora dos volumes das construções',geometry.rows.every(o=>!o.overlaps.length),geometry.rows.filter(o=>o.overlaps.length));

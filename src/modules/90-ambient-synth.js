@@ -52,7 +52,7 @@
     timer=setTimeout(()=>{timer=null;scheduleCrickets();},2100+Math.random()*2300);
   }
   function mixScene(options={}){
-    const weights={farm:0,mountain:0,desert:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
+    const weights={farm:0,mountain:0,desert:0,forest:0,wetland:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
     for(const entry of input){const id=Array.isArray(entry)?entry[0]:entry.id,w=Array.isArray(entry)?entry[1]:(entry.w??entry.weight);if(id in weights)weights[id]+=clamp(w);}
     const total=Object.values(weights).reduce((a,b)=>a+b,0)||1;for(const key of Object.keys(weights))weights[key]/=total;
     const region=Object.keys(weights).reduce((a,b)=>weights[a]>=weights[b]?a:b),tod=((Number(options.timeOfDay)||0)%24+24)%24;
@@ -69,13 +69,19 @@
       result.river=.055;result.loops.room_tone=.11;result.loops.birds_loop=night||cold?0:.009;
       result.music.indoor=true;return result;
     }
-    const field=weights.farm,mountain=weights.mountain,desert=weights.desert;
+    const forest=weights.forest,wetland=weights.wetland;
+    const field=weights.farm+forest*.7+wetland*.55,mountain=weights.mountain,desert=weights.desert;
     result.loops.farm_ambience=field*(cold?.035:(night?.055:.13));
     result.loops.birds_loop=field*(cold||night?0:tod<9?.05:tod<16?.025:.017);
     result.loops.cicadas_loop=field*(cold||night?0:(tod>=11&&tod<16?.045+heat*.035:.018));
     result.loops.cold_wind=mountain*(.28+(night?.06:0))+field*(cold?.17:.01);
     result.loops.desert_breeze=desert*(night?.19:.25);
     result.loops.fireplace=fire;result.river=water*(field*(cold?.16:.55)+mountain*.18+desert*.28);result.crickets=field*(night&&!cold?.34:0);
+    // As novas regiões usam o banco original: pássaros na mata e água/insetos
+    // nas veredas. Os pesos conservam as misturas dos três biomas antigos.
+    result.loops.birds_loop+=forest*(cold||night?0:.035);
+    result.river+=wetland*(cold?.04:.12)+forest*.025;
+    result.crickets+=wetland*(night&&!cold?.15:0);
     if(resting){
       for(const key of Object.keys(result.loops))result.loops[key]*=['birds_loop','cicadas_loop'].includes(key)?.35:.65;
       result.river*=.7;result.crickets*=.45;

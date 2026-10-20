@@ -81,6 +81,10 @@ MODULE_ORDER = [
     "38-skin-learning.js",    # tecidos da pele e investigações de Lia
     "39-valley-details.js",   # escolhas refletidas em superfícies já existentes
     "40-grass-sway.js",       # animated grass blades + wind streaks
+    "41-player-actions.js",   # encenação transitória das atividades e alvos
+    "42-water-life.js",       # água, lírios e pesca na mesma grade de pixels
+    "43-open-world.js",      # mata e veredas contíguas, sem deslocar o vale original
+    "44-frontier-story.js",  # novos moradores, missões e cuidados renováveis
     "50-window-glow.js",      # warm halos from house/barn windows at night
     "60-histology-annotations.js", # realtime science labels over the player
     "70-synth-sfx.js",        # procedural UI/feedback sounds via Web Audio API

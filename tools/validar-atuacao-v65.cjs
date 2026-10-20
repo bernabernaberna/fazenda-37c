@@ -10,7 +10,7 @@ const report={geradoEm:new Date().toISOString(),metodo:'Edge isolado, RAF suspen
 let browser,page,expectedCast={};
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 function check(nome,passou,evidencia){report.checagens.push({nome,passou:!!passou,evidencia});assert.ok(passou,nome);}
-async function sim(){return page.evaluate(()=>JSON.stringify({scene:currentScene,player,timeOfDay,seasonTimer,currentSeason,currentWeather,weatherTimer,weatherCooldown,story:FarmStoryWorld.serialize(),saga:FarmValleySaga.serialize(),farm:FarmLife.serialize(),npcs:FarmStoryIntegration.navigationState()}));}
+async function sim(){return page.evaluate(()=>JSON.stringify({scene:currentScene,player,timeOfDay,seasonTimer,currentSeason,currentWeather,weatherTimer,weatherCooldown,story:FarmStoryWorld.serialize(),saga:FarmValleySaga.serialize(),frontier:FarmFrontierStory.serialize(),farm:FarmLife.serialize(),npcs:FarmStoryIntegration.navigationState()}));}
 async function calls(){return page.evaluate(()=>({info:FarmStoryCinematics.info(),actors:__actingActors,portrait:__actingPortrait,text:document.querySelector('#valeCinema .vc-line').textContent,full:document.querySelector('#valeCinema .vc-sr').textContent}));}
 async function frame(dt=0){await page.evaluate(dt=>{__actingActors=[];FarmStoryCinematics.update(dt);},dt);return calls();}
 async function capture(name,viewport={width:1280,height:800}){
@@ -70,6 +70,7 @@ async function runCatalogue(ids,collect){
   player.name='Lua';player.gender='f';player.en=90;player.hyd=90;player.temp=37;player.resting=false;player.moving=false;player.running=false;player.actionTimer=0;
   const story=FarmStoryWorld.serialize();story.main.forEach(r=>{r.status='completed';r.paid=true;});FarmStoryWorld.restore(story);
   const saga=FarmValleySaga.serialize();saga.episodes.forEach(r=>Object.assign(r,{status:'completed',paid:true,choice:0,acceptedAt:0}));FarmValleySaga.restore(saga);
+  const frontier=FarmFrontierStory.serialize();frontier.met=['helena','davi','bia'];Object.values(frontier.missions).forEach(r=>Object.assign(r,{status:'completed',paid:true,choice:0,acceptedAt:0}));FarmFrontierStory.restore(frontier);
   FarmStoryIntegration.initializeCinematics();FarmStoryCinematics.restore({version:1,seenScenes:[]},{chapterIndex:6});setSceneTo('house',112,86);
   const art=FarmCharacterArt,record=(id,g,a,o)=>{const p=g.getTransform().transformPoint({x:Number.isFinite(o.x)?o.x:a.x,y:(Number.isFinite(o.y)?o.y:a.y)+10});(g.canvas.id==='game'?window.__worldActors:window.__actingActors).push({id,dir:o.facing??a.dir,x:a.x,y:a.y,feet:{x:p.x,y:p.y},speaking:!!o.speaking,expression:o.expression,gesture:o.gesture,gaze:o.gaze,heldProp:o.heldProp,speechTime:o.speechTime,reducedMotion:!!o.reducedMotion});};
   window.__actingActors=[];window.__worldActors=[];window.__actingPortrait=null;window.FarmCharacterArt={...art,
@@ -78,8 +79,9 @@ async function runCatalogue(ids,collect){
    drawPortrait(c,id,o={}){if(c===document.querySelector('#valeCinema .vc-portrait'))window.__actingPortrait={id,speaking:!!o.speaking,expression:o.expression,gesture:o.gesture,speechTime:o.speechTime,reducedMotion:!!o.reducedMotion};return art.drawPortrait(c,id,o);}
   };
  });
- const catalogue=await page.evaluate(()=>FarmStoryCinematics.catalogue());check('Catálogo integrado libera as seis cenas e oito episódios da saga',catalogue.length===14&&catalogue.every(f=>f.available),catalogue.map(f=>f.id));
- expectedCast=await page.evaluate(()=>Object.fromEntries(Object.entries({carta:['rosa','player'],horta:['nico','rosa','player'],rio:['lia','player'],abrigo:['ines','tomas','player'],oasis:['caio','nico','player'],reabertura:['rosa','lia','tomas','ines','caio','nico'],...Object.fromEntries(FarmValleySaga.cinematicScenes().map(f=>[f.id,f.cast]))}).map(([id,cast])=>[id,[...new Set(cast)].sort()])));
+ const catalogue=await page.evaluate(()=>FarmStoryCinematics.catalogue());
+ expectedCast=await page.evaluate(()=>Object.fromEntries(Object.entries({carta:['rosa','player'],horta:['nico','rosa','player'],rio:['lia','player'],abrigo:['ines','tomas','player'],oasis:['caio','nico','player'],reabertura:['rosa','lia','tomas','ines','caio','nico'],...Object.fromEntries(FarmValleySaga.cinematicScenes().map(f=>[f.id,f.cast])),...Object.fromEntries(FarmFrontierStory.cinematicScenes().map(f=>[f.id,f.cast]))}).map(([id,cast])=>[id,[...new Set(cast)].sort()])));
+ check('Catálogo integrado libera as cenas legadas, a saga e a expansão',catalogue.length===Object.keys(expectedCast).length&&catalogue.length>=16&&catalogue.every(f=>f.available&&expectedCast[f.id]),catalogue.map(f=>f.id));
  const ids=catalogue.map(f=>f.id),before=await sim();await start('carta');
  await page.keyboard.down('d');await page.evaluate(()=>{for(let i=0;i<30;i++){update(.05);updateWeather(.05);}});await page.keyboard.up('d');
  check('Cena aberta desde o interior pausa mundo, jogador, recursos e relógios',before===await sim());
@@ -89,7 +91,7 @@ async function runCatalogue(ids,collect){
  check('Rever todas as cenas preserva estado da partida e recompensas',before===await sim());
  const cacheWarm=await page.evaluate(()=>FarmCharacterArt.cacheInfo());await runCatalogue(ids,false);const cacheAgain=await page.evaluate(()=>FarmCharacterArt.cacheInfo());
  check('Repetir os mesmos planos mantém os caches estáveis e dentro dos limites',JSON.stringify(cacheWarm)===JSON.stringify(cacheAgain)&&cacheAgain.sprites<=cacheAgain.maxSprites&&cacheAgain.portraits<=cacheAgain.maxPortraits&&cacheAgain.speechBanks<=cacheAgain.maxSpeechBanks,{cacheWarm,cacheAgain});
- const captures=['carta','horta','rio','abrigo','oasis','reabertura',ids.find(x=>x.startsWith('saga-')),ids.at(-1)];
+ const sagaIds=ids.filter(x=>x.startsWith('saga-')),captures=['carta','horta','rio','abrigo','oasis','reabertura',sagaIds[0],sagaIds.at(-1),...ids.filter(x=>x.startsWith('frontier-'))];
  for(const id of [...new Set(captures)]){await start(id);await frame(.1);await capture('atuacao-v65-'+id+'-1280x800');await close();}
  for(const viewport of [{width:1024,height:640},{width:390,height:844}]){await start('reabertura');await frame(.1);await capture('atuacao-v65-reabertura-'+viewport.width+'x'+viewport.height,viewport);const fit=await page.locator('#valeCinema .vc-film').evaluate(n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:innerWidth,height:innerHeight};});check('Cena e controles cabem em '+viewport.width+'x'+viewport.height,fit.x>=-1&&fit.y>=-1&&fit.right<=fit.width+1&&fit.bottom<=fit.height+1,fit);await close();}
  await page.setViewportSize({width:1280,height:800});
