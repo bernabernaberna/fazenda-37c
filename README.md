@@ -45,6 +45,8 @@ Plantar, regar, colher, recolher lenha, alimentar e pescar têm gestos próprios
 com ferramentas voltadas ao alvo da ação. Água, margens, vegetação, caminhada
 e descanso mantêm a pixel art do vale e respeitam a opção de reduzir movimento.
 
+A **mochila (I)** reúne 32 tipos de item com ícones próprios, categorias, busca, quantidades e instruções. Selecione para inspecionar; os botões de usar, equipar e organizar os seis atalhos são explícitos. Ela também mostra o depósito da fazenda sem duplicar seus produtos. O adubo da estufa acelera em 50% o crescimento de uma planta regada. Consumíveis são preservados quando não trazem benefício.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

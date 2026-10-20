@@ -85,6 +85,8 @@ MODULE_ORDER = [
     "42-water-life.js",       # água, lírios e pesca na mesma grade de pixels
     "43-open-world.js",      # mata e veredas contíguas, sem deslocar o vale original
     "44-frontier-story.js",  # novos moradores, missões e cuidados renováveis
+    "45-item-art.js",       # ícones originais para ferramentas, provisões e produtos
+    "46-inventory.js",      # mochila acessível, detalhes e atalhos explícitos
     "50-window-glow.js",      # warm halos from house/barn windows at night
     "60-histology-annotations.js", # realtime science labels over the player
     "70-synth-sfx.js",        # procedural UI/feedback sounds via Web Audio API

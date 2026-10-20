@@ -2653,22 +2653,11 @@ body.hud-game #legend{display:none !important;}
 </div>
 <div id="celebrateLayer"></div>
 
-<div id="inventoryPanel">
-  <div class="invWindow">
-    <h2>🎒 Inventário</h2>
-    <p class="invHelp">Pressione <b>I</b> para abrir/fechar. Clique em um slot rápido e depois em um item da mochila para trocar. Clique nos itens para usar, equipar ou desativar.</p>
-    <div class="invSectionTitle">Inventário rápido</div>
-    <div class="invGrid" id="fullHotbarGrid"></div>
-    <div class="invSectionTitle">Mochila — itens adicionais</div>
-    <div class="invGrid" id="bagGrid"></div>
-    <div class="invClose">
-      <span class="muted" id="invInfo"></span>
-      <button onclick="toggleInventory(false)">Fechar</button>
-    </div>
-  </div>
+<div id="inventoryPanel" role="dialog" aria-modal="true" aria-labelledby="bagTitle">
+  <div class="invWindow"></div>
 </div>
 
-<div id="status" class="panel">
+<div id="status" class="panel" hidden aria-hidden="true" style="display:none !important">
   <div class="stat" id="sSweat"><span class="ic">💦</span>Suando</div>
   <div class="stat" id="sCansado"><span class="ic">😪</span>Cansado</div>
   <div class="stat" id="sHyd"><span class="ic">💧</span>Hidratado</div>
@@ -4939,6 +4928,7 @@ const ITEM_DEFS = {
   veg:      {key:'veg',      ic:'🥕', svg: VEG_ICON,  name:'Vegetais',      tint:'#ee7a1f'},
   wool:     {key:'wool',     ic:'🐑', svg: WOOL_ICON, name:'Lã',            tint:'#f4ecd6'},
   wood:     {key:'wood',     ic:'🪵', svg: ICON_SVG.wood,    name:'Lenha',         tint:'#7a5230'},
+  fertilizer:{key:'fertilizer',ic:'🌱', name:'Adubo', tint:'#99724b', desc:'Aplique perto de uma planta em crescimento. Acelera em 50% enquanto estiver regada; uma aplicação dura até a colheita.'},
   isotonic: {key:'isotonic', ic:'🥤', name:'Isotônico',     tint:'#ff8a6a'},
   warmDrink:{key:'warmDrink',ic:'☕', name:'Bebida quente', tint:'#a04030'},
   soup:     {key:'soup',     ic:'🍲', name:'Sopa quente',   tint:'#d9a847'},
@@ -4966,13 +4956,14 @@ function normalizePlayerState(){
   if(!player.inv) player.inv = {};
   if(!player.inv.seeds) player.inv.seeds = {tomato:player.inv.seed||0,corn:0,carrot:0,forage:0};
   for(const id of Object.keys(SEED_TYPES)) player.inv.seeds[id] = Number(player.inv.seeds[id]) || 0;
-  const invDefaults = {seed:0, water:0, watercan:1, veg:0, hay:0, towel:0, wool:0, coat:0, wood:0, isotonic:0, warmDrink:0, soup:0, blanket:0, gloves:0, scarf:0, boots:0, ice:0, oasisWater:0};
+  const invDefaults = {seed:0, water:0, watercan:1, veg:0, hay:0, towel:0, wool:0, coat:0, wood:0, fertilizer:0, isotonic:0, warmDrink:0, soup:0, blanket:0, gloves:0, scarf:0, boots:0, ice:0, oasisWater:0};
   for(const [key, fallback] of Object.entries(invDefaults)){
     const n = Number(player.inv[key]);
     player.inv[key] = Number.isFinite(n) ? n : fallback;
   }
   player.inv.seed = totalSeedCount();
   for(const key of ['ice','oasisWater']) player.inv[key]=Math.max(0,Math.min(3,Math.floor(player.inv[key])));
+  player.inv.fertilizer=Math.max(0,Math.floor(player.inv.fertilizer));
   if(player.scarf && player.inv.scarf<=0) player.inv.scarf = 1;
   if(player.boots && player.inv.boots<=0) player.inv.boots = 1;
   if(player.inv.scarf<=0) player.scarf = false;
@@ -6373,11 +6364,11 @@ function renderInv(){
     let c = countForInv(s.key);
     if(s.key==='coat' && !player.inv.coat) c = 'W'+(player.inv.wool||0);
     // Use SVG icon if defined, fallback to emoji
-    const iconHTML = s.svg ? s.svg : `<span class="ic-emoji">${s.ic}</span>`;
-    return `<div class="slot ${i===player.activeSlot?'active':''}" onclick="setSlot(${i})" title="${s.name}">
+    const iconHTML = window.FarmItemArt?.icon(s.key,s.key==='seed'?player.selectedSeed:undefined) || s.svg || `<span class="ic-emoji">${s.ic}</span>`;
+    return `<button type="button" class="slot ${i===player.activeSlot?'active':''}" onclick="setSlot(${i})" aria-label="Atalho ${i+1}: ${s.name}" aria-pressed="${i===player.activeSlot}" title="${s.name}">
       <span class="key">${i+1}</span><span class="ic">${iconHTML}</span>
-      <span class="ct">${c}</span></div>`;
-  }).join('');
+      <span class="ct">${c}</span></button>`;
+  }).join('') + '<button type="button" class="slot inv-open" onclick="toggleInventory(true)" aria-label="Abrir mochila, tecla I" title="Mochila · I"><span class="key">I</span><span class="bag-open-label">Mochila</span></button>';
   // Coin counter with SVG icon
   const coinVal = document.getElementById('coinVal');
   if(coinVal){
@@ -6429,39 +6420,42 @@ function toggleWinterGear(invKey, flagKey, label, onMsg, offMsg){
 function useItemByKey(key){
   if(player.dead) return;
   normalizePlayerState();
+  // O evento vem depois do efeito: abrir a mochila ou tentar usar um item
+  // sem benefício não avança pedidos, nem consome uma unidade.
+  const used = () => { window.FarmStoryIntegration?.record('use',{item:key}); renderInv(); updateBars(); };
+  if(key==='fertilizer') return fertilizeCrop();
   if(key==='ice'){
     if(!player.inv.ice){ showAlert('Colete gelo no lago da montanha'); return; }
     if(player.temp<=37.2){ showAlert('Guarde o gelo para quando o corpo estiver quente'); return; }
     player.inv.ice--;
-    window.FarmStoryIntegration?.record('use',{item:'ice'});
     const antes=player.temp;
     player.temp=Math.max(37.2,player.temp-0.5);
     window.FarmThermalFeedback.reset();
     flashFx(player.x,player.y-12,'gelo: −'+(antes-player.temp).toFixed(1)+' °C','#9fd9ed');
     showToast('Gelo da montanha: resfriou o corpo. Observe a nova tendência.', 'info', 3200);
-    sfx.water(); renderInv(); updateBars(); return;
+    sfx.water(); used(); return;
   }
   if(key==='oasisWater'){
     if(!player.inv.oasisWater){ showAlert('Colete água na margem do oásis'); return; }
     if(player.hyd>=100 && player.en>=100){ showAlert('Hidratação e energia já estão completas'); return; }
     player.inv.oasisWater--;
-    window.FarmStoryIntegration?.record('use',{item:'oasisWater'});
     player.hyd=Math.min(100,player.hyd+35); player.en=Math.min(100,player.en+5);
     stats.waterDrunk++; tickTask('drink'); unlockJournal('hydration');
     flashFx(player.x,player.y-12,'oásis: +hidratação','#58bed5');
     showToast('Água do oásis: +35 de hidratação e +5 de energia.', 'info', 3200);
-    sfx.drink(); renderInv(); updateBars(); return;
+    sfx.drink(); used(); return;
   }
   if(key==='seed') return plantCrop();
   if(key==='water'){
     if(player.inv.water>0){
+      if(player.hyd>=100){ showAlert('Sua hidratação já está completa. Guarde a água.'); return; }
       player.inv.water--; player.hyd = Math.min(100, player.hyd+25);
-      window.FarmStoryIntegration?.record('use',{item:'water'});
       stats.waterDrunk++;
       tickTask('drink');
       flashFx(player.x,player.y-12,'bebeu','#5fc6ff');
       unlockJournal('hydration');
       sfx.drink();
+      used();
     } else showAlert('Sem água no inventário');
     renderInv();
     return;
@@ -6474,11 +6468,12 @@ function useItemByKey(key){
   if(key==='hay') return tryInteract();
   if(key==='towel'){
     if(player.inv.towel>0){
+      if(player.temp<=36.5){ showAlert('Guarde a toalha para quando o corpo estiver quente.'); return; }
       player.inv.towel--; player.towelTimer = 8;
       player.temp = Math.max(36.5, player.temp-0.6);
       flashFx(player.x,player.y-12,'refrescou','#9fe1ff');
       sfx.water();
-      renderInv();
+      used();
     } else showAlert('Sem toalha no inventário');
     return;
   }
@@ -6494,24 +6489,38 @@ function useItemByKey(key){
     return;
   }
   if(key==='isotonic'){
-    if(player.inv.isotonic>0){ player.inv.isotonic--; player.hyd=Math.min(100,player.hyd+18); player.en=Math.min(100,player.en+18); flashFx(player.x,player.y-12,'isotônico','#7ad0ff'); renderInv(); }
+    if(player.inv.isotonic>0){
+      if(player.hyd>=100 && player.en>=100){ showAlert('Sua hidratação e energia já estão completas.'); return; }
+      player.inv.isotonic--; player.hyd=Math.min(100,player.hyd+18); player.en=Math.min(100,player.en+18); flashFx(player.x,player.y-12,'isotônico','#7ad0ff'); used();
+    }
     else showAlert('Sem isotônico no inventário');
     return;
   }
   if(key==='warmDrink'){
-    if(player.inv.warmDrink>0){ player.inv.warmDrink--; player.temp=Math.min(37.8,player.temp+0.7); player.en=Math.min(100,player.en+10); flashFx(player.x,player.y-12,'bebida quente','#ffd98a'); showAlert('Bebida quente: aquecimento temporário do corpo'); renderInv(); }
+    if(player.inv.warmDrink>0){
+      const warmth=Math.max(0,Math.min(.7,37.8-player.temp)),energy=Math.max(0,Math.min(10,100-player.en));
+      if(!warmth && !energy){ showAlert('Você já está aquecido e com energia completa. Guarde a bebida.'); return; }
+      player.inv.warmDrink--; player.temp+=warmth; player.en+=energy; flashFx(player.x,player.y-12,'bebida quente','#ffd98a'); showAlert(warmth?'Bebida quente: aquecimento temporário do corpo':'Bebida quente: energia recuperada'); used();
+    }
     else showAlert('Sem bebida quente no inventário');
     return;
   }
   if(key==='soup'){
-    if(player.inv.soup>0){ player.inv.soup--; player.temp=Math.min(38.0,player.temp+0.9); player.en=Math.min(100,player.en+12); player.hyd=Math.min(100,player.hyd+6); flashFx(player.x,player.y-12,'sopa quente','#ffcf87'); showAlert('Sopa quente: aquece, hidrata e recupera energia'); renderInv(); }
+    if(player.inv.soup>0){
+      const warmth=Math.max(0,Math.min(.9,38-player.temp)),energy=Math.max(0,Math.min(12,100-player.en)),hydration=Math.max(0,Math.min(6,100-player.hyd));
+      if(!warmth && !energy && !hydration){ showAlert('Você já está aquecido, hidratado e com energia completa. Guarde a sopa.'); return; }
+      player.inv.soup--; player.temp+=warmth; player.en+=energy; player.hyd+=hydration; flashFx(player.x,player.y-12,'sopa quente','#ffcf87'); showAlert(warmth?'Sopa quente: aquece, hidrata e recupera energia':'Sopa quente: hidratação e energia recuperadas'); used();
+    }
     else showAlert('Sem sopa no inventário');
     return;
   }
-  if(key==='blanket') return toggleWinterGear('blanket','blanketEquipped','cobertor','Cobertor ativo: descanso no frio aquece melhor','Cobertor guardado');
-  if(key==='gloves') return toggleWinterGear('gloves','glovesEquipped','luvas','Luvas equipadas: mãos protegidas no frio','Luvas retiradas');
-  if(key==='scarf') return toggleWinterGear('scarf','scarf','cachecol','Cachecol equipado: pescoço protegido do frio','Cachecol retirado');
-  if(key==='boots') return toggleWinterGear('boots','boots','botas térmicas','Botas equipadas: melhor locomoção no inverno','Botas retiradas');
+  const winterGear={blanket:['blanketEquipped','cobertor','Cobertor ativo: descanso no frio aquece melhor','Cobertor guardado'],gloves:['glovesEquipped','luvas','Luvas equipadas: mãos protegidas no frio','Luvas retiradas'],scarf:['scarf','cachecol','Cachecol equipado: pescoço protegido do frio','Cachecol retirado'],boots:['boots','botas térmicas','Botas equipadas: melhor locomoção no inverno','Botas retiradas']}[key];
+  if(winterGear){
+    const [flag,label,onMsg,offMsg]=winterGear,before=player[flag];
+    toggleWinterGear(key,flag,label,onMsg,offMsg);
+    if(player[flag]!==before) window.FarmStoryIntegration?.record('equip',{item:key,equipped:player[flag]});
+    return;
+  }
   if(key==='wood') { showAlert('Use a lenha na fogueira: fique sobre a fogueira e pressione E'); return; }
   if(key==='veg') { showAlert('Venda os vegetais na caixa de venda'); return; }
   if(key==='wool') { showAlert('Use 2 lãs no tear para fazer casaco'); return; }
@@ -6570,53 +6579,29 @@ window.assignQuickSlot = function(key, seed=''){
 }
 function renderFullInventory(){
   normalizePlayerState();
-  const hot = document.getElementById('fullHotbarGrid');
-  const bag = document.getElementById('bagGrid');
-  if(!hot || !bag) return;
-  const quickItems = quickSlotItems();
-  hot.innerHTML = quickItems.map((it,i)=>slotHTML(it,i,true)).join('');
-  const bagItems = [
-    ITEM_DEFS.ice, ITEM_DEFS.oasisWater,
-    // ===== SEMENTES (visual diferente de vegetais — saquinho marrom com cor da fruta no topo) =====
-    {key:'seed_tomato',      quickKey:'seed', seed:'tomato',      ic:'🌱', name:'Sem. Tomate'},
-    {key:'seed_corn',        quickKey:'seed', seed:'corn',        ic:'🌱', name:'Sem. Milho'},
-    {key:'seed_carrot',      quickKey:'seed', seed:'carrot',      ic:'🌱', name:'Sem. Cenoura'},
-    {key:'seed_forage',      quickKey:'seed', seed:'forage',      ic:'🌱', name:'Sem. Forragem'},
-    {key:'seed_lettuce',     quickKey:'seed', seed:'lettuce',     ic:'🌱', name:'Sem. Alface'},
-    {key:'seed_sweetpotato', quickKey:'seed', seed:'sweetpotato', ic:'🌱', name:'Sem. Bat. doce'},
-    {key:'seed_pumpkin',     quickKey:'seed', seed:'pumpkin',     ic:'🌱', name:'Sem. Abóbora'},
-    // ===== PRODUTOS COLHIDOS =====
-    {key:'veg',  ic:'🥕', svg: VEG_ICON, name:'Vegetais'},
-    {key:'hay',  ic:'🌾', svg: ICON_SVG.hay, name:'Feno'},
-    // ===== UTILITÁRIOS =====
-    {key:'water',    ic:'💧', svg: ICON_SVG.water,    name:'Água'},
-    {key:'watercan', ic:'🚿', svg: ICON_SVG.watercan, name:'Regador', actionableEmpty:true},
-    {key:'isotonic', ic:'🥤', name:'Isotônico'},
-    {key:'towel',    ic:'🧊', svg: ICON_SVG.towel,    name:'Toalha gelada'},
-    {key:'wool',     ic:'🐑', svg: WOOL_ICON,         name:'Lã'},
-    {key:'wood',     ic:'🪵', svg: ICON_SVG.wood,     name:'Lenha'},
-    // ===== INVERNO =====
-    {key:'warmDrink', ic:'☕', name:'Bebida quente'},
-    {key:'soup',      ic:'🍲', name:'Sopa quente'},
-    {key:'blanket',   ic:'🛏️', name:'Cobertor'},
-    {key:'gloves',    ic:'🧤', name:'Luvas'},
-    {key:'scarf',     ic:'🧣', name:'Cachecol'},
-    {key:'boots',     ic:'🥾', name:'Botas térmicas'},
-    {key:'coat',      ic:'🧥', svg: COAT_ICON, name:'Casaco'}
-  ];
-  bag.innerHTML = bagItems.map((it,i)=>slotHTML(it,i,false)).join('');
-  const info = document.getElementById('invInfo');
-  const winter = [player.scarf?'cachecol':'',player.boots?'botas':'',player.glovesEquipped?'luvas':'',player.blanketEquipped?'cobertor':'',player.coatEquipped?'casaco':''].filter(Boolean).join(', ') || 'nenhum ativo';
-  if(info) info.textContent = quickEditSlot!==null ? `Editando slot ${quickEditSlot+1}: escolha um item da mochila` : `Moedas: ${player.coins} · Semente ativa: ${selectedSeedDef().name} · Inverno: ${winter}`;
+  window.FarmInventory?.render({
+    player,definitions:ITEM_DEFS,seedTypes:SEED_TYPES,quickItems:quickSlotItems(),editSlot:quickEditSlot,
+    stockItems:window.FarmLife?.snapshot().stockItems||[],
+    close:()=>toggleInventory(false),
+    setEdit:i=>{quickEditSlot=i===null?null:Math.max(0,Math.min(5,Math.floor(i)));renderFullInventory();},
+    assign:(key,seed)=>{assignQuickSlot(key,seed);saveGame(true);},
+    selectSeed:id=>{selectSeed(id);saveGame(true);},
+    use:key=>{useItemByKey(key);updateBars();saveGame(true);renderFullInventory();},
+    consume:id=>{const result=window.FarmLife?.consume(id);if(result?.message)showAlert(result.message);renderInv();updateBars();},
+    recipes:()=>{toggleInventory(false);window.FarmValleyPanels?.openFarm('recipes');}
+  });
 }
+
 function toggleInventory(force){
   inventoryOpen = (typeof force === 'boolean') ? force : !inventoryOpen;
   if(inventoryOpen) sfx.inventory();
-  if(!inventoryOpen) quickEditSlot = null;
+  if(!inventoryOpen){ quickEditSlot = null; window.FarmInventory?.closed(); }
   document.getElementById('inventoryPanel').classList.toggle('show', inventoryOpen);
   if(inventoryOpen){
     player.resting = false;
+    for(const key of Object.keys(keys)) keys[key]=false;
     renderFullInventory();
+    window.FarmInventory?.opened();
   }
 }
 
@@ -7240,6 +7225,30 @@ function cropTileAtPlayer(){
   const t = currentTile();
   return isFieldTile(t.x,t.y) ? t : null;
 }
+function fertilizeCrop(){
+  if(player.dead) return false;
+  normalizePlayerState();
+  if(player.inv.fertilizer<1){ showAlert('Recolha adubo na composteira da estufa.'); return false; }
+  let target=null,best=24*24;
+  const tx=Math.floor(player.x/TS),ty=Math.floor(player.y/TS);
+  for(let y=ty-2;y<=ty+2;y++)for(let x=tx-2;x<=tx+2;x++){
+    const crop=getCrop(x,y);
+    if(!crop || !isFieldTile(x,y)) continue;
+    const d=(player.x-(x*TS+TS/2))**2+(player.y-(y*TS+TS/2))**2;
+    if(d<=best){best=d;target={x,y,crop};}
+  }
+  if(!target){ showAlert('Aproxime-se de uma planta para aplicar adubo.'); return false; }
+  if(target.crop.stage>=3){ showAlert('Esta planta já está madura. Colha antes de adubar uma nova plantação.'); return false; }
+  if(target.crop.fertilized===true){ showAlert('Esta planta já está adubada até a colheita.'); return false; }
+  player.inv.fertilizer--;
+  target.crop.fertilized=true;
+  window.FarmStoryIntegration?.record('use',{item:'fertilizer',amount:1,crop:target.crop.type||'tomato'});
+  flashFx(target.x*TS+TS/2,target.y*TS,'adubada +50%','#cfe57a');
+  showToast('Planta adubada: cresce 50% mais rápido enquanto estiver regada.', 'success', 3200);
+  renderInv();
+  return true;
+}
+window.fertilizeCrop=fertilizeCrop;
 function objectTileRange(o){
   if(o.type==='house'||o.type==='barn'||o.type==='pen'){
     return {x0:Math.floor(o.x/TS), y0:Math.floor(o.y/TS), x1:Math.floor((o.x+o.w)/TS), y1:Math.floor((o.y+o.h)/TS)};
@@ -8806,7 +8815,7 @@ function update(dt){
     const c = crops[k]; if(!c) continue;
     const def = SEED_TYPES[c.type] || {};
     if(c.water>0){
-      c.t += dt;
+      c.t += dt*(c.fertilized===true?1.5:1);
       let growTime = isFrio() ? (c.type==='forage' ? 7.2 : 9.5) : 5;
       if(def.longGrow)                    growTime *= 1.6;
       if(def.coldHardy && isFrio())       growTime *= 0.6;

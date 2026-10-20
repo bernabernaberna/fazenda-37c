@@ -2653,22 +2653,11 @@ body.hud-game #legend{display:none !important;}
 </div>
 <div id="celebrateLayer"></div>
 
-<div id="inventoryPanel">
-  <div class="invWindow">
-    <h2>🎒 Inventário</h2>
-    <p class="invHelp">Pressione <b>I</b> para abrir/fechar. Clique em um slot rápido e depois em um item da mochila para trocar. Clique nos itens para usar, equipar ou desativar.</p>
-    <div class="invSectionTitle">Inventário rápido</div>
-    <div class="invGrid" id="fullHotbarGrid"></div>
-    <div class="invSectionTitle">Mochila — itens adicionais</div>
-    <div class="invGrid" id="bagGrid"></div>
-    <div class="invClose">
-      <span class="muted" id="invInfo"></span>
-      <button onclick="toggleInventory(false)">Fechar</button>
-    </div>
-  </div>
+<div id="inventoryPanel" role="dialog" aria-modal="true" aria-labelledby="bagTitle">
+  <div class="invWindow"></div>
 </div>
 
-<div id="status" class="panel">
+<div id="status" class="panel" hidden aria-hidden="true" style="display:none !important">
   <div class="stat" id="sSweat"><span class="ic">💦</span>Suando</div>
   <div class="stat" id="sCansado"><span class="ic">😪</span>Cansado</div>
   <div class="stat" id="sHyd"><span class="ic">💧</span>Hidratado</div>
@@ -10886,6 +10875,358 @@ body.hud-game #legend{display:none !important;}
   window.FarmFrontierStory={characters,routines,init(api={}){adapter=plain(api)?api:{};return snapshot();},hasCharacter:id=>Object.hasOwn(byId,id),isMissionComplete:id=>Object.hasOwn(missionById,id)&&state.missions[id].paid,interact,choose,close,currentDialogue,isOpen:()=>!!dialogue,record,update,inspect,survey,snapshot,diaryView,conversationResponse,worldState,cinematicScenes,revision:()=>revision,landmarks:()=>clone(landmarks),missionCatalogue:()=>clone(missions),serialize:()=>clone(state),restore,reset(value){state=fresh(value);close();changed();return snapshot();}};
 })();
 
+/* ==========================
+   src/modules/45-item-art.js
+   ========================== */
+/* Objetos de bolso originais: silhuetas em uma grade de 24 pixels.
+   Somente desenho, sem estado do inventário, DOM, rede ou dependências.
+   Os recortes inteiros conservam a nitidez em 24 e 48 px. */
+(function(){
+  'use strict';
+  const P=Object.freeze({
+    ink:'#263c36',dark:'#4e493c',wood:'#886548',woodLight:'#b99161',
+    cream:'#eee2b8',linen:'#c9bc91',gold:'#e3b86b',goldDark:'#a77b42',
+    green:'#66805a',sage:'#a8b97a',greenDark:'#3c6250',
+    blue:'#699d9c',blueDark:'#366669',ice:'#b4d6ce',
+    clay:'#ad6650',clayLight:'#d39368',red:'#a75e55',redDark:'#74483f',
+    berry:'#956476',purple:'#624d5c',white:'#f0f3df'
+  });
+  const r=(x,y,w,h,c)=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+P[c]+'"/>';
+  const p=(points,c)=>'<polygon points="'+points+'" fill="'+P[c]+'"/>';
+  const svg=body=>'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" shape-rendering="crispEdges">'+body+'</svg>';
+  const steam=()=>r(8,2,2,3,'linen')+r(9,1,2,1,'linen')+r(13,3,2,3,'cream')+r(14,2,2,1,'cream');
+  function bottle(liquid){
+    return r(9,2,6,3,'ink')+r(10,2,4,2,'woodLight')+
+      p('9,5 15,5 15,7 17,7 17,9 18,9 18,20 16,20 16,22 8,22 8,20 6,20 6,9 7,9 7,7 9,7','ink')+
+      p('10,5 14,5 14,8 16,8 16,10 17,10 17,19 15,19 15,21 9,21 9,19 7,19 7,10 8,10 8,8 10,8','blue')+
+      r(8,12,8,7,liquid)+r(9,19,6,1,liquid)+r(8,9,2,8,'ice')+r(10,6,1,3,'ice');
+  }
+  function jar(liquid){
+    return r(7,3,10,3,'ink')+r(8,3,8,2,'goldDark')+r(8,3,6,1,'gold')+
+      p('7,6 17,6 17,8 18,8 18,20 16,20 16,22 8,22 8,20 6,20 6,8 7,8','ink')+
+      r(7,9,10,10,liquid)+r(8,7,8,2,'linen')+r(8,19,8,2,liquid)+r(7,9,2,8,'cream');
+  }
+  const seeds=Object.freeze(['tomato','corn','carrot','forage','lettuce','sweetpotato','pumpkin']);
+  const emblems=Object.freeze({
+    tomato:()=>p('10,10 14,10 14,11 16,11 16,15 14,15 14,16 10,16 10,15 8,15 8,11 10,11','redDark')+r(9,11,6,3,'red')+r(10,11,2,1,'clayLight')+r(11,9,2,2,'greenDark')+r(9,10,6,1,'green'),
+    corn:()=>r(10,9,4,8,'goldDark')+r(11,9,2,7,'gold')+r(10,11,4,1,'cream')+r(10,14,4,1,'cream')+p('8,12 10,14 10,17 14,17 14,14 16,12 16,16 14,18 10,18 8,16','greenDark'),
+    carrot:()=>p('9,11 15,11 15,14 13,14 13,17 11,17 11,15 9,15','clay')+r(9,11,2,3,'clayLight')+r(10,13,3,1,'wood')+r(12,9,2,2,'green')+r(10,8,2,2,'sage')+r(14,8,2,2,'greenDark'),
+    forage:()=>p('8,11 10,11 10,14 11,14 11,9 13,9 13,14 14,14 14,10 16,10 16,14 14,14 14,17 10,17 10,15 8,15','greenDark')+r(11,10,1,6,'sage')+r(14,10,1,4,'green')+r(9,12,1,3,'green'),
+    lettuce:()=>p('10,9 14,9 14,10 16,10 16,12 17,12 17,15 15,15 15,17 9,17 9,15 7,15 7,12 8,12 8,10 10,10','greenDark')+r(9,11,6,4,'green')+r(10,10,3,2,'sage')+r(8,12,2,2,'sage')+r(12,12,1,4,'linen'),
+    sweetpotato:()=>p('13,9 16,9 16,12 15,12 15,14 13,14 13,16 10,16 10,17 8,17 8,14 9,14 9,12 11,12 11,10 13,10','purple')+p('13,10 15,10 15,12 13,12 13,14 11,14 11,16 9,16 9,14 10,14 10,12 12,12 12,11 13,11','berry')+r(11,12,2,1,'clayLight'),
+    pumpkin:()=>p('9,10 15,10 15,11 17,11 17,15 15,15 15,17 9,17 9,15 7,15 7,11 9,11','wood')+r(8,12,8,3,'clay')+r(10,11,4,5,'clayLight')+r(12,11,1,5,'clay')+r(11,8,2,3,'greenDark')
+  });
+  function seedPouch(kind){
+    return p('7,2 17,2 17,4 16,4 16,6 18,6 18,8 19,8 19,20 17,20 17,22 7,22 7,20 5,20 5,8 6,8 6,6 8,6 8,4 7,4','ink')+
+      r(8,3,8,2,'woodLight')+r(9,5,6,2,'wood')+
+      p('8,7 16,7 16,9 18,9 18,19 16,19 16,21 8,21 8,19 6,19 6,9 8,9','goldDark')+
+      p('8,8 16,8 16,10 17,10 17,19 7,19 7,10 8,10','linen')+
+      r(7,10,1,8,'cream')+r(9,6,6,1,'ink')+r(8,19,8,1,'woodLight')+emblems[kind]();
+  }
+  const painters=Object.freeze({
+    water:()=>r(9,1,6,3,'ink')+r(10,2,4,1,'woodLight')+r(8,4,8,2,'ink')+
+      p('7,6 17,6 17,8 19,8 19,18 17,18 17,21 7,21 7,18 5,18 5,8 7,8','ink')+
+      p('8,6 16,6 16,9 18,9 18,17 16,17 16,20 8,20 8,17 6,17 6,9 8,9','blueDark')+
+      r(8,7,8,12,'blue')+r(8,7,2,8,'ice')+r(7,10,10,2,'wood')+r(10,10,4,2,'gold')+r(10,17,5,2,'blueDark'),
+    watercan:()=>p('3,8 8,8 8,10 6,10 6,15 3,15 3,13 4,13 4,10 3,10','ink')+
+      p('9,5 15,5 15,7 17,7 17,10 19,10 19,7 22,7 22,10 20,10 20,14 17,14 17,20 7,20 7,18 6,18 6,9 8,9 8,7 9,7','ink')+
+      r(8,10,8,9,'blueDark')+r(8,11,6,6,'blue')+r(8,10,2,5,'ice')+r(9,6,5,2,'woodLight')+r(9,8,5,2,'ink')+
+      p('16,11 19,11 19,8 21,8 21,9 19,13 16,13','blue')+r(20,6,3,2,'gold')+r(8,18,8,1,'blue'),
+    hay:()=>p('5,5 18,5 18,6 20,6 20,18 18,18 18,20 5,20 5,18 3,18 3,7 5,7','ink')+
+      r(5,6,13,13,'goldDark')+r(4,8,15,9,'gold')+r(5,7,12,1,'cream')+r(5,10,12,1,'linen')+r(5,15,13,1,'goldDark')+
+      r(8,6,2,13,'wood')+r(14,6,2,13,'wood')+r(8,7,1,10,'woodLight')+r(14,7,1,10,'woodLight'),
+    towel:()=>p('5,4 17,4 17,5 20,5 20,8 21,8 21,18 19,18 19,20 4,20 4,18 3,18 3,7 5,7','ink')+
+      r(5,5,12,13,'blue')+r(4,8,14,9,'ice')+r(5,5,2,12,'white')+r(5,14,13,2,'blueDark')+
+      r(16,6,3,12,'blueDark')+r(17,7,2,10,'blue')+r(5,18,13,1,'blue')+r(6,19,1,2,'linen')+r(9,19,1,2,'linen')+r(12,19,1,2,'linen'),
+    coat:()=>p('7,3 10,3 10,4 14,4 14,3 17,3 17,5 19,5 19,8 21,8 21,13 18,13 18,11 17,11 17,21 7,21 7,11 6,11 6,13 3,13 3,8 5,8 5,5 7,5','ink')+
+      p('7,5 10,5 10,6 14,6 14,5 17,5 17,7 19,7 19,12 18,12 18,9 16,9 16,20 8,20 8,9 6,9 6,12 4,12 4,9 6,9 6,7 7,7','blueDark')+
+      r(8,7,4,12,'blue')+r(8,6,2,6,'ice')+r(10,4,4,2,'linen')+r(11,6,2,14,'wood')+r(12,8,1,1,'gold')+r(12,12,1,1,'gold')+r(12,16,1,1,'gold')+r(9,16,2,2,'blueDark')+r(14,16,2,2,'ink'),
+    veg:()=>p('3,12 6,12 6,11 10,11 10,13 12,13 12,17 10,17 10,20 5,20 5,18 3,18','ink')+
+      r(5,13,5,5,'red')+r(5,13,2,2,'clayLight')+r(6,10,2,3,'greenDark')+
+      p('15,8 20,8 20,13 18,13 18,17 16,17 16,20 14,20 14,16 13,16 13,11 15,11','ink')+
+      r(15,10,4,4,'clayLight')+r(14,12,4,3,'clay')+r(15,15,2,3,'clay')+r(15,12,3,1,'wood')+
+      r(15,5,2,4,'green')+r(13,4,2,3,'sage')+r(18,4,2,5,'greenDark'),
+    wool:()=>p('8,3 15,3 15,5 19,5 19,8 21,8 21,15 19,15 19,19 15,19 15,21 7,21 7,19 3,19 3,14 2,14 2,9 5,9 5,5 8,5','ink')+
+      p('8,4 14,4 14,6 18,6 18,9 20,9 20,14 18,14 18,18 14,18 14,20 8,20 8,18 4,18 4,13 3,13 3,10 6,10 6,6 8,6','linen')+
+      r(8,5,6,5,'cream')+r(6,7,5,6,'white')+r(4,11,7,5,'cream')+r(11,9,7,6,'cream')+r(8,14,7,5,'cream')+r(10,10,2,3,'linen')+r(6,15,3,1,'linen'),
+    wood:()=>p('4,11 14,3 18,3 21,6 21,10 11,18 7,18 4,15','ink')+
+      p('5,11 15,4 18,4 20,7 20,9 10,17 7,17 5,15','wood')+p('6,11 16,4 18,5 8,13','woodLight')+
+      p('3,16 13,8 17,8 20,11 20,15 10,22 6,22 3,19','ink')+
+      p('4,16 14,9 17,9 19,12 19,14 9,21 6,21 4,19','wood')+p('5,16 15,9 17,10 7,18','woodLight')+
+      r(5,17,4,3,'gold')+r(6,18,2,1,'wood')+r(6,12,3,3,'gold')+r(7,13,1,1,'wood'),
+    isotonic:()=>bottle('greenDark')+r(7,12,10,5,'cream')+r(10,13,4,3,'green')+r(11,12,2,5,'sage'),
+    warmDrink:()=>steam()+r(16,9,6,9,'ink')+r(17,11,3,5,'clayLight')+r(17,12,2,3,'ink')+
+      p('4,8 17,8 17,19 15,19 15,21 6,21 6,19 4,19','ink')+r(5,9,11,9,'red')+r(6,18,9,2,'redDark')+r(6,10,2,7,'clayLight')+r(5,9,11,2,'wood')+r(7,9,7,1,'gold'),
+    soup:()=>steam()+p('2,9 22,9 22,15 20,15 20,18 17,18 17,21 7,21 7,18 4,18 4,15 2,15','ink')+
+      r(3,10,18,4,'wood')+r(4,10,16,2,'gold')+r(6,11,2,1,'greenDark')+r(14,11,3,1,'clay')+
+      p('4,14 20,14 20,16 17,16 17,19 7,19 7,16 4,16','clay')+r(5,14,14,1,'clayLight')+r(7,17,3,1,'clayLight')+r(8,20,8,1,'wood'),
+    blanket:()=>p('4,4 18,4 18,6 21,6 21,19 19,19 19,21 4,21 4,19 2,19 2,7 4,7','ink')+
+      r(4,5,14,14,'redDark')+r(3,8,17,10,'red')+r(5,5,2,14,'clayLight')+r(4,9,15,2,'clayLight')+r(4,15,15,2,'clayLight')+
+      r(11,5,2,14,'gold')+r(17,7,2,12,'redDark')+r(5,19,13,1,'linen')+r(5,20,1,2,'gold')+r(9,20,1,2,'gold')+r(13,20,1,2,'gold'),
+    gloves:()=>p('4,3 8,3 8,8 10,8 10,6 12,6 12,14 10,14 10,18 3,18 3,16 2,16 2,7 4,7','ink')+
+      r(4,4,3,11,'green')+r(3,8,6,7,'green')+r(5,5,1,6,'sage')+r(9,8,2,5,'greenDark')+r(3,15,7,2,'goldDark')+
+      p('15,5 19,5 19,9 21,9 21,18 19,18 19,21 12,21 12,16 10,16 10,10 12,10 12,12 14,12 14,7 15,7','ink')+
+      r(15,6,3,11,'green')+r(13,13,7,5,'green')+r(15,7,1,6,'sage')+r(11,12,2,3,'greenDark')+r(13,18,6,2,'goldDark'),
+    scarf:()=>p('6,3 18,3 18,4 20,4 20,10 16,10 16,21 10,21 10,16 5,16 5,7 4,7 4,4 6,4','ink')+
+      r(6,4,12,5,'red')+r(5,5,14,2,'clayLight')+r(6,9,5,6,'redDark')+r(11,9,4,11,'red')+r(11,10,1,8,'clayLight')+
+      r(11,17,4,1,'gold')+r(6,13,4,1,'gold')+r(11,20,1,2,'gold')+r(14,20,1,2,'gold')+r(6,15,1,2,'gold'),
+    boots:()=>p('3,3 10,3 10,13 13,13 13,15 15,15 15,20 2,20 2,16 3,16','ink')+
+      r(4,4,5,11,'wood')+r(4,4,2,10,'woodLight')+r(3,15,9,3,'wood')+r(3,18,11,1,'dark')+r(4,5,5,2,'goldDark')+
+      p('12,5 19,5 19,15 22,15 22,17 23,17 23,22 11,22 11,18 12,18','ink')+
+      r(13,6,5,11,'wood')+r(13,6,2,9,'woodLight')+r(12,17,9,3,'wood')+r(12,20,10,1,'dark')+r(13,7,5,2,'goldDark'),
+    ice:()=>p('8,3 17,3 17,5 21,5 21,18 18,18 18,21 5,21 5,18 3,18 3,7 6,7 6,5 8,5','ink')+
+      p('8,4 16,4 16,6 20,6 20,17 17,17 17,20 6,20 6,17 4,17 4,8 7,8 7,6 8,6','blue')+
+      p('8,5 16,5 16,7 18,7 18,9 14,9 14,11 5,11 5,8 8,8','ice')+r(6,11,8,8,'blue')+r(6,11,2,7,'ice')+
+      r(14,10,5,7,'blueDark')+r(8,6,7,1,'white')+r(9,13,3,1,'ice'),
+    oasisWater:()=>bottle('blueDark')+r(9,13,6,2,'blue')+r(9,18,6,1,'ice')+p('11,8 13,8 13,10 15,10 15,12 9,12 9,10 11,10','sage')+r(11,10,2,2,'greenDark'),
+    fertilizer:()=>p('7,3 17,3 17,5 16,5 16,7 18,7 18,9 20,9 20,20 18,20 18,22 6,22 6,20 4,20 4,9 6,9 6,7 8,7 8,5 7,5','ink')+
+      r(8,4,8,2,'greenDark')+r(8,7,8,2,'wood')+r(6,9,12,11,'wood')+r(5,11,14,8,'wood')+r(6,10,2,9,'woodLight')+
+      r(8,11,8,7,'gold')+r(11,12,2,5,'greenDark')+r(9,12,2,2,'green')+r(13,13,2,2,'green')+r(9,6,6,1,'ink'),
+    hat:()=>p('8,3 16,3 16,5 18,5 18,11 21,11 21,13 23,13 23,17 20,17 20,19 4,19 4,17 1,17 1,13 3,13 3,11 6,11 6,5 8,5','ink')+
+      r(8,4,8,9,'goldDark')+r(7,6,10,7,'gold')+r(8,5,3,6,'cream')+r(7,10,10,3,'wood')+
+      r(4,12,16,5,'goldDark')+r(2,14,20,2,'gold')+r(5,17,14,1,'woodLight')+r(4,12,3,1,'cream'),
+    light:()=>p('7,3 10,3 10,5 14,5 14,3 17,3 17,5 19,5 19,7 21,7 21,12 18,12 18,10 17,10 17,21 7,21 7,10 6,10 6,12 3,12 3,7 5,7 5,5 7,5','ink')+
+      p('7,5 9,5 9,6 15,6 15,5 17,5 17,7 19,7 19,11 18,11 18,9 16,9 16,20 8,20 8,9 6,9 6,11 4,11 4,8 6,8 6,6 7,6','linen')+
+      r(8,7,7,12,'cream')+r(8,7,2,8,'white')+r(10,5,4,2,'greenDark')+r(11,6,2,1,'sage')+r(14,9,2,3,'sage')+r(8,19,8,1,'greenDark'),
+    mel:()=>jar('goldDark')+r(9,9,7,10,'gold')+r(10,12,5,5,'cream')+r(10,13,5,1,'dark')+r(10,15,5,1,'dark')+r(11,11,2,2,'ice'),
+    fruta:()=>p('7,6 11,6 11,7 13,7 13,6 17,6 17,8 20,8 20,16 18,16 18,20 14,20 14,21 10,21 10,20 6,20 6,17 4,17 4,9 7,9','ink')+
+      p('7,7 10,7 10,8 14,8 14,7 17,7 17,9 19,9 19,16 17,16 17,19 13,19 13,20 10,20 10,19 7,19 7,16 5,16 5,10 7,10','red')+
+      r(7,9,3,6,'clayLight')+r(9,8,2,2,'cream')+r(12,3,2,5,'wood')+r(14,3,4,2,'green')+r(16,2,3,1,'sage')+r(13,18,4,1,'redDark'),
+    leite:()=>r(9,1,6,4,'ink')+r(10,2,4,2,'red')+
+      p('9,5 15,5 15,7 17,7 17,9 18,9 18,20 16,20 16,22 8,22 8,20 6,20 6,9 7,9 7,7 9,7','ink')+
+      p('10,5 14,5 14,8 16,8 16,10 17,10 17,19 15,19 15,21 9,21 9,19 7,19 7,10 8,10 8,8 10,8','linen')+
+      r(8,10,8,9,'cream')+r(8,10,2,8,'white')+r(10,13,5,4,'blueDark')+r(11,14,3,2,'blue'),
+    ovos:()=>p('6,4 10,4 10,6 12,6 12,14 10,14 10,17 4,17 4,15 2,15 2,9 4,9 4,6 6,6','ink')+
+      p('6,5 9,5 9,7 11,7 11,13 9,13 9,16 5,16 5,14 3,14 3,10 5,10 5,7 6,7','linen')+r(6,7,3,6,'cream')+r(5,9,2,3,'white')+
+      p('15,6 19,6 19,8 21,8 21,11 23,11 23,18 21,18 21,21 14,21 14,19 12,19 12,11 14,11 14,8 15,8','ink')+
+      p('15,7 18,7 18,9 20,9 20,12 22,12 22,17 20,17 20,20 15,20 15,18 13,18 13,12 15,12','goldDark')+r(15,10,5,8,'gold')+r(15,10,2,5,'cream'),
+    compota:()=>jar('redDark')+r(9,10,7,9,'red')+r(10,13,5,4,'cream')+r(11,14,3,2,'redDark')+
+      r(6,3,12,3,'greenDark')+r(7,3,10,2,'sage')+r(9,3,1,3,'cream')+r(13,3,1,3,'cream')+r(6,6,2,2,'green')+r(16,6,2,2,'green')
+  });
+  const keys=Object.freeze(['water','seed',...Object.keys(painters).filter(key=>key!=='water')]);
+  const cache=new Map(),limit=keys.length+seeds.length-1;
+  const fallback=svg(p('6,6 18,6 18,18 6,18','ink')+r(7,7,10,10,'wood')+r(8,8,8,2,'woodLight')+r(11,10,2,5,'linen'));
+  function icon(key,seed){
+    // Entradas externas nunca entram na marcação, nem criam chaves de cache.
+    if(typeof key!=='string') return fallback;
+    if(key.startsWith('seed_')){seed=key.slice(5);key='seed';}
+    let cacheKey=key,paint;
+    if(key==='seed'){
+      const kind=typeof seed==='string'&&seeds.includes(seed)?seed:'tomato';
+      cacheKey='seed:'+kind;paint=()=>seedPouch(kind);
+    }else{
+      if(!Object.prototype.hasOwnProperty.call(painters,key))return fallback;
+      paint=painters[key];
+    }
+    if(!cache.has(cacheKey))cache.set(cacheKey,svg(paint()));
+    return cache.get(cacheKey);
+  }
+  window.FarmItemArt=Object.freeze({
+    icon,
+    info:()=>({version:1,keys:keys.slice(),seedVariants:seeds.slice(),cacheSize:cache.size,cacheLimit:limit})
+  });
+})();
+
+/* ===========================
+   src/modules/46-inventory.js
+   =========================== */
+/* Mochila: inspecionar é gratuito; usar e organizar exigem uma ação explícita.
+   Estoque da fazenda e inventário conservam suas origens e seus saves. */
+(function(){
+ 'use strict';
+ let model=null,root=null,ready=false,selected='water',category='all',query='',previousFocus=null;
+ const categories={all:'Tudo',seeds:'Sementes',supplies:'Provisões',gear:'Equipamento',materials:'Materiais',stock:'Depósito'};
+ const meta={
+  water:['supplies','Água do cantil','Recupera até 25 de hidratação.','Encha o cantil no poço da fazenda.','Beber'],
+  ice:['supplies','Gelo da montanha','Resfria até 0,5 °C, sem baixar de 37,2 °C.','Colete com E junto ao lago congelado. Capacidade: 3.','Usar gelo'],
+  oasisWater:['supplies','Água do oásis','Recupera até 35 de hidratação e 5 de energia.','Colete com E na margem do oásis. Capacidade: 3.','Beber'],
+  towel:['supplies','Toalha gelada','Refresca o corpo e mantém um efeito de 8 segundos.','Compre na loja da fazenda.','Usar toalha'],
+  isotonic:['supplies','Isotônico','Recupera até 18 de hidratação e 18 de energia.','Compre na loja da fazenda.','Beber'],
+  warmDrink:['supplies','Bebida quente','Aquece até 0,7 °C e recupera até 10 de energia.','Compre na loja ou prepare chá com mel na cozinha recuperada.','Beber'],
+  soup:['supplies','Sopa da horta','Aquece até 0,9 °C, recupera até 12 de energia e 6 de hidratação.','Prepare com vegetais e lenha na cozinha, ou compre na loja.','Comer'],
+  watercan:['gear','Regador','Ferramenta permanente. F rega o canteiro próximo.','Acompanha você desde o começo. Não gasta água do cantil.',''],
+  coat:['gear','Casaco','Reduz a perda de calor quando equipado.','Faça um casaco no tear com 2 lãs.','Equipar'],
+  blanket:['gear','Cobertor','Melhora o descanso no frio quando equipado.','Prepare na oficina recuperada com 2 lãs.','Equipar'],
+  gloves:['gear','Luvas de trabalho','Reduzem a perda de calor nas tarefas.','Prepare na oficina recuperada com 1 lã.','Equipar'],
+  scarf:['gear','Cachecol','Protege o pescoço e reduz a perda de calor.','Compre na loja da fazenda.','Equipar'],
+  boots:['gear','Botas térmicas','Melhoram a locomoção no inverno.','Compre na loja da fazenda.','Equipar'],
+  hat:['gear','Chapéu','Proteção permanente contra o sol.','Adquirido na loja; sua proteção fica sempre ativa.',''],
+  light:['gear','Roupa leve','Ajuda o corpo a perder calor.','Adquirida na loja; sua proteção fica sempre ativa.',''],
+  veg:['materials','Vegetais da horta','Servem para cozinhar, fazer ração, adubo e entregar encomendas.','Colha canteiros maduros com C. Também podem ser vendidos na caixa de venda.',''],
+  hay:['materials','Feno','Alimenta os animais e participa de receitas e encomendas.','Cultive forragem ou prepare ração. Aproxime-se do animal e pressione E.',''],
+  wool:['materials','Lã','Material para casaco, luvas, cobertor e encomendas.','Cuide das ovelhas e recolha a lã com E.',''],
+  wood:['materials','Lenha','Serve para cozinhar, construir e manter a fogueira acesa.','Recolha troncos caídos com E. Use E junto à fogueira para abastecer.',''],
+  fertilizer:['materials','Adubo','Acelera em 50% o crescimento da planta enquanto ela está regada.','Transforme vegetais na composteira da estufa. Use uma vez por planta próxima.','Adubar canteiro']
+ };
+ const flags={coat:'coatEquipped',blanket:'blanketEquipped',gloves:'glovesEquipped',scarf:'scarf',boots:'boots',hat:'hat',light:'light'};
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const art=(key,seed)=>window.FarmItemArt?.icon(key,seed)||'';
+ function entries(){
+  const p=model.player,inv=p.inv||{},rows=[];
+  for(const [key,m]of Object.entries(meta)){
+   const permanent=key==='watercan'||key==='hat'||key==='light';
+   const amount=key==='watercan'?1:(key==='hat'||key==='light')?Number(!!p[key]):Math.max(0,Number(inv[key])||0);
+   rows.push({key,group:m[0],name:m[1],description:m[2],source:m[3],action:m[4],amount,permanent,equipped:!!(flags[key]&&p[flags[key]]),quick:!!model.definitions[key]});
+  }
+  for(const [id,s]of Object.entries(model.seedTypes))rows.push({key:'seed_'+id,seed:id,group:'seeds',name:'Sementes de '+s.name.toLowerCase(),description:(s.product==='hay'?'Produz feno para a criação.':'Produz vegetais para receitas e entregas.')+(s.coldHardy?' Cresce melhor no frio.':s.heatSensitive?' Cresce mais devagar no calor.':s.longGrow?' Precisa de mais tempo para amadurecer.':''),source:'Compre na loja. Selecione esta semente e use Q perto de um canteiro vazio.',action:'Selecionar para plantar',amount:Math.max(0,Number(inv.seeds?.[id])||0),equipped:p.selectedSeed===id,quick:true});
+  for(const s of model.stockItems||[])rows.push({key:'stock_'+s.id,stockId:s.id,group:'stock',name:s.name,description:s.description,source:'Guardado no depósito da fazenda. A quantidade é a mesma do Caderno.',action:s.id==='compota'?'Comer compota':'Ver receitas',amount:s.amount,canConsume:s.canConsume,disabledReason:s.disabledReason,quick:false});
+  return rows;
+ }
+ function mount(){
+  if(ready)return;root=document.getElementById('inventoryPanel');if(!root)return;
+  root.classList.add('inv-v69');root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-labelledby','bagTitle');
+  root.querySelector('.invWindow').innerHTML=`<header class="bagHeader"><div><span class="bagEyebrow">PREPARAR A PRÓXIMA CAMINHADA</span><h2 id="bagTitle">Sua mochila</h2></div><button type="button" data-bag-command="close" class="bagClose" aria-label="Fechar mochila">Fechar <kbd>Esc</kbd></button></header>
+   <div class="bagQuickHeading"><strong>À mão <small>atalhos 1–6</small></strong><span id="invInfo"></span></div><div id="fullHotbarGrid" aria-label="Seis atalhos"></div>
+   <div class="bagToolbar"><nav id="bagCategories" aria-label="Categorias de itens"></nav><label class="bagSearch"><span class="bagSr">Buscar item</span><input id="bagSearch" type="search" autocomplete="off" placeholder="Buscar item…"></label></div>
+   <div class="bagWorkspace"><section class="bagContents" aria-label="Itens"><div class="bagListHeading"><span id="bagResultCount"></span><span>Selecione para conhecer</span></div><div id="bagGrid"></div><p id="bagEmpty" hidden>Nenhum item encontrado. Experimente outro nome ou categoria.</p></section><aside id="bagDetail" aria-label="Detalhes do item"></aside></div>
+   <footer class="bagFooter"><span>O vale espera enquanto você organiza a mochila.</span><span id="bagMoney"></span></footer><p id="bagNotice" class="bagSr" aria-live="polite"></p>`;
+  root.addEventListener('click',e=>{
+   const b=e.target.closest('button');if(!b||!root.contains(b))return;
+   if(b.dataset.bagCommand==='close')return model.close();
+   if(b.dataset.bagCategory){category=b.dataset.bagCategory;paint();return;}
+   if(b.dataset.bagItem){selected=b.dataset.bagItem;paint();if(innerWidth<=520)root.querySelector('#bagDetail').scrollIntoView({block:'start'});return;}
+   if(b.dataset.bagQuick!==undefined){model.setEdit(Number(b.dataset.bagQuick));return;}
+   if(b.dataset.bagCommand==='cancel'){model.setEdit(null);return;}
+   const row=entries().find(r=>r.key===selected);if(!row)return;
+   if(b.dataset.bagCommand==='assign'){if(row.quick&&model.editSlot!==null)model.assign(row.seed?'seed':row.key,row.seed||'');return;}
+   if(b.dataset.bagCommand==='use'){
+    if(row.seed)model.selectSeed(row.seed);
+    else if(row.stockId==='compota')model.consume(row.stockId);
+    else if(row.stockId)model.recipes();
+    else model.use(row.key);
+   }
+  });
+  root.querySelector('#bagSearch').addEventListener('input',e=>{query=e.target.value;paint();});
+  window.addEventListener('keydown',e=>{
+   if(!root.classList.contains('show'))return;
+   const typing=e.target instanceof HTMLInputElement;
+   if(e.key==='Escape'||(!typing&&e.key.toLowerCase()==='i')){e.preventDefault();e.stopImmediatePropagation();model.close();return;}
+   if(e.key==='Tab'){
+    const nodes=[...root.querySelectorAll('button:not(:disabled),input')].filter(n=>n.getClientRects().length),first=nodes[0],last=nodes[nodes.length-1];
+    if(e.shiftKey&&(document.activeElement===first||!root.contains(document.activeElement))){e.preventDefault();last?.focus();}
+    else if(!e.shiftKey&&(document.activeElement===last||!root.contains(document.activeElement))){e.preventDefault();first?.focus();}
+   }
+   // Impede os atalhos globais de abrir outro painel ou usar o mundo.
+   e.stopImmediatePropagation();
+  },true);
+  ready=true;
+ }
+ function paint(){
+  if(!ready||!model)return;
+  const focused=document.activeElement,focusKey=focused?.dataset?.bagItem,focusCategory=focused?.dataset?.bagCategory,focusCommand=focused?.dataset?.bagCommand,focusQuick=focused?.dataset?.bagQuick;
+  const rows=entries(),row=rows.find(r=>r.key===selected)||rows[0];selected=row.key;
+  root.querySelector('#bagCategories').innerHTML=Object.entries(categories).map(([id,name])=>`<button type="button" data-bag-category="${id}" aria-pressed="${category===id}">${name}</button>`).join('');
+  const needle=query.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const filtered=rows.filter(r=>(category==='all'||r.group===category)&&(!needle||(r.name+' '+r.description).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(needle))).sort((a,b)=>Number(b.amount>0)-Number(a.amount>0)||a.name.localeCompare(b.name,'pt-BR'));
+  root.querySelector('#bagGrid').innerHTML=filtered.map(r=>`<button type="button" class="bagItem ${r.amount?'':'bagAbsent'}" data-bag-item="${r.key}" title="${esc(r.name)}" aria-pressed="${r.key===selected}" aria-label="${esc(r.name)}, ${r.amount? r.permanent?'permanente':r.amount+' unidades':'sem estoque'}${r.equipped?', em uso':''}"><span class="bagItemArt">${art(r.seed?'seed':r.stockId||r.key,r.seed)}</span><span class="bagItemName">${esc(r.name)}</span><span class="bagItemCount">${r.amount?r.permanent?'∞':r.amount:'0'}</span>${r.equipped?'<span class="bagEquipped">Em uso</span>':''}</button>`).join('');
+  root.querySelector('#bagResultCount').textContent=filtered.length+' tipos de item';root.querySelector('#bagEmpty').hidden=!!filtered.length;
+  root.querySelector('#fullHotbarGrid').innerHTML=model.quickItems.map((it,i)=>{const r=it.key==='seed'?rows.find(r=>r.seed===model.player.selectedSeed):rows.find(r=>r.key===it.key);return `<button type="button" class="bagQuick" data-bag-quick="${i}" aria-pressed="${model.editSlot===i}" aria-label="Editar atalho ${i+1}: ${esc(r?.name||it.name)}"><kbd>${i+1}</kbd>${art(it.key,it.key==='seed'?model.player.selectedSeed:undefined)}<span>${esc(r?.name||it.name)}</span><b>${r?.permanent?'∞':r?.amount||0}</b></button>`;}).join('');
+  root.querySelector('#invInfo').innerHTML=model.editSlot===null?'Clique em um atalho para trocar seu item.':`Trocando atalho ${model.editSlot+1} <button type="button" data-bag-command="cancel">Cancelar</button>`;
+  root.querySelector('#bagMoney').textContent=model.player.coins+' moedas';
+  const qty=row.permanent?(row.amount?'Uso permanente':'Ainda não adquirido'):(row.amount+' '+(row.stockId?'no depósito':'na mochila'));
+  const blocked=!row.stockId&&!row.amount || row.stockId==='compota'&&!row.canConsume;
+  const action=row.equipped&&flags[row.key]&&row.action?'Guardar equipamento':row.action;
+  root.querySelector('#bagDetail').innerHTML=`<div class="bagDetailArt">${art(row.seed?'seed':row.stockId||row.key,row.seed)}</div><span class="bagEyebrow">${esc(categories[row.group])}</span><h3>${esc(row.name)}</h3><p class="bagQuantity">${esc(qty)}${row.equipped?' · Em uso':''}</p><p>${esc(row.description)}</p><div class="bagSource"><strong>Como conseguir e usar</strong><p>${esc(row.source)}</p></div>${action?`<button type="button" class="bagPrimary" data-bag-command="use" ${blocked?'disabled':''}>${esc(action)}</button>`:''}${blocked?`<p class="bagReason">${esc(row.stockId==='compota'?row.disabledReason:'Você ainda não tem este item.')}</p>`:''}${row.quick?model.editSlot!==null?`<button type="button" class="bagAssign" data-bag-command="assign">Colocar no atalho ${model.editSlot+1}</button>`:'<p class="bagHint">Para levar à mão, escolha um dos seis atalhos acima.</p>':'<p class="bagHint">'+(row.stockId?'Este produto fica no depósito compartilhado da fazenda.':'Proteção permanente; não ocupa um atalho.')+'</p>'}`;
+  if(focusKey)root.querySelector(`[data-bag-item="${focusKey}"]`)?.focus({preventScroll:true});
+  else if(focusCategory)root.querySelector(`[data-bag-category="${focusCategory}"]`)?.focus({preventScroll:true});
+  else if(focusCommand)root.querySelector(`[data-bag-command="${focusCommand}"]`)?.focus({preventScroll:true});
+  else if(focusQuick!==undefined)root.querySelector(`[data-bag-quick="${focusQuick}"]`)?.focus({preventScroll:true});
+ }
+ const css=`
+ #inventoryPanel.inv-v69{display:none!important;position:fixed!important;inset:0!important;background:rgba(10,22,17,.78)!important;pointer-events:auto!important;padding:20px!important;align-items:center!important;justify-content:center!important;z-index:130!important;box-sizing:border-box!important;font-family:Georgia,serif!important;}
+ #inventoryPanel.inv-v69.show{display:flex!important;}
+ #inventoryPanel.inv-v69 .invWindow{position:relative!important;inset:auto!important;transform:none!important;width:min(960px,100%)!important;max-width:960px!important;min-width:0!important;height:min(740px,calc(100dvh - 40px))!important;max-height:calc(100dvh - 40px)!important;margin:0!important;padding:22px!important;background:#f1ead4!important;color:#253d30!important;border:2px solid #b79a61!important;border-radius:12px!important;box-shadow:0 18px 70px #07160ddd!important;display:flex!important;flex-direction:column!important;gap:12px!important;overflow:hidden!important;box-sizing:border-box!important;}
+ #inventoryPanel.inv-v69 *{box-sizing:border-box;}
+ #inventoryPanel.inv-v69 button,#inventoryPanel.inv-v69 input{font:inherit;box-shadow:none;background:#f8f3e5;color:#253d30;border:1px solid #c7bb98;border-radius:5px;cursor:pointer;}
+ #inventoryPanel.inv-v69 button:focus-visible,#inventoryPanel.inv-v69 input:focus-visible{outline:3px solid #9c6c20;outline-offset:2px;}
+ #inventoryPanel.inv-v69 button:hover{background:#e5dcc1;}
+ #inventoryPanel.inv-v69 button:disabled{opacity:.5;cursor:default;}
+ #inventoryPanel.inv-v69 kbd{font:11px monospace;}
+ #inventoryPanel.inv-v69 .bagHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+ #inventoryPanel.inv-v69 .bagEyebrow{font:10px Georgia,serif;letter-spacing:1.8px;color:#76613a;}
+ #inventoryPanel.inv-v69 h2{font:bold 30px Georgia,serif!important;color:#253d30!important;margin:3px 0 0!important;text-shadow:none!important;}
+ #inventoryPanel.inv-v69 .bagClose{padding:10px 13px;min-height:42px;white-space:nowrap;}
+ #inventoryPanel.inv-v69 .bagQuickHeading{display:flex;justify-content:space-between;gap:12px;font-size:13px;align-items:center;}
+ #inventoryPanel.inv-v69 .bagQuickHeading small{font-weight:normal;color:#6b715b;margin-left:8px;}
+ #inventoryPanel.inv-v69 #invInfo{font-size:12px!important;color:#626b54!important;margin:0!important;}
+ #inventoryPanel.inv-v69 #invInfo button{padding:3px 7px;margin-left:5px;}
+ #inventoryPanel.inv-v69 #fullHotbarGrid{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:6px!important;padding:0!important;margin:0!important;background:none!important;border:0!important;box-shadow:none!important;flex-shrink:0;}
+ #inventoryPanel.inv-v69 .bagQuick{min-width:0;position:relative;padding:8px 8px 7px;display:flex;align-items:center;gap:8px;height:60px;text-align:left;}
+ #inventoryPanel.inv-v69 .bagQuick svg{width:24px;height:24px;flex:none;image-rendering:pixelated;}
+ #inventoryPanel.inv-v69 .bagQuick>span{font-size:10px;line-height:1.2;padding-right:7px;}
+ #inventoryPanel.inv-v69 .bagQuick kbd{position:absolute;top:2px;left:3px;color:#78623c;font-size:9px;}
+ #inventoryPanel.inv-v69 .bagQuick b{position:absolute;bottom:2px;right:5px;font-size:10px;}
+ #inventoryPanel.inv-v69 .bagQuick[aria-pressed=true]{background:#d4dfc9;border-color:#45624c;outline:2px solid #45624c;}
+ #inventoryPanel.inv-v69 .bagToolbar{display:flex;gap:12px;align-items:center;border-bottom:1px solid #c9bf9e;padding-bottom:10px;}
+ #inventoryPanel.inv-v69 #bagCategories{display:flex;gap:4px;flex:1;flex-wrap:wrap;}
+ #inventoryPanel.inv-v69 #bagCategories button{padding:8px 9px;border:0;background:transparent;font-size:12px;min-height:36px;}
+ #inventoryPanel.inv-v69 #bagCategories [aria-pressed=true]{color:#f8f1d9;background:#31503d;}
+ #inventoryPanel.inv-v69 .bagSearch{width:160px;flex-shrink:0;}
+ #inventoryPanel.inv-v69 .bagSearch input{width:100%;min-width:0;padding:9px 10px;font-size:12px;}
+ #inventoryPanel.inv-v69 .bagWorkspace{display:grid;grid-template-columns:minmax(0,1fr) 262px;gap:22px;min-height:0;flex:1;}
+ #inventoryPanel.inv-v69 .bagContents{overflow:auto;min-width:0;padding:2px 5px 5px 2px;}
+ #inventoryPanel.inv-v69 .bagListHeading{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#6b715b;margin:0 0 10px;}
+ #inventoryPanel.inv-v69 #bagGrid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;background:none!important;border:0!important;padding:0!important;margin:0!important;}
+ #inventoryPanel.inv-v69 .bagItem{position:relative;min-width:0;min-height:116px;padding:12px 7px 10px;display:flex;align-items:center;flex-direction:column;justify-content:flex-start;gap:7px;text-align:center;}
+ #inventoryPanel.inv-v69 .bagItemArt{width:48px;height:48px;display:block;}
+ #inventoryPanel.inv-v69 .bagItemArt svg{width:100%;height:100%;image-rendering:pixelated;}
+ #inventoryPanel.inv-v69 .bagItemName{font-size:12px;line-height:1.25;word-break:normal;}
+ #inventoryPanel.inv-v69 .bagItemCount{position:absolute;top:5px;right:6px;font-size:12px;font-weight:bold;}
+ #inventoryPanel.inv-v69 .bagEquipped{font-size:9px;letter-spacing:.3px;color:#355640;}
+ #inventoryPanel.inv-v69 .bagItem[aria-pressed=true]{background:#e1e6cf;border:2px solid #42664c;padding:11px 6px 9px;}
+ #inventoryPanel.inv-v69 .bagAbsent .bagItemArt{opacity:.45;}
+ #inventoryPanel.inv-v69 #bagDetail{border-left:1px solid #c7bb98;padding:4px 0 6px 20px;overflow:auto;min-width:0;}
+ #inventoryPanel.inv-v69 .bagDetailArt{width:98px;height:98px;background:#e2dcc4;border:1px solid #c7bb98;border-radius:8px;padding:12px;margin-bottom:14px;}
+ #inventoryPanel.inv-v69 .bagDetailArt svg{width:100%;height:100%;image-rendering:pixelated;}
+ #inventoryPanel.inv-v69 h3{font:bold 23px/1.12 Georgia,serif;margin:6px 0;color:#253d30;}
+ #inventoryPanel.inv-v69 #bagDetail p{font-size:13px;line-height:1.45;margin:10px 0;}
+ #inventoryPanel.inv-v69 .bagQuantity{color:#6b715b;font-size:12px!important;}
+ #inventoryPanel.inv-v69 .bagSource{border-top:1px solid #c7bb98;padding-top:12px;margin-top:15px;}
+ #inventoryPanel.inv-v69 .bagSource strong{font-size:12px;}
+ #inventoryPanel.inv-v69 .bagPrimary,#inventoryPanel.inv-v69 .bagAssign{display:block;width:100%;padding:11px;margin-top:12px;font-size:13px;min-height:42px;}
+ #inventoryPanel.inv-v69 .bagPrimary{background:#31503d;color:#fff6df;border-color:#31503d;}
+ #inventoryPanel.inv-v69 .bagPrimary:hover:not(:disabled){background:#43664e;}
+ #inventoryPanel.inv-v69 .bagHint,#inventoryPanel.inv-v69 .bagReason{font-size:11px!important;color:#6b715b;}
+ #inventoryPanel.inv-v69 .bagFooter{border-top:1px solid #c9bf9e;padding-top:10px;font-size:11px;color:#6b715b;display:flex;justify-content:space-between;gap:12px;flex-shrink:0;}
+ #inventoryPanel.inv-v69 .bagSr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+ #wrap #inv .slot{padding:0;color:inherit;font-family:inherit;cursor:pointer;flex-shrink:0;}
+ #wrap #inv .slot:focus-visible{outline:2px solid #ffdf83;outline-offset:2px;}
+ #wrap #inv .slot svg{width:24px!important;height:24px!important;image-rendering:pixelated;filter:none!important;}
+ #wrap #inv .inv-open{font-size:10px!important;line-height:1.2!important;color:#fff3ce!important;}
+ #wrap #inv .inv-open .bag-open-label{display:block;font-size:9px;}
+ @media(max-width:760px){
+  #inventoryPanel.inv-v69{padding:10px!important;}
+  #inventoryPanel.inv-v69 .invWindow{padding:14px!important;height:calc(100dvh - 20px)!important;max-height:calc(100dvh - 20px)!important;gap:10px!important;}
+  #inventoryPanel.inv-v69 .bagWorkspace{grid-template-columns:minmax(0,1fr) 220px;gap:12px;}
+  #inventoryPanel.inv-v69 #bagGrid{grid-template-columns:repeat(3,minmax(0,1fr))!important;}
+  #inventoryPanel.inv-v69 .bagQuick>span{display:none;}
+  #inventoryPanel.inv-v69 .bagQuick{justify-content:center;height:52px;}
+  #inventoryPanel.inv-v69 .bagToolbar{flex-wrap:wrap;gap:6px;}
+  #inventoryPanel.inv-v69 .bagSearch{width:100%;}
+ }
+ @media(max-width:520px){
+  #inventoryPanel.inv-v69 h2{font-size:25px!important;}
+  #inventoryPanel.inv-v69 .bagEyebrow{font-size:8px;letter-spacing:1.3px;}
+  #inventoryPanel.inv-v69 .bagQuickHeading{display:block;}
+  #inventoryPanel.inv-v69 #invInfo{display:block;margin-top:4px!important;}
+  #inventoryPanel.inv-v69 #bagCategories{gap:2px;}
+  #inventoryPanel.inv-v69 #bagCategories button{padding:7px;font-size:11px;}
+  #inventoryPanel.inv-v69 .bagWorkspace{display:flex;flex-direction:column;overflow:auto;gap:14px;}
+  #inventoryPanel.inv-v69 .bagContents{overflow:visible;flex:none;}
+  #inventoryPanel.inv-v69 #bagGrid{grid-template-columns:repeat(3,minmax(0,1fr))!important;max-height:260px;overflow:auto;padding:2px!important;}
+  #inventoryPanel.inv-v69 .bagItem{min-height:112px;}
+  #inventoryPanel.inv-v69 #bagDetail{overflow:visible;flex:none;border-left:0;border-top:1px solid #c7bb98;padding:14px 0 0;}
+  #inventoryPanel.inv-v69 .bagDetailArt{width:62px;height:62px;padding:6px;float:right;margin:0 0 8px 10px;}
+  #inventoryPanel.inv-v69 .bagFooter{font-size:10px;}
+  #inventoryPanel.inv-v69 .bagFooter>span:first-child{max-width:220px;}
+  #wrap #inv{gap:3px!important;padding:5px!important;max-width:calc(100vw - 12px)!important;}
+  #wrap #inv .slot{width:40px!important;height:40px!important;flex-basis:40px!important;}
+ }
+ `;
+ const style=document.createElement('style');style.id='farm-inventory-v69-style';style.textContent=css;document.head.append(style);
+ window.FarmInventory=Object.freeze({render(next){model=next;mount();paint();},opened(){previousFocus=document.activeElement;root?.querySelector('.bagClose')?.focus();},closed(){const target=previousFocus?.isConnected?previousFocus:document.querySelector('#inv .inv-open');target?.focus({preventScroll:true});previousFocus=null;},snapshot:()=>({selected,category,query,items:model?entries().map(({key,amount,group,equipped})=>({key,amount,group,equipped})):[]})});
+})();
+
 /* =============================
    src/modules/50-window-glow.js
    ============================= */
@@ -13834,6 +14175,7 @@ const ITEM_DEFS = {
   veg:      {key:'veg',      ic:'🥕', svg: VEG_ICON,  name:'Vegetais',      tint:'#ee7a1f'},
   wool:     {key:'wool',     ic:'🐑', svg: WOOL_ICON, name:'Lã',            tint:'#f4ecd6'},
   wood:     {key:'wood',     ic:'🪵', svg: ICON_SVG.wood,    name:'Lenha',         tint:'#7a5230'},
+  fertilizer:{key:'fertilizer',ic:'🌱', name:'Adubo', tint:'#99724b', desc:'Aplique perto de uma planta em crescimento. Acelera em 50% enquanto estiver regada; uma aplicação dura até a colheita.'},
   isotonic: {key:'isotonic', ic:'🥤', name:'Isotônico',     tint:'#ff8a6a'},
   warmDrink:{key:'warmDrink',ic:'☕', name:'Bebida quente', tint:'#a04030'},
   soup:     {key:'soup',     ic:'🍲', name:'Sopa quente',   tint:'#d9a847'},
@@ -13861,13 +14203,14 @@ function normalizePlayerState(){
   if(!player.inv) player.inv = {};
   if(!player.inv.seeds) player.inv.seeds = {tomato:player.inv.seed||0,corn:0,carrot:0,forage:0};
   for(const id of Object.keys(SEED_TYPES)) player.inv.seeds[id] = Number(player.inv.seeds[id]) || 0;
-  const invDefaults = {seed:0, water:0, watercan:1, veg:0, hay:0, towel:0, wool:0, coat:0, wood:0, isotonic:0, warmDrink:0, soup:0, blanket:0, gloves:0, scarf:0, boots:0, ice:0, oasisWater:0};
+  const invDefaults = {seed:0, water:0, watercan:1, veg:0, hay:0, towel:0, wool:0, coat:0, wood:0, fertilizer:0, isotonic:0, warmDrink:0, soup:0, blanket:0, gloves:0, scarf:0, boots:0, ice:0, oasisWater:0};
   for(const [key, fallback] of Object.entries(invDefaults)){
     const n = Number(player.inv[key]);
     player.inv[key] = Number.isFinite(n) ? n : fallback;
   }
   player.inv.seed = totalSeedCount();
   for(const key of ['ice','oasisWater']) player.inv[key]=Math.max(0,Math.min(3,Math.floor(player.inv[key])));
+  player.inv.fertilizer=Math.max(0,Math.floor(player.inv.fertilizer));
   if(player.scarf && player.inv.scarf<=0) player.inv.scarf = 1;
   if(player.boots && player.inv.boots<=0) player.inv.boots = 1;
   if(player.inv.scarf<=0) player.scarf = false;
@@ -15268,11 +15611,11 @@ function renderInv(){
     let c = countForInv(s.key);
     if(s.key==='coat' && !player.inv.coat) c = 'W'+(player.inv.wool||0);
     // Use SVG icon if defined, fallback to emoji
-    const iconHTML = s.svg ? s.svg : `<span class="ic-emoji">${s.ic}</span>`;
-    return `<div class="slot ${i===player.activeSlot?'active':''}" onclick="setSlot(${i})" title="${s.name}">
+    const iconHTML = window.FarmItemArt?.icon(s.key,s.key==='seed'?player.selectedSeed:undefined) || s.svg || `<span class="ic-emoji">${s.ic}</span>`;
+    return `<button type="button" class="slot ${i===player.activeSlot?'active':''}" onclick="setSlot(${i})" aria-label="Atalho ${i+1}: ${s.name}" aria-pressed="${i===player.activeSlot}" title="${s.name}">
       <span class="key">${i+1}</span><span class="ic">${iconHTML}</span>
-      <span class="ct">${c}</span></div>`;
-  }).join('');
+      <span class="ct">${c}</span></button>`;
+  }).join('') + '<button type="button" class="slot inv-open" onclick="toggleInventory(true)" aria-label="Abrir mochila, tecla I" title="Mochila · I"><span class="key">I</span><span class="bag-open-label">Mochila</span></button>';
   // Coin counter with SVG icon
   const coinVal = document.getElementById('coinVal');
   if(coinVal){
@@ -15324,39 +15667,42 @@ function toggleWinterGear(invKey, flagKey, label, onMsg, offMsg){
 function useItemByKey(key){
   if(player.dead) return;
   normalizePlayerState();
+  // O evento vem depois do efeito: abrir a mochila ou tentar usar um item
+  // sem benefício não avança pedidos, nem consome uma unidade.
+  const used = () => { window.FarmStoryIntegration?.record('use',{item:key}); renderInv(); updateBars(); };
+  if(key==='fertilizer') return fertilizeCrop();
   if(key==='ice'){
     if(!player.inv.ice){ showAlert('Colete gelo no lago da montanha'); return; }
     if(player.temp<=37.2){ showAlert('Guarde o gelo para quando o corpo estiver quente'); return; }
     player.inv.ice--;
-    window.FarmStoryIntegration?.record('use',{item:'ice'});
     const antes=player.temp;
     player.temp=Math.max(37.2,player.temp-0.5);
     window.FarmThermalFeedback.reset();
     flashFx(player.x,player.y-12,'gelo: −'+(antes-player.temp).toFixed(1)+' °C','#9fd9ed');
     showToast('Gelo da montanha: resfriou o corpo. Observe a nova tendência.', 'info', 3200);
-    sfx.water(); renderInv(); updateBars(); return;
+    sfx.water(); used(); return;
   }
   if(key==='oasisWater'){
     if(!player.inv.oasisWater){ showAlert('Colete água na margem do oásis'); return; }
     if(player.hyd>=100 && player.en>=100){ showAlert('Hidratação e energia já estão completas'); return; }
     player.inv.oasisWater--;
-    window.FarmStoryIntegration?.record('use',{item:'oasisWater'});
     player.hyd=Math.min(100,player.hyd+35); player.en=Math.min(100,player.en+5);
     stats.waterDrunk++; tickTask('drink'); unlockJournal('hydration');
     flashFx(player.x,player.y-12,'oásis: +hidratação','#58bed5');
     showToast('Água do oásis: +35 de hidratação e +5 de energia.', 'info', 3200);
-    sfx.drink(); renderInv(); updateBars(); return;
+    sfx.drink(); used(); return;
   }
   if(key==='seed') return plantCrop();
   if(key==='water'){
     if(player.inv.water>0){
+      if(player.hyd>=100){ showAlert('Sua hidratação já está completa. Guarde a água.'); return; }
       player.inv.water--; player.hyd = Math.min(100, player.hyd+25);
-      window.FarmStoryIntegration?.record('use',{item:'water'});
       stats.waterDrunk++;
       tickTask('drink');
       flashFx(player.x,player.y-12,'bebeu','#5fc6ff');
       unlockJournal('hydration');
       sfx.drink();
+      used();
     } else showAlert('Sem água no inventário');
     renderInv();
     return;
@@ -15369,11 +15715,12 @@ function useItemByKey(key){
   if(key==='hay') return tryInteract();
   if(key==='towel'){
     if(player.inv.towel>0){
+      if(player.temp<=36.5){ showAlert('Guarde a toalha para quando o corpo estiver quente.'); return; }
       player.inv.towel--; player.towelTimer = 8;
       player.temp = Math.max(36.5, player.temp-0.6);
       flashFx(player.x,player.y-12,'refrescou','#9fe1ff');
       sfx.water();
-      renderInv();
+      used();
     } else showAlert('Sem toalha no inventário');
     return;
   }
@@ -15389,24 +15736,38 @@ function useItemByKey(key){
     return;
   }
   if(key==='isotonic'){
-    if(player.inv.isotonic>0){ player.inv.isotonic--; player.hyd=Math.min(100,player.hyd+18); player.en=Math.min(100,player.en+18); flashFx(player.x,player.y-12,'isotônico','#7ad0ff'); renderInv(); }
+    if(player.inv.isotonic>0){
+      if(player.hyd>=100 && player.en>=100){ showAlert('Sua hidratação e energia já estão completas.'); return; }
+      player.inv.isotonic--; player.hyd=Math.min(100,player.hyd+18); player.en=Math.min(100,player.en+18); flashFx(player.x,player.y-12,'isotônico','#7ad0ff'); used();
+    }
     else showAlert('Sem isotônico no inventário');
     return;
   }
   if(key==='warmDrink'){
-    if(player.inv.warmDrink>0){ player.inv.warmDrink--; player.temp=Math.min(37.8,player.temp+0.7); player.en=Math.min(100,player.en+10); flashFx(player.x,player.y-12,'bebida quente','#ffd98a'); showAlert('Bebida quente: aquecimento temporário do corpo'); renderInv(); }
+    if(player.inv.warmDrink>0){
+      const warmth=Math.max(0,Math.min(.7,37.8-player.temp)),energy=Math.max(0,Math.min(10,100-player.en));
+      if(!warmth && !energy){ showAlert('Você já está aquecido e com energia completa. Guarde a bebida.'); return; }
+      player.inv.warmDrink--; player.temp+=warmth; player.en+=energy; flashFx(player.x,player.y-12,'bebida quente','#ffd98a'); showAlert(warmth?'Bebida quente: aquecimento temporário do corpo':'Bebida quente: energia recuperada'); used();
+    }
     else showAlert('Sem bebida quente no inventário');
     return;
   }
   if(key==='soup'){
-    if(player.inv.soup>0){ player.inv.soup--; player.temp=Math.min(38.0,player.temp+0.9); player.en=Math.min(100,player.en+12); player.hyd=Math.min(100,player.hyd+6); flashFx(player.x,player.y-12,'sopa quente','#ffcf87'); showAlert('Sopa quente: aquece, hidrata e recupera energia'); renderInv(); }
+    if(player.inv.soup>0){
+      const warmth=Math.max(0,Math.min(.9,38-player.temp)),energy=Math.max(0,Math.min(12,100-player.en)),hydration=Math.max(0,Math.min(6,100-player.hyd));
+      if(!warmth && !energy && !hydration){ showAlert('Você já está aquecido, hidratado e com energia completa. Guarde a sopa.'); return; }
+      player.inv.soup--; player.temp+=warmth; player.en+=energy; player.hyd+=hydration; flashFx(player.x,player.y-12,'sopa quente','#ffcf87'); showAlert(warmth?'Sopa quente: aquece, hidrata e recupera energia':'Sopa quente: hidratação e energia recuperadas'); used();
+    }
     else showAlert('Sem sopa no inventário');
     return;
   }
-  if(key==='blanket') return toggleWinterGear('blanket','blanketEquipped','cobertor','Cobertor ativo: descanso no frio aquece melhor','Cobertor guardado');
-  if(key==='gloves') return toggleWinterGear('gloves','glovesEquipped','luvas','Luvas equipadas: mãos protegidas no frio','Luvas retiradas');
-  if(key==='scarf') return toggleWinterGear('scarf','scarf','cachecol','Cachecol equipado: pescoço protegido do frio','Cachecol retirado');
-  if(key==='boots') return toggleWinterGear('boots','boots','botas térmicas','Botas equipadas: melhor locomoção no inverno','Botas retiradas');
+  const winterGear={blanket:['blanketEquipped','cobertor','Cobertor ativo: descanso no frio aquece melhor','Cobertor guardado'],gloves:['glovesEquipped','luvas','Luvas equipadas: mãos protegidas no frio','Luvas retiradas'],scarf:['scarf','cachecol','Cachecol equipado: pescoço protegido do frio','Cachecol retirado'],boots:['boots','botas térmicas','Botas equipadas: melhor locomoção no inverno','Botas retiradas']}[key];
+  if(winterGear){
+    const [flag,label,onMsg,offMsg]=winterGear,before=player[flag];
+    toggleWinterGear(key,flag,label,onMsg,offMsg);
+    if(player[flag]!==before) window.FarmStoryIntegration?.record('equip',{item:key,equipped:player[flag]});
+    return;
+  }
   if(key==='wood') { showAlert('Use a lenha na fogueira: fique sobre a fogueira e pressione E'); return; }
   if(key==='veg') { showAlert('Venda os vegetais na caixa de venda'); return; }
   if(key==='wool') { showAlert('Use 2 lãs no tear para fazer casaco'); return; }
@@ -15465,53 +15826,29 @@ window.assignQuickSlot = function(key, seed=''){
 }
 function renderFullInventory(){
   normalizePlayerState();
-  const hot = document.getElementById('fullHotbarGrid');
-  const bag = document.getElementById('bagGrid');
-  if(!hot || !bag) return;
-  const quickItems = quickSlotItems();
-  hot.innerHTML = quickItems.map((it,i)=>slotHTML(it,i,true)).join('');
-  const bagItems = [
-    ITEM_DEFS.ice, ITEM_DEFS.oasisWater,
-    // ===== SEMENTES (visual diferente de vegetais — saquinho marrom com cor da fruta no topo) =====
-    {key:'seed_tomato',      quickKey:'seed', seed:'tomato',      ic:'🌱', name:'Sem. Tomate'},
-    {key:'seed_corn',        quickKey:'seed', seed:'corn',        ic:'🌱', name:'Sem. Milho'},
-    {key:'seed_carrot',      quickKey:'seed', seed:'carrot',      ic:'🌱', name:'Sem. Cenoura'},
-    {key:'seed_forage',      quickKey:'seed', seed:'forage',      ic:'🌱', name:'Sem. Forragem'},
-    {key:'seed_lettuce',     quickKey:'seed', seed:'lettuce',     ic:'🌱', name:'Sem. Alface'},
-    {key:'seed_sweetpotato', quickKey:'seed', seed:'sweetpotato', ic:'🌱', name:'Sem. Bat. doce'},
-    {key:'seed_pumpkin',     quickKey:'seed', seed:'pumpkin',     ic:'🌱', name:'Sem. Abóbora'},
-    // ===== PRODUTOS COLHIDOS =====
-    {key:'veg',  ic:'🥕', svg: VEG_ICON, name:'Vegetais'},
-    {key:'hay',  ic:'🌾', svg: ICON_SVG.hay, name:'Feno'},
-    // ===== UTILITÁRIOS =====
-    {key:'water',    ic:'💧', svg: ICON_SVG.water,    name:'Água'},
-    {key:'watercan', ic:'🚿', svg: ICON_SVG.watercan, name:'Regador', actionableEmpty:true},
-    {key:'isotonic', ic:'🥤', name:'Isotônico'},
-    {key:'towel',    ic:'🧊', svg: ICON_SVG.towel,    name:'Toalha gelada'},
-    {key:'wool',     ic:'🐑', svg: WOOL_ICON,         name:'Lã'},
-    {key:'wood',     ic:'🪵', svg: ICON_SVG.wood,     name:'Lenha'},
-    // ===== INVERNO =====
-    {key:'warmDrink', ic:'☕', name:'Bebida quente'},
-    {key:'soup',      ic:'🍲', name:'Sopa quente'},
-    {key:'blanket',   ic:'🛏️', name:'Cobertor'},
-    {key:'gloves',    ic:'🧤', name:'Luvas'},
-    {key:'scarf',     ic:'🧣', name:'Cachecol'},
-    {key:'boots',     ic:'🥾', name:'Botas térmicas'},
-    {key:'coat',      ic:'🧥', svg: COAT_ICON, name:'Casaco'}
-  ];
-  bag.innerHTML = bagItems.map((it,i)=>slotHTML(it,i,false)).join('');
-  const info = document.getElementById('invInfo');
-  const winter = [player.scarf?'cachecol':'',player.boots?'botas':'',player.glovesEquipped?'luvas':'',player.blanketEquipped?'cobertor':'',player.coatEquipped?'casaco':''].filter(Boolean).join(', ') || 'nenhum ativo';
-  if(info) info.textContent = quickEditSlot!==null ? `Editando slot ${quickEditSlot+1}: escolha um item da mochila` : `Moedas: ${player.coins} · Semente ativa: ${selectedSeedDef().name} · Inverno: ${winter}`;
+  window.FarmInventory?.render({
+    player,definitions:ITEM_DEFS,seedTypes:SEED_TYPES,quickItems:quickSlotItems(),editSlot:quickEditSlot,
+    stockItems:window.FarmLife?.snapshot().stockItems||[],
+    close:()=>toggleInventory(false),
+    setEdit:i=>{quickEditSlot=i===null?null:Math.max(0,Math.min(5,Math.floor(i)));renderFullInventory();},
+    assign:(key,seed)=>{assignQuickSlot(key,seed);saveGame(true);},
+    selectSeed:id=>{selectSeed(id);saveGame(true);},
+    use:key=>{useItemByKey(key);updateBars();saveGame(true);renderFullInventory();},
+    consume:id=>{const result=window.FarmLife?.consume(id);if(result?.message)showAlert(result.message);renderInv();updateBars();},
+    recipes:()=>{toggleInventory(false);window.FarmValleyPanels?.openFarm('recipes');}
+  });
 }
+
 function toggleInventory(force){
   inventoryOpen = (typeof force === 'boolean') ? force : !inventoryOpen;
   if(inventoryOpen) sfx.inventory();
-  if(!inventoryOpen) quickEditSlot = null;
+  if(!inventoryOpen){ quickEditSlot = null; window.FarmInventory?.closed(); }
   document.getElementById('inventoryPanel').classList.toggle('show', inventoryOpen);
   if(inventoryOpen){
     player.resting = false;
+    for(const key of Object.keys(keys)) keys[key]=false;
     renderFullInventory();
+    window.FarmInventory?.opened();
   }
 }
 
@@ -16135,6 +16472,30 @@ function cropTileAtPlayer(){
   const t = currentTile();
   return isFieldTile(t.x,t.y) ? t : null;
 }
+function fertilizeCrop(){
+  if(player.dead) return false;
+  normalizePlayerState();
+  if(player.inv.fertilizer<1){ showAlert('Recolha adubo na composteira da estufa.'); return false; }
+  let target=null,best=24*24;
+  const tx=Math.floor(player.x/TS),ty=Math.floor(player.y/TS);
+  for(let y=ty-2;y<=ty+2;y++)for(let x=tx-2;x<=tx+2;x++){
+    const crop=getCrop(x,y);
+    if(!crop || !isFieldTile(x,y)) continue;
+    const d=(player.x-(x*TS+TS/2))**2+(player.y-(y*TS+TS/2))**2;
+    if(d<=best){best=d;target={x,y,crop};}
+  }
+  if(!target){ showAlert('Aproxime-se de uma planta para aplicar adubo.'); return false; }
+  if(target.crop.stage>=3){ showAlert('Esta planta já está madura. Colha antes de adubar uma nova plantação.'); return false; }
+  if(target.crop.fertilized===true){ showAlert('Esta planta já está adubada até a colheita.'); return false; }
+  player.inv.fertilizer--;
+  target.crop.fertilized=true;
+  window.FarmStoryIntegration?.record('use',{item:'fertilizer',amount:1,crop:target.crop.type||'tomato'});
+  flashFx(target.x*TS+TS/2,target.y*TS,'adubada +50%','#cfe57a');
+  showToast('Planta adubada: cresce 50% mais rápido enquanto estiver regada.', 'success', 3200);
+  renderInv();
+  return true;
+}
+window.fertilizeCrop=fertilizeCrop;
 function objectTileRange(o){
   if(o.type==='house'||o.type==='barn'||o.type==='pen'){
     return {x0:Math.floor(o.x/TS), y0:Math.floor(o.y/TS), x1:Math.floor((o.x+o.w)/TS), y1:Math.floor((o.y+o.h)/TS)};
@@ -17701,7 +18062,7 @@ function update(dt){
     const c = crops[k]; if(!c) continue;
     const def = SEED_TYPES[c.type] || {};
     if(c.water>0){
-      c.t += dt;
+      c.t += dt*(c.fertilized===true?1.5:1);
       let growTime = isFrio() ? (c.type==='forage' ? 7.2 : 9.5) : 5;
       if(def.longGrow)                    growTime *= 1.6;
       if(def.coldHardy && isFrio())       growTime *= 0.6;
