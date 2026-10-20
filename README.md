@@ -49,6 +49,8 @@ A **mochila (I)** reúne 32 tipos de item com ícones próprios, categorias, bus
 
 Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressione **E** para fazer carinho, alimentar ou tosquiar. Eles olham para o jogador e reagem ao toque; a fome aparece no painel. O cocho distribui até três porções aos mais famintos, sem gastar feno em animais satisfeitos. A lã volta após três minutos ativos com alimentação suficiente. Movimento reduzido e progresso antigo continuam disponíveis.
 
+**Vozes do vale:** seis histórias pessoais com dois caminhos e três encontros por personagem, novos assuntos para os nove moradores e duas cenas de conclusão. As tarefas avançam com ações feitas depois do combinado e ficam registradas no caderno. A ponte ganhou piso e corrimãos em camadas; mata, veredas, gelo e margens têm novos detalhes, com animações discretas e opção de reduzir movimento.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

@@ -4703,10 +4703,30 @@ function registerObjectDrawer(type, fn){ OBJECT_DRAWERS[type] = fn; }
 function registerInteraction(type, fn){ INTERACTION_HANDLERS[type] = fn; }
 function registerSceneTrigger(fn){ SCENE_TRIGGERS.push(fn); }
 function registerThermalZone(scene, fn){ THERMAL_ZONES[scene] = fn; }
+// O aviso e E escolhem o mesmo morador, sem conversar através de paredes.
+function reachableNpc(o){
+  if(currentScene!=='main'||!o||o.type!=='story_npc')return false;
+  const distance=Math.hypot(player.x-o.x,player.y-o.y);if(distance>28)return false;
+  for(let i=1,n=Math.max(1,Math.ceil(distance/3));i<=n;i++){
+    const x=player.x+(o.x-player.x)*i/n,y=player.y+(o.y-player.y)*i/n;
+    if([T.FENCE,T.WATER,T.RIVER,T.OASIS].includes(map[Math.floor(y/TS)]?.[Math.floor(x/TS)])||window.FarmWorldDepth?.isBlocked(x,y))return false;
+  }
+  return true;
+}
+function nearInteractionObject(){
+  let best=null,distance=Infinity;
+  for(const o of queryObjects(Object.keys(INTERACTION_HANDLERS))){
+    const d=Math.hypot(player.x-(o.x+(o.w||0)/2),player.y-(o.y+(o.h||0)/2));
+    if(d>=(o.type==='story_npc'?28:26)||d>=distance)continue;
+    if(o.type==='story_npc'&&!reachableNpc(o))continue;
+    best=o;distance=d;
+  }
+  return best;
+}
 function biomeInteractHook(){
   const types = Object.keys(INTERACTION_HANDLERS);
   if(!types.length) return false;
-  const o = nearObj(types, 26);
+  const o = nearInteractionObject();
   if(o && INTERACTION_HANDLERS[o.type]) return INTERACTION_HANDLERS[o.type](o) !== false;
   return false;
 }
@@ -5996,6 +6016,7 @@ function saveGame(auto=false){
       storyCinematics: window.FarmStoryCinematics?.serialize(),
       valleySaga: window.FarmValleySaga?.serialize(),
       frontierStory: window.FarmFrontierStory?.serialize(),
+      villageStories: window.FarmVillageStories?.serialize(),
       farmLife: window.FarmLife?.serialize(),
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
@@ -6082,6 +6103,7 @@ function loadGameFromData(data){
   window.FarmLearningJourney.restore(data.learningJourney,learningContext());
   window.FarmValleySaga?.restore(data.valleySaga);
   window.FarmFrontierStory?.restore(data.frontierStory);
+  window.FarmVillageStories?.restore(data.villageStories);
   window.FarmLife?.restore(data.farmLife);
   window.FarmSkinLearning?.restore(data.skinLearning);
   window.FarmStoryIntegration?.restore(data.storyWorld);
@@ -7845,6 +7867,7 @@ function feedAnimal(animal){
   player.inv.hay--;animal.well=1;
   tickTask('feed');if(isFrio())tickTask('protect');
   window.FarmAnimalLife?.react?.(animal,'feed',player);
+  window.FarmStoryIntegration?.record('care',{kind:'animal',action:'feed',species:animal.kind});
   return true;
 }
 function careForAnimal(action,animal){
@@ -7862,6 +7885,7 @@ function careForAnimal(action,animal){
     tickTask('wool');window.FarmStoryIntegration?.record('collect',{item:'wool',amount:1});
     window.FarmAnimalLife?.react?.(animal,'shear',player);sfx.wool();showToast('1 lã de '+name+' guardada na mochila.','success');
   }else return false;
+  if(action!=='feed')window.FarmStoryIntegration?.record('care',{kind:'animal',action,species:animal.kind});
   if(soundEnabled)window.synthSfx?.animal(animal.kind);
   renderInv();if(action!=='pet')saveGame(true);return true;
 }
@@ -8907,6 +8931,7 @@ function resetSandboxRun(){
   window.FarmActivityReport.close();
   window.FarmValleySaga?.reset();
   window.FarmFrontierStory?.reset();
+  window.FarmVillageStories?.reset();
   window.FarmLife?.reset();
   window.FarmSkinLearning?.reset();
   window.FarmStoryIntegration?.reset();
@@ -13950,8 +13975,9 @@ function drawCinematicWorld(g,view={}){
     window.FarmWorldDepth?.drawGround(g);
     window.FarmWaterLife?.drawSurface(g,left,top,visibleW,visibleH);
     for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
-    const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
+    const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.type!=='bridge'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
     for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
+    for(const o of objects)if(o.type==='bridge'){FarmWorldDepth?.drawBridgeBase(g,o);visible.push(...(FarmWorldDepth?.bridgeParts(o)||[]));}
     if(view.stage?.prop==='table'){
       let table=null,score=Infinity;
       for(let y=Math.ceil(top+visibleH*.6);y<top+visibleH-23;y+=4)for(let x=Math.ceil(centerX-28);x<=centerX+28;x+=4){
@@ -14185,13 +14211,16 @@ function render(){
     if(window.FarmWorldDepth)FarmWorldDepth.drawPenBase(ctx,o);else drawPen(o);
   }
 
+  for(const o of objects)if(o.type==='bridge')window.FarmWorldDepth?.drawBridgeBase(ctx,o);
+
   // sort by y, including player
   const drawables=_renderDrawables;drawables.length=0;
-  for(const o of objects)if(o.type!=='pen'&&o.x+(o.w||0)+128>=camX&&o.x-128<=camX+visW&&o.y+(o.h||0)+128>=camY&&o.y-128<=camY+visH)drawables.push(o);
+  for(const o of objects)if(o.type!=='pen'&&o.type!=='bridge'&&o.x+(o.w||0)+128>=camX&&o.x-128<=camX+visW&&o.y+(o.h||0)+128>=camY&&o.y-128<=camY+visH)drawables.push(o);
   const restPose=window.FarmRestVisual?.pose(player,currentScene);
   _renderPlayer.x=restPose?.x??player.x;_renderPlayer.y=restPose?restPose.depth-10:player.y;
   drawables.push(_renderPlayer);
   if(window.FarmWorldDepth)for(const o of objects)if(o.type==='pen')drawables.push(...FarmWorldDepth.penParts(o));
+  if(window.FarmWorldDepth)for(const o of objects)if(o.type==='bridge')drawables.push(...FarmWorldDepth.bridgeParts(o));
   if(window.FarmInteriorArt)for(const o of objects)if(o.type==='gh_frame')drawables.push(...FarmInteriorArt.parts(o));
   drawables.sort((a,b)=>{
     const ay = window.FarmWorldDepth?FarmWorldDepth.depth(a):a.y+(a.h||0);
@@ -14349,7 +14378,7 @@ function currentHint(){
   if(player.dead) return 'RENASCER: reiniciar personagem';
   if(player.resting) return 'Descansando... mova-se ou pressione R para parar';
   if(!nearObj(['door_house','door_barn','gh_exit','i_door'],22)){const animalHint=window.FarmAnimalCare?.hint();if(animalHint)return animalHint;}
-  const recurso=nearObj(Object.keys(INTERACTION_HANDLERS),26);
+  const recurso=nearInteractionObject();
   if(recurso && recurso.interactionHint) return 'E: '+recurso.interactionHint;
   const barn = objectAtPlayer(['barn']);
   if(isFrio() && barn && player.inv.wool>=2 && player.inv.coat<1) return 'E: fazer casaco de lã';

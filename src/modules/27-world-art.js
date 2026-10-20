@@ -140,6 +140,20 @@
           }
         }
       }
+      if(kind==='ice'){
+        // Fissuras longas pertencem ao mundo, não ao tile. A linha clara fica
+        // de um só lado, dando espessura ao gelo sem parecer piso de pedra.
+        for(let gy=Math.floor(wy/89)-1;gy<=Math.floor((wy+PATCH)/89)+1;gy++)for(let gx=Math.floor(wx/103)-1;gx<=Math.floor((wx+PATCH)/103)+1;gx++){
+          const h=hash(gx,gy,182);if(h%3!==0)continue;
+          const x=gx*103+(h%39)-wx,y=gy*89+((h>>>8)%41)-wy;
+          const points=[[x-16,y-9],[x-3,y-3],[x+6,y+12],[x+22,y+18]];
+          for(let k=1;k<points.length;k++){
+            const a=points[k-1],b=points[k];pixelLine(g,'#6ca39f',a[0],a[1],b[0],b[1]);
+            pixelLine(g,'#a6cabe',a[0]+1,a[1],b[0]+1,b[1]);
+          }
+          pixelLine(g,'#76aaa4',x+6,y+12,x+3,y+23);
+        }
+      }
       // Detalhes pequenos ocupam uma minoria dos tiles, em posições únicas
       // calculadas no mundo. Mantém áreas de descanso entre vegetação/relevo.
       for(let ty=Math.floor(wy/TS);ty<Math.ceil((wy+PATCH)/TS);ty++)for(let tx=Math.floor(wx/TS);tx<Math.ceil((wx+PATCH)/TS);tx++){
@@ -214,6 +228,10 @@
         edgeRect(g,shoreBody(p,cold,sx,sy),px,py,side,start,2,0,d-1);
         edgeRect(g,p.wet,px,py,side,start,2,d-1,1);
         if(hash(Math.floor(along/8),boundary,133)%3===0)edgeRect(g,p.line,px,py,side,start,2,d,1);
+        // Degrau úmido na margem inferior: um pixel basta para distinguir
+        // água abaixo da terra de uma mancha pintada sobre o gramado.
+        if(side===0&&p.kind!=='snow'&&hash(Math.floor(along/6),boundary,188)%4===0)
+          edgeRect(g,p.kind==='sand'?'#8e8061':'#637365',px,py,side,start,2,d,1);
       }
     }
     function shoreCorner(g,px,py,x,y,right,bottom,p,cold,outer=false){
@@ -301,6 +319,8 @@
         g.drawImage(cached(tiles,t+':'+!!cold+':'+v,TS,TS,c=>paintTile(c,t,v,cold)),px,py);
       }
       terrainEdge(g,px,py,x,y,t,cold);
+      if(API.rawScene==='main'&&(t===T.GRASS||t===T.GRASS2))
+        window.FarmOpenWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
     });
 
     /* ---------- Vegetação: massas recortadas, folhas em agrupamentos ---------- */
@@ -542,15 +562,60 @@
         if(winter())rect(c,P.snow,2,4,28,2);
       });
     });
-    API.registerObjectDrawer('bridge',(o,g)=>{
-      const w=o.w||48;blit(g,'bridge:'+w+':'+winter(),o.x,o.y-8,w,20,c=>{
-        rect(c,P.woodDark,0,5,w,11);rect(c,P.wood,0,6,w,8);
-        for(let x=0;x<w;x+=6){rect(c,P.woodLight,x,6,5,1);rect(c,P.woodDark,x+5,6,1,8);rect(c,P.woodLight,x+1,11,3,1);}
-        rect(c,P.woodDark,0,2,w,2);rect(c,P.woodLight,0,2,w,1);
-        rect(c,P.woodDark,0,15,w,2);rect(c,P.woodLight,0,15,w,1);
-        for(const x of [0,w-3]){rect(c,P.woodDark,x,0,3,8);rect(c,P.woodLight,x,0,1,7);rect(c,P.woodDark,x,14,3,6);}
-        if(winter())rect(c,P.snow,1,1,w-2,1);
+    function bridgeGeometry(o){
+      // O objeto histórico marca o centro da primeira linha. A passagem
+      // física já tem duas linhas; nunca ampliamos o mapa para caber na arte.
+      return{x:Math.round(o.x),y:Math.floor(o.y/TS)*TS,w:Math.round(o.w||48),h:Math.max(TS*2,Math.round(o.h||TS))};
+    }
+    function drawBridgeBase(o,g){
+      const b=bridgeGeometry(o),cold=winter();
+      blit(g,'bridge-deck:'+b.w+':'+b.h+':'+cold,b.x-6,b.y-2,b.w+12,b.h+12,c=>{
+        const x=6,y=2,w=b.w,h=b.h;
+        // Encaixes de pedra nas duas margens, fora do corredor. A sombra
+        // curta pertence ao contato; corrimãos são ordenados separadamente.
+        rect(c,'rgba(24,47,40,.23)',x-4,y+h,w+8,4);
+        for(const sx of [x-5,x+w-1]){
+          rect(c,P.stoneDark,sx,y-1,6,h+5);rect(c,P.stone,sx,y-1,5,h+1);
+          rect(c,P.snowShade,sx,y-1,5,1);
+          for(let sy=6;sy<h;sy+=9){rect(c,P.stoneDark,sx,y+sy,5,1);rect(c,'#89978a',sx+1,y+sy-2,3,1);}
+        }
+        rect(c,P.woodDark,x,y,w,h+3);rect(c,'#98724e',x+1,y,w-2,h);
+        // Tábuas transversais ao percurso; emendas e veios discretos, com
+        // desgaste mais claro no centro usado pelos moradores.
+        for(let px=0;px<w;px+=6){
+          const pw=Math.min(5,w-px),seed=hash(px,w+h,193);
+          rect(c,px%12?'#a68157':'#b08b5e',x+px,y,pw,h);
+          rect(c,'#d0b184',x+px,y,pw,1);rect(c,'#76583f',x+px+pw,y,1,h);
+          rect(c,'#bd9b6a',x+px+1,y+8,pw>3?pw-2:1,h-16);
+          rect(c,'#8e6b49',x+px+1,y+4+(seed%5),2,5);
+          rect(c,'#d0b184',x+px+2,y+h-9-(seed%4),1,4);
+          for(const sy of [y+3,y+h-4])rect(c,'#5b5745',x+px+2,sy,1,1);
+        }
+        rect(c,'#634b39',x,y+h,w,3);rect(c,'#b18b5e',x,y+h,w,1);
+        for(const sx of [x+3,x+w-6]){rect(c,'#574b3b',sx,y+h+3,4,5);rect(c,'#8b7653',sx,y+h+3,1,4);}
+        if(cold){rect(c,P.snow,x,y,w,1);rect(c,P.snow,x+1,y+h-2,w-2,2);}
       });
+    }
+    function drawBridgeRail(o,g){
+      const w=o.w||48,cold=winter();
+      blit(g,'bridge-rail:'+w+':'+cold,o.x-5,o.y-13,w+10,19,c=>{
+        const x=5,y=13;
+        rect(c,'rgba(24,47,40,.18)',x-3,y,w+6,2);
+        rect(c,P.woodDark,x-3,y-9,w+6,3);rect(c,P.woodLight,x-3,y-10,w+6,2);
+        rect(c,P.pathLight,x-3,y-10,w+6,1);
+        rect(c,'#73573f',x-2,y-4,w+4,2);rect(c,'#b59060',x-2,y-4,w+4,1);
+        for(const px of [x-3,x+Math.floor(w/2)-1,x+w]){
+          rect(c,P.woodDark,px,y-12,3,16);rect(c,P.woodLight,px,y-12,2,14);
+          rect(c,P.pathLight,px-1,y-13,5,2);rect(c,'#665c46',px+1,y-8,1,1);
+          if(cold)rect(c,P.snow,px-1,y-14,5,2);
+        }
+      });
+    }
+    // Fallback para consumidores que não separam as camadas. O jogo e as
+    // cenas usam drawBridgeBase + bridgeParts de FarmWorldDepth.
+    API.registerObjectDrawer('bridge',(o,g)=>{
+      const b=bridgeGeometry(o);drawBridgeBase(o,g);
+      drawBridgeRail({x:b.x,y:b.y,w:b.w},g);drawBridgeRail({x:b.x,y:b.y+b.h,w:b.w},g);
     });
 
     function animalPaint(g,kind,shorn,closed,step,sleeping){
@@ -748,7 +813,7 @@
       }
     }
     window.FarmWorldArt=Object.freeze({
-      version:1,palette:P,drawAtmosphere,
+      version:2,palette:P,drawAtmosphere,bridgeGeometry,drawBridgeBase,drawBridgeRail,
       state:()=>({tileSprites:tiles.size,objectSprites:sprites.size,cacheBytes:cachePixels*4,drawn,culled,
         atmosphere:{...atmosphere,anchors:atmosphere.anchors.map(a=>({...a}))}})
     });

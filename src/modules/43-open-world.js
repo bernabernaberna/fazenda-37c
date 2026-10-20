@@ -7,6 +7,9 @@
   const T=API.T,S=API.TS,ORIGINAL_WIDTH=60,WIDTH=96,HEIGHT=124;
   const clamp=v=>Math.max(0,Math.min(1,v)),smooth=v=>{v=clamp(v);return v*v*(3-2*v);};
   const hash=(x,y)=>(Math.imul(x^8191,73856093)^Math.imul(y^131071,19349663))>>>0;
+  // Metadados apenas de pintura, refeitos com o mundo. Cada passarela usa
+  // tábuas perpendiculares à sua travessia, sem emendas que mudem por tile.
+  const bridgeTiles=new Map();let bridgeSections=0;
   const pixel=(x,y)=>({x:x*S+8,y:y*S+8});
   const regions=Object.freeze({
    forest:Object.freeze({id:'forest',name:'Mata das Nascentes',mapLabel:'MATA DAS NASCENTES',label:'mata',tempDelta:-.012,hydDelta:-.04,sweatBoost:0,thermalCause:'ar fresco da mata',mapX:78,mapY:46}),
@@ -37,6 +40,23 @@
   function regionAt(x,y){
    if(x<60||x>=WIDTH||y<28||y>=HEIGHT)return null;
    return y<83?'forest':'wetland';
+  }
+  function prepareBridgeArt(map){
+   bridgeTiles.clear();bridgeSections=0;
+   const visited=new Set();
+   for(let y=0;y<HEIGHT;y++)for(let x=ORIGINAL_WIDTH;x<WIDTH;x++){
+    const key=y*WIDTH+x;if(map[y]?.[x]!==T.WOOD||visited.has(key))continue;
+    const pending=[[x,y]],tiles=[];let left=x,right=x,top=y,bottom=y;visited.add(key);
+    for(let i=0;i<pending.length;i++){
+     const [tx,ty]=pending[i];tiles.push([tx,ty]);left=Math.min(left,tx);right=Math.max(right,tx);top=Math.min(top,ty);bottom=Math.max(bottom,ty);
+     for(const [dx,dy]of [[0,-1],[1,0],[0,1],[-1,0]]){
+      const nx=tx+dx,ny=ty+dy,nk=ny*WIDTH+nx;
+      if(nx>=ORIGINAL_WIDTH&&nx<WIDTH&&ny>=0&&ny<HEIGHT&&map[ny]?.[nx]===T.WOOD&&!visited.has(nk)){visited.add(nk);pending.push([nx,ny]);}
+     }
+    }
+    const horizontal=right-left>=bottom-top;bridgeSections++;
+    for(const [tx,ty]of tiles)bridgeTiles.set(ty*WIDTH+tx,horizontal);
+   }
   }
   function expand(main){
    if(!main||main._openWorldV67)return main?.MW||ORIGINAL_WIDTH;
@@ -86,7 +106,7 @@
    // pequenas lascas de madeira na borda diagonal de uma poça.
    const crossings=[...trail].map(k=>k.split(',').map(Number)).filter(([x,y])=>wetBeforeTrails[y][x]);
    for(const [x,y]of crossings)for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)if(trail.has((x+dx)+','+(y+dy)))paint(x+dx,y+dy,T.WOOD);
-   main.map=m;main.MW=WIDTH;
+   main.map=m;main.MW=WIDTH;prepareBridgeArt(m);
    const added=[],add=o=>{o._world=true;o._openWorld=true;added.push(o);main.objects.push(o);};
    // Grupos pequenos deixam clareiras e linhas de visão; nenhum volume nas trilhas.
    const room=(tx,ty,r=2)=>{
@@ -112,17 +132,62 @@
    return main.MW;
   }
   const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
+  function drawTerrainDetails(g,px,py,x,y,t,cold){
+   if(API.rawScene!=='main'||x<ORIGINAL_WIDTH||x>=WIDTH||y<28||y>=HEIGHT||![T.GRASS,T.GRASS2].includes(t))return;
+   // Folhiço e solo úmido distinguem os habitats usando o cache de terreno.
+   // Não cria tufos novos, props, animação, colisão ou sorteios por câmera.
+   const edge=smooth((x-60)/7)*smooth((y-28)/12);if(edge<=0)return;
+   const wet=smooth((y-78)/12),seed=hash(x,y),detail=hash(x*13+7,y*17+5),straw=wet>.5;
+   const px1=px+3+((detail>>>7)%8),py1=py+3+((detail>>>17)%8);
+   g.save();g.globalAlpha*=edge*(cold?.55:1);
+   if(detail%11===0){
+    // Filetes irregulares de solo entre folhas. Não há sobreposição de
+    // transparências nem carimbo repetido nos quatro tiles de um bloco.
+    const flip=(detail>>>4)&1?1:-1;
+    g.fillStyle=straw?'rgba(115,108,74,.10)':'rgba(43,78,58,.10)';
+    g.fillRect(px1,py1,3,1);g.fillRect(px1-flip,py1+1,5,1);g.fillRect(px1+flip,py1+2,2,1);
+   }
+   if(seed%7===0){
+    R(g,straw?'#7d805a':'#687650',px1,py1,4,1);
+    R(g,straw?'#959067':'#7e8360',px1+1,py1-1,2,1);
+    if((seed>>>9)%2===0)R(g,straw?'#727955':'#576a4d',px1+3,py1+2,2,1);
+   }
+   // Capilaridade na borda da água: poucos filetes escuros indicam chão
+   // molhado. O contorno físico e o desenho de oito vizinhos ficam intactos.
+   const water=v=>v===T.WATER||v===T.RIVER||v===T.OASIS;
+   if(straw&&seed%3===0){
+    const north=water(API.tileAt(x,y-1)),south=water(API.tileAt(x,y+1));
+    const west=water(API.tileAt(x-1,y)),east=water(API.tileAt(x+1,y));
+    g.fillStyle='rgba(66,85,65,.29)';
+    if(north||south){const yy=py+(north?3:S-5);g.fillRect(px+3,yy,5,1);g.fillRect(px+4,yy+1,2,1);}
+    if(west||east){const xx=px+(west?3:S-5);g.fillRect(xx,py+6,1,4);g.fillRect(xx+1,py+7,1,2);}
+   }
+   g.restore();
+  }
   API.registerTileDrawer(T.WOOD,(g,px,py,x,y)=>{
    if(API.rawScene!=='main'||x<ORIGINAL_WIDTH){API.drawBaseTile(g,px,py,x,y,T.WOOD);return;}
    // Tábuas contínuas e gastas no cache estático. A antiga textura de piso
    // interno formava tijolos laranja e repetia nós em cada quadrado de16px.
-   R(g,'#87745d',px,py,S,S);
-   for(let yy=0;yy<S;yy+=4){R(g,'#6d5d4c',px,py+yy+3,S,1);R(g,'#9a876b',px,py+yy,S,1);}
-   if((x+y)%3===0)R(g,'#514d41',px+3,py+5,1,1);
-   if(API.tileAt(x-1,y)!==T.WOOD){R(g,'#514d41',px,py,2,S);R(g,'#b39a72',px+2,py,1,S);}
-   if(API.tileAt(x+1,y)!==T.WOOD){R(g,'#514d41',px+S-2,py,2,S);R(g,'#a08b69',px+S-3,py,1,S);}
-   if(API.tileAt(x,y-1)!==T.WOOD)R(g,'#b39a72',px,py,S,2);
-   if(API.tileAt(x,y+1)!==T.WOOD)R(g,'#514d41',px,py+S-2,S,2);
+   const horizontal=bridgeTiles.get(y*WIDTH+x)??false,seed=hash(x,y),wet=y>=83;
+   R(g,wet?'#82745e':'#8b7961',px,py,S,S);
+   for(let i=0;i<S;i+=4){
+    if(horizontal){R(g,'#625b4c',px+i+3,py,1,S);R(g,'#a08c6f',px+i,py,1,S);}
+    else{R(g,'#625b4c',px,py+i+3,S,1);R(g,'#a08c6f',px,py+i,S,1);}
+   }
+   if(seed%3===0){
+    if(horizontal){R(g,'#6e6351',px+5,py+3,1,7);R(g,'#a38e70',px+6,py+5,1,3);}
+    else{R(g,'#6e6351',px+3,py+5,7,1);R(g,'#a38e70',px+5,py+6,3,1);}
+   }
+   const west=API.tileAt(x-1,y)!==T.WOOD,east=API.tileAt(x+1,y)!==T.WOOD;
+   const north=API.tileAt(x,y-1)!==T.WOOD,south=API.tileAt(x,y+1)!==T.WOOD;
+   if(west){R(g,'#514d41',px,py,2,S);R(g,'#b39a72',px+2,py,1,S);}
+   if(east){R(g,'#514d41',px+S-2,py,2,S);R(g,'#a08b69',px+S-3,py,1,S);}
+   if(north)R(g,'#b39a72',px,py,S,2);
+   if(south){R(g,'#514d41',px,py+S-3,S,3);R(g,'#a08b69',px,py+S-4,S,1);}
+   // Fixadores acompanham as vigas, não aparecem como confete no centro.
+   if(horizontal&&(north||south)){const yy=py+(north?2:S-4);R(g,'#444b43',px+5,yy,1,1);R(g,'#444b43',px+13,yy,1,1);}
+   if(!horizontal&&(west||east)){const xx=px+(west?2:S-4);R(g,'#444b43',xx,py+5,1,1);R(g,'#444b43',xx,py+13,1,1);}
+   if(wet&&seed%4===0&&(west||east||south))R(g,'#657159',px+(west?1:east?S-3:4),py+(south?S-2:6),2,1);
   });
   API.registerObjectDrawer('open_world_landmark',(o,g)=>{
    const x=Math.round(o.x),y=Math.round(o.y),cold=API.isFrio();
@@ -142,7 +207,8 @@
     R(g,'#5b9386',x-2,y-3,4,2);R(g,'#74817a',x-4,y+3,8,2);
    }
   });
-  window.FarmOpenWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,npcSpawns,routes,
+  window.FarmOpenWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,npcSpawns,routes,drawTerrainDetails,
+   artInfo(){return{bridgeSections,bridgeTiles:bridgeTiles.size};},
    dimensions:Object.freeze({originalWidth:ORIGINAL_WIDTH,width:WIDTH,height:HEIGHT})});
  });
 })();

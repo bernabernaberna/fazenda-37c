@@ -86,6 +86,7 @@ MODULE_ORDER = [
     "43-open-world.js",      # mata e veredas contíguas, sem deslocar o vale original
     "44-frontier-story.js",  # novos moradores, missões e cuidados renováveis
     "45-item-art.js",       # ícones originais para ferramentas, provisões e produtos
+    "48-village-stories.js", # vínculos pessoais, etapas e novas conversas
     "47-animal-care.js",     # cuidados individuais do curral
     "46-inventory.js",      # mochila acessível, detalhes e atalhos explícitos
     "50-window-glow.js",      # warm halos from house/barn windows at night

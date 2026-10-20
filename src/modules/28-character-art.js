@@ -61,6 +61,8 @@
     ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],helena:[5.1,1.13,.22],
     davi:[5.7,1.18,.18],bia:[4.0,.94,.08],player:[4.4,1,.12]});
   const syllables=Object.freeze(['0121031200103200012010300','01321003001210300121000','01200132000130121000300']);
+  const defaultGestures=Object.freeze({neutral:'explain',warm:'reassure',thoughtful:'reflect',
+    concerned:'reassure',joyful:'invite',resolved:'explain',surprised:'shrug'});
   const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
     if(typeof OffscreenCanvas!=='undefined') return new OffscreenCanvas(w,h);
@@ -81,18 +83,25 @@
   function conversation(opts,allowed=true,id='player'){
     const conversing=allowed&&(!!opts.speaking||gestures.includes(opts.gesture));
     const expression=conversing&&expressions.includes(opts.expression)?opts.expression:'neutral';
-    const gesture=conversing&&gestures.includes(opts.gesture)?opts.gesture:'';
+    const gesture=conversing?(gestures.includes(opts.gesture)?opts.gesture:defaultGestures[expression]):'';
     const t=Math.max(0,Number.isFinite(opts.speechTime)?opts.speechTime:clock(opts)/1000);
     const identity=id==='player'?6:Math.max(0,keys.indexOf(id)),[period,pace,delay]=acting[id]||acting.player;
     const animated=conversing&&!opts.reducedMotion,pattern=syllables[identity%syllables.length];
-    const mouth=animated&&opts.speaking?Number(pattern[Math.floor(t/(.105*pace))%pattern.length]):0;
+    const listening=gesture==='listen';
+    // Pequenas frases têm articulação e pausa para respirar. Antes a boca
+    // repetia sílabas continuamente, inclusive quando o gesto era de escuta.
+    // Só o relógio fornecido pelo diálogo controla esta interpretação.
+    const phrase=1.55*pace+(identity%3)*.12,pause=(expression==='thoughtful'?.58:.38)*pace;
+    const phraseTime=Math.max(0,t-delay)%(phrase+pause);
+    const mouth=animated&&opts.speaking&&!listening&&t>=delay&&phraseTime<phrase?
+      Number(pattern[Math.floor(phraseTime/(.125*pace))%pattern.length]):0;
     // Preparação -> gesto -> acomodação -> silêncio. A escuta reage apenas
     // de vez em quando; não faz o mesmo aceno repetido de quem está falando.
-    const listening=gesture==='listen',beat=Math.max(0,t-delay-(listening?1.35:0))%(period+(listening?2.1:0));
-    const entered=t>=delay+(listening?1.35:0),duration=(listening?1.0:1.5)*pace;
+    const beat=Math.max(0,t-delay-(listening?1.35:0))%(period+(listening?2.1:0));
+    const entered=t>=delay+(listening?1.35:0),duration=(listening?1.15:1.85)*pace;
     let speechPhase=0;
     if(animated&&gesture&&entered&&beat<duration){
-      const progress=beat/duration;speechPhase=progress<.18?1:progress<.61?2:progress<.90?3:0;
+      const progress=beat/duration;speechPhase=progress<.25?1:progress<.60?2:progress<.93?3:0;
     }
     const blinkPeriod=4.1+identity*.29,blinkAt=(t+1.2+identity*.21)%blinkPeriod;
     const speechBlink=animated&&blinkAt>blinkPeriod-.12;
@@ -126,8 +135,13 @@
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:restWalking?8:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving&&!restWalking?blend(actor.gaitRunBlend,actor.running?1:0):0;
+    // Apenas o tecido junto ao peito respira. A âncora dos pés, a cabeça e
+    // as mãos ficam estáveis; dois estados discretos mantêm o cache limitado.
+    // Na fala a respiração compartilha a pose já existente no atlas.
+    const idleBreath=!hero&&!moving&&!rest&&!action&&!speech.conversing&&!actor.dead&&!opts.reducedMotion&&
+      [0,0,0,1,1,1,0,0][Math.floor((Math.max(0,clock(opts)/1000)+Math.max(0,keys.indexOf(actor.npcId||actor.id))*.37)/.65)%8]?1:0;
     return {dir:dirOf(restWalking?opts.restWalkDir:heroAction?aim:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
-      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
+      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,idleBreath,...speech,
       heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
       action:action?(hero?(heroAction?requested:'work'):job):'',heroAction,actionReach:hasTarget&&Math.hypot(dx,dy)>18?1:0,
       actionFrame:action?(heroAction?(opts.reducedMotion?6:Math.min(11,Math.floor(progress*12))):Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8)))):0,
@@ -265,8 +279,8 @@
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
   function headDip(s){
     if(!s.conversing||!s.speechPhase)return 0;
-    if(s.gesture==='nod')return [0,-1,1,0][s.speechPhase];
-    if(s.gesture==='listen'||s.gesture==='reflect')return s.speechPhase===2?1:0;
+    if(s.gesture==='nod')return s.speechPhase===2?1:0;
+    if(s.gesture==='listen'||s.gesture==='reflect')return s.speechPhase>=2?1:0;
     if(s.gesture==='reassure')return s.speechPhase===3?1:0;
     return 0;
   }
@@ -381,11 +395,11 @@
     const emphasis=phase===2,settling=phase===3;
     let hx=side?3:7,hy=-9,w=2;
     if(phase){
-      if(s.gesture==='explain'){hx+=(emphasis?3:1)+(broad?1:0);hy-=emphasis?(quiet?2:3):1;}
-      if(s.gesture==='invite'){hx+=emphasis?4:settling?2:0;hy-=emphasis?2:1;w=emphasis?4:3;}
-      if(s.gesture==='point'){hx+=emphasis?6:settling?3:1;hy-=emphasis?4:2;w=emphasis?3:2;}
-      if(s.gesture==='reflect'){hx=side?2:1;hy=emphasis?-14:-11;w=3;}
-      if(s.gesture==='reassure'){hx=side?1:0;hy=emphasis?-12:settling?-10:-9;w=3;}
+      if(s.gesture==='explain'){hx+=(emphasis?3:settling?2:0)+(broad&&emphasis?1:0);hy-=emphasis?(quiet?2:3):settling?2:0;}
+      if(s.gesture==='invite'){hx+=emphasis?4:settling?2:0;hy-=emphasis?2:settling?1:0;w=emphasis?4:3;}
+      if(s.gesture==='point'){hx+=emphasis?6:settling?3:0;hy-=emphasis?4:settling?2:0;w=emphasis?3:2;}
+      if(s.gesture==='reflect'){hx=side?2:1;hy=emphasis?-14:settling?-12:-10;w=3;}
+      if(s.gesture==='reassure'){hx=side?1:0;hy=emphasis?-12:settling?-11:-9;w=3;}
       if(s.gesture==='shrug'){hx=side?6:9;hy=emphasis?-13:-10;w=3;}
     }
     // Papel/caixa pedem apoio contínuo das duas mãos. A interpretação segue
@@ -635,6 +649,12 @@
       rect(g,P.sage,side?-5:-7,-16,side?9:14,10);rect(g,P.leaf,side?-5:-7,-16,side?9:14,1);
       for(let i=0;i<4;i++) rect(g,P.amber,(side?-4:-6)+i*3,-9,1,2);
     }
+    if(s.idleBreath||(s.conversing&&s.speechPhase===1)){
+      const cloth=s.blanket?P.leaf:shirtHi;
+      rect(g,cloth,side?-4:-6,-16,2,2);
+      // Vinco curto, sem alargar a silhueta nem mover o braço que segura algo.
+      if(!back&&!s.heldProp)rect(g,s.blanket?P.sage:shirtSh,side?1:3,-9,1,2);
+    }
     paintHead(g,d,s);
     paintAction(g,d,s,hand,false);
     paintSpeechGesture(g,d,s,hand,false);
@@ -699,7 +719,9 @@
     rect(g,'#91a676',4,4,9,10);rect(g,P.leaf,5,5,5,1);
     // Pequeno ramo bordado no fundo, coerente com o vale.
     for(let i=0;i<4;i++){rect(g,P.edge,25-i,18+i*2,1,2);rect(g,P.leaf,24-i,17+i*2,2,1);}
-    if(s){g.save();g.translate(0,headDip(s));}
+    // O enquadramento do retrato não sobe/desce com cada aceno. Escuta é
+    // expressa pelos olhos; mãos e sobrancelhas acompanham a mesma fala.
+    if(s)g.save();
     rect(g,d.shirtSh,6,26,21,4);rect(g,d.shirt,8,24,17,6);rect(g,d.shirtHi,8,25,5,5);
     rect(g,d.shirtSh,23,26,3,4);rect(g,d.skinSh,13,21,7,5);rect(g,d.skin,14,21,4,4);
     rect(g,d.trim,11,25,3,2);rect(g,P.cream,13,25,3,3);rect(g,P.cream,18,25,3,2);
@@ -796,7 +818,8 @@
       rect(g,d.skin,x,14,w,2);
       if(s.blink)rect(g,d.hairSh,x,15,w-1,1);
       else{
-        const eyeHeight=bright||['joyful','surprised'].includes(s.expression)?2:1;
+        const attentive=s.gesture==='listen'&&s.speechPhase>=2;
+        const eyeHeight=!attentive&&(bright||['joyful','surprised'].includes(s.expression))?2:1;
         rect(g,P.cream,x,14,w,eyeHeight);
         rect(g,P.ink,x+Math.max(0,Math.min(w-1,(x===12?2:1)+s.gaze)),14,1,eyeHeight);
       }
@@ -862,6 +885,8 @@
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
     actionInfo(actor,opts={}){const s=state(actor,opts,true);return{kind:s.action,frame:s.actionFrame,direction:s.dir,active:s.heroAction,reach:s.actionReach};},
+    actingInfo(actor,opts={}){const s=state(actor,opts,false);return{direction:s.dir,moving:s.moving,mouth:s.mouth,
+      gesture:s.gesture,phase:s.speechPhase,blink:s.blink,gaze:s.gaze,breath:s.idleBreath,feetOffsetY:FEET_Y};},
     // Diagnóstico de baixo custo para integração; não revela nem altera saves.
     cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,speechBanks:speechBanks.size,maxSprites:MAX_SPRITES,maxPortraits:MAX_PORTRAITS,maxSpeechBanks:MAX_SPEECH_BANKS};}
   });

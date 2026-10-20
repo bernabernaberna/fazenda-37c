@@ -4282,7 +4282,7 @@ body.hud-game #legend{display:none !important;}
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});emit('onDialogue',null);return null;}
+  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});emit('onDialogue',null);return null;}
   // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
   // save da nova investigação permanecem separados dos seis capítulos legados.
   function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
@@ -4351,11 +4351,11 @@ body.hud-game #legend{display:none !important;}
         status:q.status==='offered'?'available':q.status,completed:q.status==='completed',accepted:q.acceptedAt!==null,objectives:list,
         progress:list.reduce((n,o)=>n+o.n,0),goal:list.reduce((n,o)=>n+o.goal,0),coins:d.coins};
     });
-    const frontier=window.FarmFrontierStory?.diaryView?.();
-    return {version:VERSION,chapter:chapterView,quests:frontier?quests.concat(frontier.quests):quests,friendships:{...clone(state.friendships),...frontier?.friendships},memories:frontier?clone(state.memories).concat(frontier.memories):clone(state.memories),
+    const frontier=window.FarmFrontierStory?.diaryView?.(),village=window.FarmVillageStories?.diaryView?.();
+    return {version:VERSION,chapter:chapterView,quests:quests.concat(frontier?.quests||[],village?.quests||[]),friendships:{...clone(state.friendships),...frontier?.friendships},memories:clone(state.memories).concat(frontier?.memories||[],village?.memories||[]),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letterView()),
       coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
-      discoveries:frontier?discoveryViews().concat(frontier.discoveries):discoveryViews(),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0),
+      discoveries:discoveryViews().concat(frontier?.discoveries||[],village?.discoveries||[]),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0)+(village?.discoveryTotal||0),
       relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
         discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length})).concat(frontier?.relationships||[])};
   }
@@ -4431,6 +4431,8 @@ body.hud-game #legend{display:none !important;}
     if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
     const frontierResponse=window.FarmFrontierStory?.conversationResponse?.(npcId);
     if(frontierResponse)message+='\n\n'+frontierResponse;
+    const villageResponse=window.FarmVillageStories?.conversationResponse?.(npcId);
+    if(villageResponse)message+='\n\n'+villageResponse;
     const activity=text(s.activities[npcId],180);
     if(!preamble){
       const echo=decisionEcho(npcId),notice=noticeLines[npcId];
@@ -4453,6 +4455,7 @@ body.hud-game #legend{display:none !important;}
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
     else message+='\n\nSeu pedido desta estação já foi entregue. Na próxima estação combinamos outro.';
+    if(window.FarmVillageStories?.hasCharacter(npcId))choices.push({id:'village:menu',label:window.FarmVillageStories.menuLabel(npcId)});
     if(window.FarmValleySaga)choices.push({id:'saga:menu',label:window.FarmValleySaga.menuLabel(npcId)});
     const pending=lore[npcId].find(scene=>state.discoveries.includes(scene.id)&&state.decisions[scene.id]===undefined);
     const next=pending||nextLore(npcId);
@@ -4463,19 +4466,21 @@ body.hud-game #legend{display:none !important;}
     return show(npcId,message,'menu',choices);
   }
   function interact(npcId){
-    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
+    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
     if(npcId==='letter'){const savedLetter=letterView();return show('rosa',savedLetter.text,'letter',[{id:'close',label:'Guardar a carta'}],savedLetter.title);}
     if(!byId[npcId])return null;
-    window.FarmValleySaga?.close?.({silent:true});
+    window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
     state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
+    window.FarmVillageStories?.record('talk',{npcId});
     record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});window.FarmFrontierStory?.record?.('talk',{npcId});
     return menu(npcId,first?(window.FarmValleySaga?.greeting?.(npcId,{first:true})||chats[npcId].first):undefined);
   }
   function choose(choiceId){
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
+    if(choiceId.startsWith('village:')){if(choiceId==='village:menu'&&!window.FarmVillageStories?.isOpen())return window.FarmVillageStories?.interact(npcId)||currentDialogue();return window.FarmVillageStories?.choose(choiceId)||currentDialogue();}
     if(choiceId.startsWith('frontier:'))return window.FarmFrontierStory?.choose?.(choiceId)||currentDialogue();
     if(choiceId==='back')return menu(npcId);
     if(choiceId.startsWith('saga:')){
@@ -4624,7 +4629,7 @@ body.hud-game #legend{display:none !important;}
   window.FarmStoryWorld={
     get characters(){return characterCatalogue();},chapters:clone(chapters),
     init(api={}){adapter=plain(api)?api:{};if(!initialized){state=fresh(ctx());initialized=true;}return snapshot();},
-    interact,currentDialogue,choose,advance,close,presentSaga,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
+    interact,currentDialogue,choose,advance,close,presentSaga,returnToMenu:menu,isOpen:()=>dialogue!==null,update,record,snapshot,worldState,
     serialize:()=>clone(state),restore,
     reset(value){state=fresh(ctx(value));for(const id of IDS)noticeLines[id]='';close();changed();return snapshot();}
   };
@@ -4920,7 +4925,7 @@ body.hud-game #legend{display:none !important;}
 (function(){
   'use strict';
   let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
-  let cinematicReady=false,lastStory=null,lastSaga=null,lastFrontier=null;
+  let cinematicReady=false,lastStory=null,lastSaga=null,lastFrontier=null,lastVillage=null;
   const cinematicQueue=[];
   const chapterScenes={1:'horta',2:'rio',3:'abrigo',4:'oasis'};
   const actors=[];
@@ -5011,7 +5016,11 @@ body.hud-game #legend{display:none !important;}
   function record(type,payload={}){
     if(!active||!gameStarted||player.dead)return false;
     // Eventos novos (estudo, oficina, produção) também chegam à saga quando o legado não os usa.
-    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);window.FarmFrontierStory?.record?.(type,payload);return true;
+    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);window.FarmFrontierStory?.record?.(type,payload);window.FarmVillageStories?.record?.(type,payload);
+    // O cuidado coletivo só é emitido depois de alimentar de fato o curral.
+    // Conta um cuidado, sem inferir quantos animais estavam com fome.
+    if(type==='care'&&payload.kind==='curral')window.FarmVillageStories?.record('care',{kind:'animal',action:'feed'});
+    return true;
   }
   function reward(event){
     const coins=Math.floor(Number(event.coins)||0);if(coins<=0||coins>1000)return;
@@ -5048,22 +5057,29 @@ body.hud-game #legend{display:none !important;}
     }
     lastFrontier=completed;
   }
+  function observeVillage(snapshot){
+    const completed=new Set(snapshot?.completedQuestIds||[]);
+    if(lastVillage&&gameStarted&&!restoring)for(const scene of window.FarmVillageStories?.cinematicScenes?.()||[])
+      if(completed.has(scene.villageMission)&&!lastVillage.has(scene.villageMission))queueScene(scene.id);
+    lastVillage=completed;
+  }
   function initializeCinematics(){
     if(cinematicReady||!window.FarmStoryCinematics)return;cinematicReady=true;
-    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),frontier:window.FarmFrontierStory?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
+    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),frontier:window.FarmFrontierStory?.snapshot?.(),village:window.FarmVillageStories?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
       beforeOpen(){window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();beforeOpen();},
       onClose(){document.getElementById('game')?.focus({preventScroll:true});refreshNarrative();},
       onChange(){refreshNarrative();scheduleSave();},
       drawWorld(g,view){return window.drawCinematicWorld?.(g,view)===true;}
     });
     if(window.FarmValleySaga?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmValleySaga.cinematicScenes());
+    if(window.FarmVillageStories?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmVillageStories.cinematicScenes());
     if(window.FarmFrontierStory?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmFrontierStory.cinematicScenes());
   }
   function visualUpdate(dt){
     if(!active||!gameStarted||document.hidden)return;initializeCinematics();
     FarmStoryUI.update(dt);window.FarmStoryCinematics?.update?.(dt);
     if(!cinematicQueue.length||!window.FarmStoryCinematics||FarmStoryCinematics.isOpen()||FarmStoryUI.isOpen()||window.FarmValleyPanels?.isOpen?.()||skinOpen
-      ||isPaused||cutsceneActive||player.dead||histologyMissionOpen||tutorialActive
+      ||window.FarmAnimalCare?.isOpen?.()||isPaused||cutsceneActive||player.dead||histologyMissionOpen||tutorialActive
       ||(typeof _pendingTutorialAfterCutscene!=='undefined'&&_pendingTutorialAfterCutscene)
       ||document.getElementById('tutorialOverlay')?.classList.contains('show'))return;
     FarmStoryCinematics.play(cinematicQueue.shift());
@@ -5129,12 +5145,20 @@ body.hud-game #legend{display:none !important;}
       onDialogue(d){FarmStoryWorld.presentSaga?.(d);},
       onChange(snapshot){observeFrontier(snapshot);refreshNarrative();scheduleSave();}
     });
+    window.FarmVillageStories?.init({readState:read,reward,
+      onDialogue(d){FarmStoryWorld.presentSaga(d);},
+      onChange(snapshot){observeVillage(snapshot);refreshNarrative();scheduleSave();},
+      onClose(value){if(value?.returnToMenu)FarmStoryWorld.returnToMenu(value.npcId);else FarmStoryWorld.close();}
+    });
+    observeVillage(window.FarmVillageStories?.snapshot());
     observeFrontier(window.FarmFrontierStory?.snapshot?.());
     for(const def of FarmStoryWorld.characters)place(def);
     observeStory(FarmStoryWorld.snapshot());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());initializeCinematics();
     rebuildNavigation();
     FarmBiomes.registerObjectDrawer('story_npc',drawNPC);
-    FarmBiomes.registerInteraction('story_npc',o=>{if(!gameStarted||player.dead)return false;FarmStoryWorld.interact(o.npcId);return true;});
+    for(const bridge of objects.filter(o=>o.type==='bridge'))bridge.interactionHint='observar as marcas da ponte';
+    FarmBiomes.registerInteraction('bridge',()=>{if(!gameStarted||player.dead)return false;return window.FarmVillageStories?.inspectBridge?.()!==false;});
+    FarmBiomes.registerInteraction('story_npc',o=>{if(!gameStarted||player.dead||!reachableNpc(o))return false;FarmStoryWorld.interact(o.npcId);return true;});
     FarmBiomes.registerInteraction('open_world_landmark',o=>{if(!gameStarted||player.dead)return false;return window.FarmFrontierStory?.inspect?.(o.landmarkId)!==false;});
     document.getElementById('game').tabIndex=-1;
     FarmStoryUI.refresh();
@@ -5201,7 +5225,7 @@ body.hud-game #legend{display:none !important;}
   }
   function update(dt){
     if(!active||!gameStarted||player.dead||document.hidden||!Number.isFinite(dt)||dt<=0||isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen())return;
-    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);window.FarmFrontierStory?.update?.(dt,frontierRead());
+    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);window.FarmFrontierStory?.update?.(dt,frontierRead());window.FarmVillageStories?.update?.(dt,read());
     const sagaWorld=window.FarmValleySaga?.worldState?.(),world={...FarmStoryWorld.worldState(),sagaGathering:!!sagaWorld?.festival&&timeOfDay>=16&&timeOfDay<20};
     // Rotinas também avançam ao entrar em casa; não somem nem teleportam na volta.
     for(let i=0;i<actors.length;i++){
@@ -5244,8 +5268,8 @@ body.hud-game #legend{display:none !important;}
     if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.y))return false;
     community={x:point.x,y:point.y};navigation=null;for(const o of actors)o._routineKey='';return true;
   }
-  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
-  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());observeFrontier(window.FarmFrontierStory?.snapshot?.());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
+  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;lastVillage=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
+  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;lastVillage=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());observeVillage(window.FarmVillageStories?.snapshot());observeFrontier(window.FarmFrontierStory?.snapshot?.());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
   function isOpen(){return !!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()||!!window.FarmValleyPanels?.isOpen?.();}
   window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,conversationPose,
     cinematicQueue:()=>cinematicQueue.slice(),
@@ -6552,6 +6576,20 @@ body.hud-game #legend{display:none !important;}
           }
         }
       }
+      if(kind==='ice'){
+        // Fissuras longas pertencem ao mundo, não ao tile. A linha clara fica
+        // de um só lado, dando espessura ao gelo sem parecer piso de pedra.
+        for(let gy=Math.floor(wy/89)-1;gy<=Math.floor((wy+PATCH)/89)+1;gy++)for(let gx=Math.floor(wx/103)-1;gx<=Math.floor((wx+PATCH)/103)+1;gx++){
+          const h=hash(gx,gy,182);if(h%3!==0)continue;
+          const x=gx*103+(h%39)-wx,y=gy*89+((h>>>8)%41)-wy;
+          const points=[[x-16,y-9],[x-3,y-3],[x+6,y+12],[x+22,y+18]];
+          for(let k=1;k<points.length;k++){
+            const a=points[k-1],b=points[k];pixelLine(g,'#6ca39f',a[0],a[1],b[0],b[1]);
+            pixelLine(g,'#a6cabe',a[0]+1,a[1],b[0]+1,b[1]);
+          }
+          pixelLine(g,'#76aaa4',x+6,y+12,x+3,y+23);
+        }
+      }
       // Detalhes pequenos ocupam uma minoria dos tiles, em posições únicas
       // calculadas no mundo. Mantém áreas de descanso entre vegetação/relevo.
       for(let ty=Math.floor(wy/TS);ty<Math.ceil((wy+PATCH)/TS);ty++)for(let tx=Math.floor(wx/TS);tx<Math.ceil((wx+PATCH)/TS);tx++){
@@ -6626,6 +6664,10 @@ body.hud-game #legend{display:none !important;}
         edgeRect(g,shoreBody(p,cold,sx,sy),px,py,side,start,2,0,d-1);
         edgeRect(g,p.wet,px,py,side,start,2,d-1,1);
         if(hash(Math.floor(along/8),boundary,133)%3===0)edgeRect(g,p.line,px,py,side,start,2,d,1);
+        // Degrau úmido na margem inferior: um pixel basta para distinguir
+        // água abaixo da terra de uma mancha pintada sobre o gramado.
+        if(side===0&&p.kind!=='snow'&&hash(Math.floor(along/6),boundary,188)%4===0)
+          edgeRect(g,p.kind==='sand'?'#8e8061':'#637365',px,py,side,start,2,d,1);
       }
     }
     function shoreCorner(g,px,py,x,y,right,bottom,p,cold,outer=false){
@@ -6713,6 +6755,8 @@ body.hud-game #legend{display:none !important;}
         g.drawImage(cached(tiles,t+':'+!!cold+':'+v,TS,TS,c=>paintTile(c,t,v,cold)),px,py);
       }
       terrainEdge(g,px,py,x,y,t,cold);
+      if(API.rawScene==='main'&&(t===T.GRASS||t===T.GRASS2))
+        window.FarmOpenWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
     });
 
     /* ---------- Vegetação: massas recortadas, folhas em agrupamentos ---------- */
@@ -6954,15 +6998,60 @@ body.hud-game #legend{display:none !important;}
         if(winter())rect(c,P.snow,2,4,28,2);
       });
     });
-    API.registerObjectDrawer('bridge',(o,g)=>{
-      const w=o.w||48;blit(g,'bridge:'+w+':'+winter(),o.x,o.y-8,w,20,c=>{
-        rect(c,P.woodDark,0,5,w,11);rect(c,P.wood,0,6,w,8);
-        for(let x=0;x<w;x+=6){rect(c,P.woodLight,x,6,5,1);rect(c,P.woodDark,x+5,6,1,8);rect(c,P.woodLight,x+1,11,3,1);}
-        rect(c,P.woodDark,0,2,w,2);rect(c,P.woodLight,0,2,w,1);
-        rect(c,P.woodDark,0,15,w,2);rect(c,P.woodLight,0,15,w,1);
-        for(const x of [0,w-3]){rect(c,P.woodDark,x,0,3,8);rect(c,P.woodLight,x,0,1,7);rect(c,P.woodDark,x,14,3,6);}
-        if(winter())rect(c,P.snow,1,1,w-2,1);
+    function bridgeGeometry(o){
+      // O objeto histórico marca o centro da primeira linha. A passagem
+      // física já tem duas linhas; nunca ampliamos o mapa para caber na arte.
+      return{x:Math.round(o.x),y:Math.floor(o.y/TS)*TS,w:Math.round(o.w||48),h:Math.max(TS*2,Math.round(o.h||TS))};
+    }
+    function drawBridgeBase(o,g){
+      const b=bridgeGeometry(o),cold=winter();
+      blit(g,'bridge-deck:'+b.w+':'+b.h+':'+cold,b.x-6,b.y-2,b.w+12,b.h+12,c=>{
+        const x=6,y=2,w=b.w,h=b.h;
+        // Encaixes de pedra nas duas margens, fora do corredor. A sombra
+        // curta pertence ao contato; corrimãos são ordenados separadamente.
+        rect(c,'rgba(24,47,40,.23)',x-4,y+h,w+8,4);
+        for(const sx of [x-5,x+w-1]){
+          rect(c,P.stoneDark,sx,y-1,6,h+5);rect(c,P.stone,sx,y-1,5,h+1);
+          rect(c,P.snowShade,sx,y-1,5,1);
+          for(let sy=6;sy<h;sy+=9){rect(c,P.stoneDark,sx,y+sy,5,1);rect(c,'#89978a',sx+1,y+sy-2,3,1);}
+        }
+        rect(c,P.woodDark,x,y,w,h+3);rect(c,'#98724e',x+1,y,w-2,h);
+        // Tábuas transversais ao percurso; emendas e veios discretos, com
+        // desgaste mais claro no centro usado pelos moradores.
+        for(let px=0;px<w;px+=6){
+          const pw=Math.min(5,w-px),seed=hash(px,w+h,193);
+          rect(c,px%12?'#a68157':'#b08b5e',x+px,y,pw,h);
+          rect(c,'#d0b184',x+px,y,pw,1);rect(c,'#76583f',x+px+pw,y,1,h);
+          rect(c,'#bd9b6a',x+px+1,y+8,pw>3?pw-2:1,h-16);
+          rect(c,'#8e6b49',x+px+1,y+4+(seed%5),2,5);
+          rect(c,'#d0b184',x+px+2,y+h-9-(seed%4),1,4);
+          for(const sy of [y+3,y+h-4])rect(c,'#5b5745',x+px+2,sy,1,1);
+        }
+        rect(c,'#634b39',x,y+h,w,3);rect(c,'#b18b5e',x,y+h,w,1);
+        for(const sx of [x+3,x+w-6]){rect(c,'#574b3b',sx,y+h+3,4,5);rect(c,'#8b7653',sx,y+h+3,1,4);}
+        if(cold){rect(c,P.snow,x,y,w,1);rect(c,P.snow,x+1,y+h-2,w-2,2);}
       });
+    }
+    function drawBridgeRail(o,g){
+      const w=o.w||48,cold=winter();
+      blit(g,'bridge-rail:'+w+':'+cold,o.x-5,o.y-13,w+10,19,c=>{
+        const x=5,y=13;
+        rect(c,'rgba(24,47,40,.18)',x-3,y,w+6,2);
+        rect(c,P.woodDark,x-3,y-9,w+6,3);rect(c,P.woodLight,x-3,y-10,w+6,2);
+        rect(c,P.pathLight,x-3,y-10,w+6,1);
+        rect(c,'#73573f',x-2,y-4,w+4,2);rect(c,'#b59060',x-2,y-4,w+4,1);
+        for(const px of [x-3,x+Math.floor(w/2)-1,x+w]){
+          rect(c,P.woodDark,px,y-12,3,16);rect(c,P.woodLight,px,y-12,2,14);
+          rect(c,P.pathLight,px-1,y-13,5,2);rect(c,'#665c46',px+1,y-8,1,1);
+          if(cold)rect(c,P.snow,px-1,y-14,5,2);
+        }
+      });
+    }
+    // Fallback para consumidores que não separam as camadas. O jogo e as
+    // cenas usam drawBridgeBase + bridgeParts de FarmWorldDepth.
+    API.registerObjectDrawer('bridge',(o,g)=>{
+      const b=bridgeGeometry(o);drawBridgeBase(o,g);
+      drawBridgeRail({x:b.x,y:b.y,w:b.w},g);drawBridgeRail({x:b.x,y:b.y+b.h,w:b.w},g);
     });
 
     function animalPaint(g,kind,shorn,closed,step,sleeping){
@@ -7160,7 +7249,7 @@ body.hud-game #legend{display:none !important;}
       }
     }
     window.FarmWorldArt=Object.freeze({
-      version:1,palette:P,drawAtmosphere,
+      version:2,palette:P,drawAtmosphere,bridgeGeometry,drawBridgeBase,drawBridgeRail,
       state:()=>({tileSprites:tiles.size,objectSprites:sprites.size,cacheBytes:cachePixels*4,drawn,culled,
         atmosphere:{...atmosphere,anchors:atmosphere.anchors.map(a=>({...a}))}})
     });
@@ -7233,6 +7322,8 @@ body.hud-game #legend{display:none !important;}
     ines:[4.7,1.07,.16],caio:[4.5,1.04,.13],nico:[3.4,.83,.04],helena:[5.1,1.13,.22],
     davi:[5.7,1.18,.18],bia:[4.0,.94,.08],player:[4.4,1,.12]});
   const syllables=Object.freeze(['0121031200103200012010300','01321003001210300121000','01200132000130121000300']);
+  const defaultGestures=Object.freeze({neutral:'explain',warm:'reassure',thoughtful:'reflect',
+    concerned:'reassure',joyful:'invite',resolved:'explain',surprised:'shrug'});
   const sprites=new Map(),portraits=new Map(),speechBanks=new Map();
   function canvas(w,h){
     if(typeof OffscreenCanvas!=='undefined') return new OffscreenCanvas(w,h);
@@ -7253,18 +7344,25 @@ body.hud-game #legend{display:none !important;}
   function conversation(opts,allowed=true,id='player'){
     const conversing=allowed&&(!!opts.speaking||gestures.includes(opts.gesture));
     const expression=conversing&&expressions.includes(opts.expression)?opts.expression:'neutral';
-    const gesture=conversing&&gestures.includes(opts.gesture)?opts.gesture:'';
+    const gesture=conversing?(gestures.includes(opts.gesture)?opts.gesture:defaultGestures[expression]):'';
     const t=Math.max(0,Number.isFinite(opts.speechTime)?opts.speechTime:clock(opts)/1000);
     const identity=id==='player'?6:Math.max(0,keys.indexOf(id)),[period,pace,delay]=acting[id]||acting.player;
     const animated=conversing&&!opts.reducedMotion,pattern=syllables[identity%syllables.length];
-    const mouth=animated&&opts.speaking?Number(pattern[Math.floor(t/(.105*pace))%pattern.length]):0;
+    const listening=gesture==='listen';
+    // Pequenas frases têm articulação e pausa para respirar. Antes a boca
+    // repetia sílabas continuamente, inclusive quando o gesto era de escuta.
+    // Só o relógio fornecido pelo diálogo controla esta interpretação.
+    const phrase=1.55*pace+(identity%3)*.12,pause=(expression==='thoughtful'?.58:.38)*pace;
+    const phraseTime=Math.max(0,t-delay)%(phrase+pause);
+    const mouth=animated&&opts.speaking&&!listening&&t>=delay&&phraseTime<phrase?
+      Number(pattern[Math.floor(phraseTime/(.125*pace))%pattern.length]):0;
     // Preparação -> gesto -> acomodação -> silêncio. A escuta reage apenas
     // de vez em quando; não faz o mesmo aceno repetido de quem está falando.
-    const listening=gesture==='listen',beat=Math.max(0,t-delay-(listening?1.35:0))%(period+(listening?2.1:0));
-    const entered=t>=delay+(listening?1.35:0),duration=(listening?1.0:1.5)*pace;
+    const beat=Math.max(0,t-delay-(listening?1.35:0))%(period+(listening?2.1:0));
+    const entered=t>=delay+(listening?1.35:0),duration=(listening?1.15:1.85)*pace;
     let speechPhase=0;
     if(animated&&gesture&&entered&&beat<duration){
-      const progress=beat/duration;speechPhase=progress<.18?1:progress<.61?2:progress<.90?3:0;
+      const progress=beat/duration;speechPhase=progress<.25?1:progress<.60?2:progress<.93?3:0;
     }
     const blinkPeriod=4.1+identity*.29,blinkAt=(t+1.2+identity*.21)%blinkPeriod;
     const speechBlink=animated&&blinkAt>blinkPeriod-.12;
@@ -7298,8 +7396,13 @@ body.hud-game #legend{display:none !important;}
     // ambos os pés pousarem; valores discretos mantêm o cache de sprites finito.
     const gait=rest||actor.dead||opts.reducedMotion||action?0:restWalking?8:blend(actor.gaitBlend,actor.moving?1:0);
     const moving=gait>0,runMix=moving&&!restWalking?blend(actor.gaitRunBlend,actor.running?1:0):0;
+    // Apenas o tecido junto ao peito respira. A âncora dos pés, a cabeça e
+    // as mãos ficam estáveis; dois estados discretos mantêm o cache limitado.
+    // Na fala a respiração compartilha a pose já existente no atlas.
+    const idleBreath=!hero&&!moving&&!rest&&!action&&!speech.conversing&&!actor.dead&&!opts.reducedMotion&&
+      [0,0,0,1,1,1,0,0][Math.floor((Math.max(0,clock(opts)/1000)+Math.max(0,keys.indexOf(actor.npcId||actor.id))*.37)/.65)%8]?1:0;
     return {dir:dirOf(restWalking?opts.restWalkDir:heroAction?aim:opts.facing??actor.dir),frame:moving?((Math.floor((Number(restWalking?opts.restWalkPhase:actor.anim)||0)/(Math.PI/8))%16)+16)%16:0,
-      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,...speech,
+      moving,gait,runMix,rest,restMode,restStage,restBreath,restDoze,idleBreath,...speech,
       heldProp:!rest&&!actor.dead&&heldProps.includes(opts.heldProp)?opts.heldProp:'',
       action:action?(hero?(heroAction?requested:'work'):job):'',heroAction,actionReach:hasTarget&&Math.hypot(dx,dy)>18?1:0,
       actionFrame:action?(heroAction?(opts.reducedMotion?6:Math.min(11,Math.floor(progress*12))):Math.min(7,Math.max(0,Math.floor((hero?(1-actor.actionTimer/.35):activity/2.4)*8)))):0,
@@ -7437,8 +7540,8 @@ body.hud-game #legend{display:none !important;}
   // sentado e deitado. O descanso muda olhos/apoio, não troca o personagem.
   function headDip(s){
     if(!s.conversing||!s.speechPhase)return 0;
-    if(s.gesture==='nod')return [0,-1,1,0][s.speechPhase];
-    if(s.gesture==='listen'||s.gesture==='reflect')return s.speechPhase===2?1:0;
+    if(s.gesture==='nod')return s.speechPhase===2?1:0;
+    if(s.gesture==='listen'||s.gesture==='reflect')return s.speechPhase>=2?1:0;
     if(s.gesture==='reassure')return s.speechPhase===3?1:0;
     return 0;
   }
@@ -7553,11 +7656,11 @@ body.hud-game #legend{display:none !important;}
     const emphasis=phase===2,settling=phase===3;
     let hx=side?3:7,hy=-9,w=2;
     if(phase){
-      if(s.gesture==='explain'){hx+=(emphasis?3:1)+(broad?1:0);hy-=emphasis?(quiet?2:3):1;}
-      if(s.gesture==='invite'){hx+=emphasis?4:settling?2:0;hy-=emphasis?2:1;w=emphasis?4:3;}
-      if(s.gesture==='point'){hx+=emphasis?6:settling?3:1;hy-=emphasis?4:2;w=emphasis?3:2;}
-      if(s.gesture==='reflect'){hx=side?2:1;hy=emphasis?-14:-11;w=3;}
-      if(s.gesture==='reassure'){hx=side?1:0;hy=emphasis?-12:settling?-10:-9;w=3;}
+      if(s.gesture==='explain'){hx+=(emphasis?3:settling?2:0)+(broad&&emphasis?1:0);hy-=emphasis?(quiet?2:3):settling?2:0;}
+      if(s.gesture==='invite'){hx+=emphasis?4:settling?2:0;hy-=emphasis?2:settling?1:0;w=emphasis?4:3;}
+      if(s.gesture==='point'){hx+=emphasis?6:settling?3:0;hy-=emphasis?4:settling?2:0;w=emphasis?3:2;}
+      if(s.gesture==='reflect'){hx=side?2:1;hy=emphasis?-14:settling?-12:-10;w=3;}
+      if(s.gesture==='reassure'){hx=side?1:0;hy=emphasis?-12:settling?-11:-9;w=3;}
       if(s.gesture==='shrug'){hx=side?6:9;hy=emphasis?-13:-10;w=3;}
     }
     // Papel/caixa pedem apoio contínuo das duas mãos. A interpretação segue
@@ -7807,6 +7910,12 @@ body.hud-game #legend{display:none !important;}
       rect(g,P.sage,side?-5:-7,-16,side?9:14,10);rect(g,P.leaf,side?-5:-7,-16,side?9:14,1);
       for(let i=0;i<4;i++) rect(g,P.amber,(side?-4:-6)+i*3,-9,1,2);
     }
+    if(s.idleBreath||(s.conversing&&s.speechPhase===1)){
+      const cloth=s.blanket?P.leaf:shirtHi;
+      rect(g,cloth,side?-4:-6,-16,2,2);
+      // Vinco curto, sem alargar a silhueta nem mover o braço que segura algo.
+      if(!back&&!s.heldProp)rect(g,s.blanket?P.sage:shirtSh,side?1:3,-9,1,2);
+    }
     paintHead(g,d,s);
     paintAction(g,d,s,hand,false);
     paintSpeechGesture(g,d,s,hand,false);
@@ -7871,7 +7980,9 @@ body.hud-game #legend{display:none !important;}
     rect(g,'#91a676',4,4,9,10);rect(g,P.leaf,5,5,5,1);
     // Pequeno ramo bordado no fundo, coerente com o vale.
     for(let i=0;i<4;i++){rect(g,P.edge,25-i,18+i*2,1,2);rect(g,P.leaf,24-i,17+i*2,2,1);}
-    if(s){g.save();g.translate(0,headDip(s));}
+    // O enquadramento do retrato não sobe/desce com cada aceno. Escuta é
+    // expressa pelos olhos; mãos e sobrancelhas acompanham a mesma fala.
+    if(s)g.save();
     rect(g,d.shirtSh,6,26,21,4);rect(g,d.shirt,8,24,17,6);rect(g,d.shirtHi,8,25,5,5);
     rect(g,d.shirtSh,23,26,3,4);rect(g,d.skinSh,13,21,7,5);rect(g,d.skin,14,21,4,4);
     rect(g,d.trim,11,25,3,2);rect(g,P.cream,13,25,3,3);rect(g,P.cream,18,25,3,2);
@@ -7968,7 +8079,8 @@ body.hud-game #legend{display:none !important;}
       rect(g,d.skin,x,14,w,2);
       if(s.blink)rect(g,d.hairSh,x,15,w-1,1);
       else{
-        const eyeHeight=bright||['joyful','surprised'].includes(s.expression)?2:1;
+        const attentive=s.gesture==='listen'&&s.speechPhase>=2;
+        const eyeHeight=!attentive&&(bright||['joyful','surprised'].includes(s.expression))?2:1;
         rect(g,P.cream,x,14,w,eyeHeight);
         rect(g,P.ink,x+Math.max(0,Math.min(w-1,(x===12?2:1)+s.gaze)),14,1,eyeHeight);
       }
@@ -8034,6 +8146,8 @@ body.hud-game #legend{display:none !important;}
     drawNPC(g,o,opts={}){return draw(g,o,profiles[o?.npcId||o?.id]?o.npcId||o.id:'nico',opts,false);},
     drawPortrait,
     actionInfo(actor,opts={}){const s=state(actor,opts,true);return{kind:s.action,frame:s.actionFrame,direction:s.dir,active:s.heroAction,reach:s.actionReach};},
+    actingInfo(actor,opts={}){const s=state(actor,opts,false);return{direction:s.dir,moving:s.moving,mouth:s.mouth,
+      gesture:s.gesture,phase:s.speechPhase,blink:s.blink,gaze:s.gaze,breath:s.idleBreath,feetOffsetY:FEET_Y};},
     // Diagnóstico de baixo custo para integração; não revela nem altera saves.
     cacheInfo(){return {sprites:sprites.size,portraits:portraits.size,speechBanks:speechBanks.size,maxSprites:MAX_SPRITES,maxPortraits:MAX_PORTRAITS,maxSpeechBanks:MAX_SPEECH_BANKS};}
   });
@@ -8232,6 +8346,7 @@ body.hud-game #legend{display:none !important;}
   function depth(o){
    if(o.type==='player'||o.type==='story_npc')return o.y+10;
    if(o.type==='world_pen_rail')return o.y;
+   if(o.type==='world_bridge_rail')return o.y+2;
    if(o.type==='mtn_cabin')return o.y+3;
    if(o.type==='animal')return o.y+(['chick','chicken'].includes(o.kind)?4:6);
    if(o.type==='tree'||o.type==='fx_fruittree')return o.y+9;
@@ -8253,6 +8368,16 @@ body.hud-game #legend{display:none !important;}
   }
   API.registerObjectDrawer('world_pen_rail',(o,g)=>rail(g,o.x,o.y,o.w));
   API.registerObjectDrawer('world_pen_side',(o,g)=>{R(g,P.woodDark,o.x,o.y-21,3,10);R(g,P.woodLight,o.x,o.y-21,1,10);R(g,P.wood,o.x,o.y-12,3,9);});
+
+  // Deck antes dos personagens; corrimãos só nos dois limites do corredor.
+  // São peças efêmeras de desenho, não objetos físicos nem itens de save.
+  function drawBridgeBase(g,o){window.FarmWorldArt.drawBridgeBase(o,g);}
+  function bridgeParts(o){
+   const b=window.FarmWorldArt.bridgeGeometry(o);
+   return [{type:'world_bridge_rail',x:b.x,y:b.y,w:b.w},
+    {type:'world_bridge_rail',x:b.x,y:b.y+b.h,w:b.w}];
+  }
+  API.registerObjectDrawer('world_bridge_rail',(o,g)=>window.FarmWorldArt.drawBridgeRail(o,g));
 
   function drawGround(g){
    if(API.rawScene!=='main')return;
@@ -8308,6 +8433,12 @@ body.hud-game #legend{display:none !important;}
        volumeProjection(g,o.x,o.y+o.h-2,o.w,o.h,dx,false);break;
       case 'mtn_cabin':volumeProjection(g,o.x-32,o.y,64,68,dx,false);break;
       case 'world_ridge':volumeProjection(g,o.x,o.y+o.h,o.w,o.rise,dx,true);break;
+      case 'world_bridge_rail':
+       // Só a projeção varia com o sol; bases e tábuas não se deslocam.
+       for(const xx of [o.x-3,o.x+Math.floor(o.w/2)-1,o.x+o.w]){
+        g.beginPath();g.moveTo(xx,o.y+1);g.lineTo(xx+3,o.y+1);
+        g.lineTo(xx+3+dx*8,o.y+5);g.lineTo(xx+dx*8,o.y+5);g.closePath();g.fill();
+       }break;
       default:continue;
      }
      count++;
@@ -8322,7 +8453,7 @@ body.hud-game #legend{display:none !important;}
    if(o.type!=='barn')points.push({x:o.x+o.w-34,y:o.y+64,r:25},{x:o.x+o.w/2,y:o.y+o.h-26,r:16});
    return points;
   }
-  window.FarmWorldDepth=Object.freeze({version:2,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawGroundShadows,drawPenBase,penParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
+  window.FarmWorldDepth=Object.freeze({version:3,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawGroundShadows,drawPenBase,penParts,drawBridgeBase,bridgeParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
  });
 })();
 
@@ -9076,8 +9207,9 @@ body.hud-game #legend{display:none !important;}
   function registerScenes(definitions){
     if(!Array.isArray(definitions))return 0;let count=0;
     for(const def of definitions.slice(0,16)){
-      if(!def||!/^(saga|frontier)-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(!def||!/^(saga|frontier|village)-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
       if(def.id.startsWith('frontier-')&&(typeof def.frontierMission!=='string'||!/^helena-[a-z-]+$/.test(def.frontierMission)))continue;
+      if(def.id.startsWith('village-')&&(typeof def.villageMission!=='string'||!window.FarmVillageStories?.missionCatalogue()?.some(q=>q.id===def.villageMission)))continue;
       if(!def.shots.every(s=>s&&names[s.speaker]&&typeof s.line==='string'&&s.line.length<1800))continue;
       const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.startsWith('saga-')?def.id.slice(5):null};
       films.push(film);byId.set(film.id,film);count++;
@@ -9086,6 +9218,7 @@ body.hud-game #legend{display:none !important;}
   }
   function available(film){
     if(seen.has(film.id))return true;
+    if(film.villageMission)return !!read().village?.completedQuestIds?.includes(film.villageMission);
     if(film.frontierMission)return !!read().frontier?.arcs?.some(a=>a.missions?.some(m=>m.id==='frontier:'+film.frontierMission&&m.completed));
     if(!film.sagaEpisode)return film.chapter<=chapterIndex();
     const saga=read().saga;
@@ -9115,7 +9248,7 @@ body.hud-game #legend{display:none !important;}
     install();safely(adapter.beforeOpen);previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';root.setAttribute('aria-hidden','false');reduced=isReduced();
   }
   function play(id,opts={}){
-    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||(film.sagaEpisode||film.frontierMission)&&!available(film))return false;
+    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||(film.sagaEpisode||film.frontierMission||film.villageMission)&&!available(film))return false;
     showOverlay();const state=read();active={kind:'film',film,index:0,elapsed:0,speech:0,reveal:0,replay:!!opts.replay,player:{name:typeof state.name==='string'?state.name.slice(0,40):'Você',gender:state.gender==='f'?'f':'m'},backdrop:null};
     root.querySelector('.vc-gallery').hidden=true;stage.hidden=false;root.querySelector('.vc-dialogue').hidden=false;root.querySelector('.vc-controls').hidden=false;root.querySelector('.vc-skip').textContent='Pular cena';
     heading.textContent=film.title;subheading.textContent='Uma lembrança do vale · avance no seu ritmo';enterShot();nextButton.focus({preventScroll:true});return true;
@@ -10026,15 +10159,18 @@ body.hud-game #legend{display:none !important;}
   const labels={saga:'Minha história',people:'Moradores',farm:'Vida na fazenda',journal:'Meu caderno'};
   const tabLabels={saga:'História',people:'Pessoas',farm:'Fazenda',journal:'Caderno'};
   const farmLabels={projects:'Projetos',recipes:'Oficina e cozinha',production:'Produção',orders:'Entregas',clues:'Pistas do vale'};
-  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico'};
+  const names={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',helena:'Helena',davi:'Davi',bia:'Bia'};
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
   const button=(text,fn,key,primary=false)=>{const n=el('button',primary?'v6-button v6-primary':'v6-button',text);n.type='button';if(key)n.dataset.valleyAction=key;n.addEventListener('click',fn);return n;};
   const read=()=>adapter.readState?.()||{};
   const saga=()=>window.FarmValleySaga?.snapshot?.()||{};
   const farm=()=>window.FarmLife?.snapshot?.()||{};
+  const village=()=>window.FarmVillageStories?.snapshot?.()||{};
+  const villageDiary=()=>window.FarmVillageStories?.diaryView?.()||{};
   const titleOf=id=>names[id]||id||'um morador';
+  function storyText(text){const info=read(),name=info.name||info.player?.name||'Alex';return String(text||'').replace(/\bAlex\b/g,()=>name);}
   function location(id){const info=read(),n=(info.npcs||[]).find(n=>n.npcId===id);if(!n)return 'Procure no mapa do vale.';return direction(n.x,n.y);}
-  function direction(x,y){const info=read(),dx=x-(info.x||0),dy=y-(info.y||0),steps=Math.round(Math.hypot(dx,dy)/16),region=y<42*16?'Montanha':y>=90*16?'Oásis':'Fazenda';return region+' · '+(steps<=2?'perto de você':steps+' passos ao '+(Math.abs(dx)>Math.abs(dy)?dx<0?'oeste':'leste':dy<0?'norte':'sul'));}
+  function direction(x,y){const info=read(),dx=x-(info.x||0),dy=y-(info.y||0),steps=Math.round(Math.hypot(dx,dy)/16),east=window.FarmOpenWorld?.regionAt?.(x/16,y/16),region=window.FarmOpenWorld?.regions?.[east]?.name||(y<42*16?'Montanha':y>=90*16?'Oásis':'Fazenda');return region+' · '+(steps<=2?'perto de você':steps+' passos ao '+(Math.abs(dx)>Math.abs(dy)?dx<0?'oeste':'leste':dy<0?'norte':'sul'));}
   function destination(id,x,y){close(false);adapter.focusGame?.();if(window.FarmWorldMap?.open?.()===true)FarmWorldMap.setDestination(id?'npc:'+id:{x,y});}
   function npcGuide(npcId){const box=el('div','v6-guide');box.append(el('strong','',titleOf(npcId)+' espera sua conversa'),el('p','',location(npcId)+' Aproxime-se e pressione E. O combinado e a entrega acontecem com este morador.'),button('Encontrar '+titleOf(npcId)+' no mapa',()=>destination(npcId),'map:npc:'+npcId));return box;}
   function objectives(list){const ul=el('ul','v6-objectives');for(const o of list||[]){const n=Math.max(0,Number(o.n)||0),goal=Math.max(1,Number(o.goal)||1);ul.append(el('li',n>=goal?'v6-done':'',(n>=goal?'✓ ':'')+(o.text||'Objetivo')+' · '+n+' / '+goal));}return ul;}
@@ -10043,23 +10179,52 @@ body.hud-game #legend{display:none !important;}
   function action(card,text,method,id,enabled,reason,key){const b=button(text,()=>transact(method,id),key||method+':'+id,true);b.disabled=enabled!==true;card.append(b);if(!enabled&&reason)card.append(el('p','v6-reason',reason));}
   function transact(method,id){const api=window.FarmLife;if(!opened||typeof api?.[method]!=='function')return false;const result=api[method](id);notice=result?.message||'Esta ação ainda não está disponível.';noticeOk=result?.ok===true;adapter.onTransaction?.(result);refresh();return noticeOk;}
   function time(seconds){const n=Math.max(0,Math.ceil(Number(seconds)||0));return n>=60?Math.floor(n/60)+' min '+(n%60)+' s':n+' s';}
+  function villageStatus(arc){
+    if(arc.completed||arc.status==='completed')return '✓ História concluída · '+arc.stageCount+' encontros';
+    if(arc.status==='available')return 'Uma história por descobrir · '+arc.stageCount+' encontros';
+    return 'Encontro '+(arc.stage+1)+' / '+arc.stageCount+' · '+(arc.status==='ready'?'Volte para conversar':'Em andamento');
+  }
+  function appendVillageArc(card,arc,discovery){
+    if(!arc)return;
+    card.append(el('h4','',arc.title),el('p',arc.completed?'v6-done':'v6-kicker',villageStatus(arc)));
+    if(arc.completed){
+      if(arc.consequence)card.append(el('p','v6-voice',storyText(arc.consequence)));
+      if(discovery?.text){const ending=el('details','v6-memory'),text=el('p','',storyText(discovery.text));text.style.whiteSpace='pre-line';ending.append(el('summary','','Relembrar o último encontro'),text);card.append(ending);}
+    }else if(arc.status==='available')card.append(el('p','v6-reason','Aproxime-se de '+titleOf(arc.npcId)+' e pressione E para conversar sobre esta história. O primeiro encontro começa quando vocês combinarem um caminho.'));
+    else{
+      card.append(el('p','v6-voice',arc.stageTitle),objectives(arc.objectives));
+      card.append(el('p','v6-reason',arc.status==='ready'?'Os objetivos desta etapa estão prontos. Volte a '+titleOf(arc.npcId)+' e pressione E para conferir o que mudou e combinar a continuação.':'As ações contam depois do combinado. A próxima etapa começa na conversa com '+titleOf(arc.npcId)+'.'));
+    }
+  }
+  function renderVillageSummary(){
+    const s=village(),arcs=s.arcs||[];if(!arcs.length)return;
+    const active=arcs.filter(a=>a.status==='active'||a.status==='ready'),completed=arcs.filter(a=>a.completed).length;
+    const card=block('Vozes do vale',storyText(active.length?active.length+(active.length===1?' história em andamento.':' histórias em andamento.')+' Cada encontro continua com quem fez o combinado.':completed===arcs.length?'As seis histórias chegaram ao último encontro. As escolhas permanecem nas falas dos moradores.':'Seis histórias próprias aproximam Alex dos moradores. Converse sobre as lembranças, a ponte, as sementes e os caminhos do vale.'));
+    card.append(el('p','v6-reason',completed+' / '+arcs.length+' histórias concluídas'));
+    for(const arc of active){const item=el('details','v6-memory');item.open=active.length===1;item.append(el('summary','',titleOf(arc.npcId)+' · '+arc.title),el('p','v6-kicker',villageStatus(arc)),el('p','v6-voice',arc.stageTitle),objectives(arc.objectives));item.append(button('Encontrar '+titleOf(arc.npcId)+' no mapa',()=>destination(arc.npcId),'map:village:'+arc.npcId));card.append(item);}
+    card.append(button('Ver histórias dos moradores',()=>{section='people';selectedId='';body.scrollTop=0;refresh();},'village:people'));body.append(card);
+  }
   function renderSaga(){const s=saga(),p=s.protagonist||{},info=read(),hero=block(p.name||info.name||'Alex Vale',p.description||'Um retorno ao vale, uma pergunta antiga e um lugar para construir aos poucos.','v6-hero');
     hero.prepend(el('span','v6-kicker',p.role||'Uma aventura acolhedora com mistério'));
     if(p.voice)hero.append(el('p','v6-voice',p.voice));if(p.innerVoice)hero.append(el('blockquote','v6-inner',p.innerVoice));body.append(hero);
     const act=s.act;if(act){const card=block(act.title,act.description);card.prepend(el('span','v6-kicker',(s.completed?'A vida continua no vale':'Página '+((act.index||0)+1)+' / '+(s.episodes?.length||8))+' · '+(({available:'Converse para combinar',active:'Em andamento',ready:'Volte para conversar',completed:'Concluída'})[act.status]||'Por descobrir')));card.append(objectives(act.objectives));if(act.coins)card.append(el('p','v6-reason',act.coins+' moedas ao concluir; ações anteriores ao combinado não contam.'));if((act.objectives||[]).some(o=>/pele|histologia|epiderme|derme|vasos/i.test(o.text||'')))card.append(button('Investigar a pele',()=>{close(false);adapter.focusGame?.();adapter.openSkin?.();},'skin:study'));if(!s.completed)card.append(npcGuide(act.npcId));body.append(card);}
     if(s.completed)body.append(block('Uma casa não termina quando se abre','O mistério deixa marcas nas relações. Cultive, produza, visite os moradores e leve novas entregas ao quadro. O vale continua depois da última página.'));
+    renderVillageSummary();
     const completed=(s.episodes||[]).filter(e=>e.status==='completed');if(completed.length){const history=block('O caminho até aqui');for(const e of completed){const item=el('details','v6-memory');item.append(el('summary','',e.title),el('p','',e.description||''));if(e.decision)item.append(el('p','v6-voice',typeof e.decision==='string'?e.decision:e.decision.consequence||e.decision.label||''));history.append(item);}body.append(history);}
     body.append(button('Jornada das sementes, carta e mapa social',()=>{close(false);window.FarmStoryUI?.open?.();},'legacy:journey'));
   }
-  function renderPeople(){const s=saga(),grid=el('div','v6-grid');body.append(el('p','v6-intro','Cada morador tem um plano próprio, algo que evita dizer e um trabalho que precisa de companhia. Os vínculos avançam com combinados cumpridos e decisões lembradas.'));
+  function renderPeople(){const s=saga(),stories=village(),diary=villageDiary(),grid=el('div','v6-grid');body.append(el('p','v6-intro','Cada morador tem um plano próprio, algo que evita dizer e um trabalho que precisa de companhia. Os vínculos avançam com combinados cumpridos e decisões lembradas.'));
     for(const arc of s.arcs||[]){const relation=(s.relationships||[]).find(r=>r.npcId===arc.npcId),card=block(titleOf(arc.npcId)+' · '+arc.title,arc.agenda);const c=el('canvas','v6-face');c.width=96;c.height=96;c.setAttribute('aria-label','Retrato de '+titleOf(arc.npcId));window.FarmCharacterArt?.drawPortrait(c,arc.npcId,{reducedMotion:true});card.prepend(c);
       card.append(el('p','v6-voice',relation?.label||'Um vínculo por descobrir'),el('p','',relation?.consequence||arc.flaw||''),el('p','v6-reason','Encontros concluídos: '+(arc.step||0)+' / '+(arc.total||2)));
-      if(arc.objective)card.append(el('p','',arc.objective));card.append(objectives(arc.objectives),el('p','v6-reason',location(arc.npcId)),button('Encontrar no mapa',()=>destination(arc.npcId),'map:npc:'+arc.npcId));grid.append(card);
+      if(arc.objective)card.append(el('p','',arc.objective));card.append(objectives(arc.objectives));
+      appendVillageArc(card,(stories.arcs||[]).find(a=>a.npcId===arc.npcId),(diary.discoveries||[]).find(a=>a.npcId===arc.npcId));
+      card.dataset.valleyItem='person:'+arc.npcId;card.append(el('p','v6-reason',location(arc.npcId)),button('Encontrar no mapa',()=>destination(arc.npcId),'map:npc:'+arc.npcId));grid.append(card);
     }body.append(grid);if(!grid.children.length)body.append(block('Seis vozes do vale','Rosa, Lia, Tomás, Inês, Caio e Nico estão no mapa. A primeira conversa abre espaço para os próximos encontros.'));
   }
-  function renderJournal(){const s=saga();body.append(el('p','v6-intro','Páginas escritas depois dos encontros. Carregar o jogo preserva lembranças e escolhas, sem conceder recompensas outra vez.'));
+  function renderJournal(){const s=saga(),stories=village();body.append(el('p','v6-intro','Páginas escritas depois dos encontros. Carregar o jogo preserva lembranças e escolhas, sem conceder recompensas outra vez.'));
+    for(const entry of (stories.journal||[]).slice().reverse()){const card=block(entry.title,storyText(entry.text));card.prepend(el('span','v6-kicker','Vozes do vale · '+titleOf(entry.npcId)));const text=card.querySelector('p');if(text)text.style.whiteSpace='pre-line';body.append(card);}
     for(const e of (s.journal||[]).slice().reverse()){const card=block(e.title,e.text);if(e.npcId)card.prepend(el('span','v6-kicker',titleOf(e.npcId)));body.append(card);}
-    if(!s.journal?.length)body.append(block('Uma primeira página em branco','Converse com Rosa para começar. As anotações de Alex aparecem depois de escolhas e experiências reais.'));
+    if(!s.journal?.length&&!stories.journal?.length)body.append(block('Uma primeira página em branco','Converse com Rosa para começar. As anotações de Alex aparecem depois de escolhas e experiências reais.'));
     if(s.decisionHistory?.length){const choices=block('As escolhas que ficaram');for(const d of s.decisionHistory)choices.append(el('h4','',d.label),el('p','',d.consequence));body.append(choices);}
     if(s.clues?.length){const clues=block('O que já sabemos');for(const c of s.clues)clues.append(el('h4','',c.title),el('p','',c.text));body.append(clues);}
   }
@@ -10457,7 +10622,8 @@ body.hud-game #legend{display:none !important;}
   (window.__farmBiomes=window.__farmBiomes||[]).push(function(API){
     'use strict';
     const T=API.T,TS=API.TS,masks=new Map(),anchors=new Map();
-    let sourceMap=null,groups=0;
+    let sourceMap=null,groups=0,cellStride=1;
+    const MAX_GROUPS=96;
     const wet=t=>t===T.WATER||t===T.RIVER||t===T.OASIS||t===T.ICE;
     const liquid=t=>t===T.OASIS||((t===T.WATER||t===T.RIVER)&&!API.isFrio());
     const reduced=()=>typeof motionOk==='function'&&!motionOk();
@@ -10538,20 +10704,31 @@ body.hud-game #legend{display:none !important;}
       waterRect(g,color,x-r+2,y+ry,r*2-3);
     }
     function drawSurface(g,camX,camY,visW,visH){
-      groups=0;if(API.rawScene!=='main'||reduced())return;
+      groups=0;cellStride=1;if(API.rawScene!=='main'||reduced()||visW<=0||visH<=0)return;
       const time=performance.now()/1000;
       // Uma crista a cada célula de 32px; distribuição fixa no mundo.
       // A cor vem da água, sem estrelas brancas nem uma grade piscando.
+      while((Math.ceil(visW/(32*cellStride))+1)*(Math.ceil(visH/(32*cellStride))+1)>MAX_GROUPS)cellStride*=2;
       for(let cy=Math.floor(camY/32);cy<=Math.floor((camY+visH)/32);cy++)
         for(let cx=Math.floor(camX/32);cx<=Math.floor((camX+visW)/32);cx++){
+          if(((cx%cellStride)+cellStride)%cellStride||((cy%cellStride)+cellStride)%cellStride)continue;
           const seed=hash(cx,cy);if(seed%5===0)continue;
           const x=cx*32+7+seed%18,y=cy*32+7+(seed>>>8)%18;
           const tile=API.tileAt(Math.floor(x/TS),Math.floor(y/TS));
           if(!liquid(tile)||!surfaceAt(x,y))continue;
-          const phase=Math.floor(time*.9+seed%17)%4,dy=phase===3?1:0;
-          const color=phase===0?'#508e87':phase===3?'#4b8983':'#629d93';
-          waterRect(g,color,x,y+dy,3+(seed>>>16)%4);
-          if(phase===1)waterRect(g,'#538f87',x+2,y-1,2);
+          const oasis=tile===T.OASIS,phase=Math.floor(time*(oasis?.55:.85)+seed%17)%6;
+          const dy=oasis?(phase===4?1:0):Math.floor(phase/2),dx=oasis?0:(phase%3)-1;
+          const color=oasis?(phase<2?'#54988c':phase>3?'#4c8e84':'#73ab99'):
+            (phase<2?'#508e87':phase>3?'#4b8983':'#629d93');
+          const length=3+(seed>>>16)%4+(phase===2||phase===3?2:0);
+          waterRect(g,color,x+dx,y+dy,length);
+          if(phase===2)waterRect(g,oasis?'#5d9d8f':'#538f87',x+dx+2,y+dy-1,2);
+          // Reflexo comprido e quebrado, raro. Oásis quase imóvel; corrente
+          // do rio avança poucos pixels e some antes de reiniciar o ciclo.
+          if(seed%7===0&&phase>0&&phase<4){
+            waterRect(g,oasis?'#649e8b':'#689b91',x+dx-2,y+dy+3,3);
+            waterRect(g,oasis?'#76ab98':'#76a89b',x+dx+4,y+dy+3,3+(phase%2));
+          }
           groups++;
         }
     }
@@ -10607,7 +10784,7 @@ body.hud-game #legend{display:none !important;}
     API.registerObjectDrawer('river_cattail',drawCattail);
     API.registerObjectDrawer('fishing_spot',drawFishing);
     window.FarmWaterLife=Object.freeze({drawSurface,fishingTarget,surfaceAt,
-      info:()=>({tileMasks:masks.size,maskBytes:masks.size*TS*2,anchors:anchors.size,maxAnchors:64,groups})});
+      info:()=>({tileMasks:masks.size,maskBytes:masks.size*TS*2,anchors:anchors.size,maxAnchors:64,groups,maxGroups:MAX_GROUPS,cellStride})});
   });
 })();
 
@@ -10623,6 +10800,9 @@ body.hud-game #legend{display:none !important;}
   const T=API.T,S=API.TS,ORIGINAL_WIDTH=60,WIDTH=96,HEIGHT=124;
   const clamp=v=>Math.max(0,Math.min(1,v)),smooth=v=>{v=clamp(v);return v*v*(3-2*v);};
   const hash=(x,y)=>(Math.imul(x^8191,73856093)^Math.imul(y^131071,19349663))>>>0;
+  // Metadados apenas de pintura, refeitos com o mundo. Cada passarela usa
+  // tábuas perpendiculares à sua travessia, sem emendas que mudem por tile.
+  const bridgeTiles=new Map();let bridgeSections=0;
   const pixel=(x,y)=>({x:x*S+8,y:y*S+8});
   const regions=Object.freeze({
    forest:Object.freeze({id:'forest',name:'Mata das Nascentes',mapLabel:'MATA DAS NASCENTES',label:'mata',tempDelta:-.012,hydDelta:-.04,sweatBoost:0,thermalCause:'ar fresco da mata',mapX:78,mapY:46}),
@@ -10653,6 +10833,23 @@ body.hud-game #legend{display:none !important;}
   function regionAt(x,y){
    if(x<60||x>=WIDTH||y<28||y>=HEIGHT)return null;
    return y<83?'forest':'wetland';
+  }
+  function prepareBridgeArt(map){
+   bridgeTiles.clear();bridgeSections=0;
+   const visited=new Set();
+   for(let y=0;y<HEIGHT;y++)for(let x=ORIGINAL_WIDTH;x<WIDTH;x++){
+    const key=y*WIDTH+x;if(map[y]?.[x]!==T.WOOD||visited.has(key))continue;
+    const pending=[[x,y]],tiles=[];let left=x,right=x,top=y,bottom=y;visited.add(key);
+    for(let i=0;i<pending.length;i++){
+     const [tx,ty]=pending[i];tiles.push([tx,ty]);left=Math.min(left,tx);right=Math.max(right,tx);top=Math.min(top,ty);bottom=Math.max(bottom,ty);
+     for(const [dx,dy]of [[0,-1],[1,0],[0,1],[-1,0]]){
+      const nx=tx+dx,ny=ty+dy,nk=ny*WIDTH+nx;
+      if(nx>=ORIGINAL_WIDTH&&nx<WIDTH&&ny>=0&&ny<HEIGHT&&map[ny]?.[nx]===T.WOOD&&!visited.has(nk)){visited.add(nk);pending.push([nx,ny]);}
+     }
+    }
+    const horizontal=right-left>=bottom-top;bridgeSections++;
+    for(const [tx,ty]of tiles)bridgeTiles.set(ty*WIDTH+tx,horizontal);
+   }
   }
   function expand(main){
    if(!main||main._openWorldV67)return main?.MW||ORIGINAL_WIDTH;
@@ -10702,7 +10899,7 @@ body.hud-game #legend{display:none !important;}
    // pequenas lascas de madeira na borda diagonal de uma poça.
    const crossings=[...trail].map(k=>k.split(',').map(Number)).filter(([x,y])=>wetBeforeTrails[y][x]);
    for(const [x,y]of crossings)for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)if(trail.has((x+dx)+','+(y+dy)))paint(x+dx,y+dy,T.WOOD);
-   main.map=m;main.MW=WIDTH;
+   main.map=m;main.MW=WIDTH;prepareBridgeArt(m);
    const added=[],add=o=>{o._world=true;o._openWorld=true;added.push(o);main.objects.push(o);};
    // Grupos pequenos deixam clareiras e linhas de visão; nenhum volume nas trilhas.
    const room=(tx,ty,r=2)=>{
@@ -10728,17 +10925,62 @@ body.hud-game #legend{display:none !important;}
    return main.MW;
   }
   const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
+  function drawTerrainDetails(g,px,py,x,y,t,cold){
+   if(API.rawScene!=='main'||x<ORIGINAL_WIDTH||x>=WIDTH||y<28||y>=HEIGHT||![T.GRASS,T.GRASS2].includes(t))return;
+   // Folhiço e solo úmido distinguem os habitats usando o cache de terreno.
+   // Não cria tufos novos, props, animação, colisão ou sorteios por câmera.
+   const edge=smooth((x-60)/7)*smooth((y-28)/12);if(edge<=0)return;
+   const wet=smooth((y-78)/12),seed=hash(x,y),detail=hash(x*13+7,y*17+5),straw=wet>.5;
+   const px1=px+3+((detail>>>7)%8),py1=py+3+((detail>>>17)%8);
+   g.save();g.globalAlpha*=edge*(cold?.55:1);
+   if(detail%11===0){
+    // Filetes irregulares de solo entre folhas. Não há sobreposição de
+    // transparências nem carimbo repetido nos quatro tiles de um bloco.
+    const flip=(detail>>>4)&1?1:-1;
+    g.fillStyle=straw?'rgba(115,108,74,.10)':'rgba(43,78,58,.10)';
+    g.fillRect(px1,py1,3,1);g.fillRect(px1-flip,py1+1,5,1);g.fillRect(px1+flip,py1+2,2,1);
+   }
+   if(seed%7===0){
+    R(g,straw?'#7d805a':'#687650',px1,py1,4,1);
+    R(g,straw?'#959067':'#7e8360',px1+1,py1-1,2,1);
+    if((seed>>>9)%2===0)R(g,straw?'#727955':'#576a4d',px1+3,py1+2,2,1);
+   }
+   // Capilaridade na borda da água: poucos filetes escuros indicam chão
+   // molhado. O contorno físico e o desenho de oito vizinhos ficam intactos.
+   const water=v=>v===T.WATER||v===T.RIVER||v===T.OASIS;
+   if(straw&&seed%3===0){
+    const north=water(API.tileAt(x,y-1)),south=water(API.tileAt(x,y+1));
+    const west=water(API.tileAt(x-1,y)),east=water(API.tileAt(x+1,y));
+    g.fillStyle='rgba(66,85,65,.29)';
+    if(north||south){const yy=py+(north?3:S-5);g.fillRect(px+3,yy,5,1);g.fillRect(px+4,yy+1,2,1);}
+    if(west||east){const xx=px+(west?3:S-5);g.fillRect(xx,py+6,1,4);g.fillRect(xx+1,py+7,1,2);}
+   }
+   g.restore();
+  }
   API.registerTileDrawer(T.WOOD,(g,px,py,x,y)=>{
    if(API.rawScene!=='main'||x<ORIGINAL_WIDTH){API.drawBaseTile(g,px,py,x,y,T.WOOD);return;}
    // Tábuas contínuas e gastas no cache estático. A antiga textura de piso
    // interno formava tijolos laranja e repetia nós em cada quadrado de16px.
-   R(g,'#87745d',px,py,S,S);
-   for(let yy=0;yy<S;yy+=4){R(g,'#6d5d4c',px,py+yy+3,S,1);R(g,'#9a876b',px,py+yy,S,1);}
-   if((x+y)%3===0)R(g,'#514d41',px+3,py+5,1,1);
-   if(API.tileAt(x-1,y)!==T.WOOD){R(g,'#514d41',px,py,2,S);R(g,'#b39a72',px+2,py,1,S);}
-   if(API.tileAt(x+1,y)!==T.WOOD){R(g,'#514d41',px+S-2,py,2,S);R(g,'#a08b69',px+S-3,py,1,S);}
-   if(API.tileAt(x,y-1)!==T.WOOD)R(g,'#b39a72',px,py,S,2);
-   if(API.tileAt(x,y+1)!==T.WOOD)R(g,'#514d41',px,py+S-2,S,2);
+   const horizontal=bridgeTiles.get(y*WIDTH+x)??false,seed=hash(x,y),wet=y>=83;
+   R(g,wet?'#82745e':'#8b7961',px,py,S,S);
+   for(let i=0;i<S;i+=4){
+    if(horizontal){R(g,'#625b4c',px+i+3,py,1,S);R(g,'#a08c6f',px+i,py,1,S);}
+    else{R(g,'#625b4c',px,py+i+3,S,1);R(g,'#a08c6f',px,py+i,S,1);}
+   }
+   if(seed%3===0){
+    if(horizontal){R(g,'#6e6351',px+5,py+3,1,7);R(g,'#a38e70',px+6,py+5,1,3);}
+    else{R(g,'#6e6351',px+3,py+5,7,1);R(g,'#a38e70',px+5,py+6,3,1);}
+   }
+   const west=API.tileAt(x-1,y)!==T.WOOD,east=API.tileAt(x+1,y)!==T.WOOD;
+   const north=API.tileAt(x,y-1)!==T.WOOD,south=API.tileAt(x,y+1)!==T.WOOD;
+   if(west){R(g,'#514d41',px,py,2,S);R(g,'#b39a72',px+2,py,1,S);}
+   if(east){R(g,'#514d41',px+S-2,py,2,S);R(g,'#a08b69',px+S-3,py,1,S);}
+   if(north)R(g,'#b39a72',px,py,S,2);
+   if(south){R(g,'#514d41',px,py+S-3,S,3);R(g,'#a08b69',px,py+S-4,S,1);}
+   // Fixadores acompanham as vigas, não aparecem como confete no centro.
+   if(horizontal&&(north||south)){const yy=py+(north?2:S-4);R(g,'#444b43',px+5,yy,1,1);R(g,'#444b43',px+13,yy,1,1);}
+   if(!horizontal&&(west||east)){const xx=px+(west?2:S-4);R(g,'#444b43',xx,py+5,1,1);R(g,'#444b43',xx,py+13,1,1);}
+   if(wet&&seed%4===0&&(west||east||south))R(g,'#657159',px+(west?1:east?S-3:4),py+(south?S-2:6),2,1);
   });
   API.registerObjectDrawer('open_world_landmark',(o,g)=>{
    const x=Math.round(o.x),y=Math.round(o.y),cold=API.isFrio();
@@ -10758,7 +11000,8 @@ body.hud-game #legend{display:none !important;}
     R(g,'#5b9386',x-2,y-3,4,2);R(g,'#74817a',x-4,y+3,8,2);
    }
   });
-  window.FarmOpenWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,npcSpawns,routes,
+  window.FarmOpenWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,npcSpawns,routes,drawTerrainDetails,
+   artInfo(){return{bridgeSections,bridgeTiles:bridgeTiles.size};},
    dimensions:Object.freeze({originalWidth:ORIGINAL_WIDTH,width:WIDTH,height:HEIGHT})});
  });
 })();
@@ -10857,6 +11100,11 @@ body.hud-game #legend{display:none !important;}
     davi:{first:'Davi. A régua é minha, a água não assinou nenhum compromisso. Você deve ser Alex; Helena reconheceu sua seta num mapa e fez uma cara que merecia outra legenda. Pode andar pela vereda. Só confira a passagem de hoje antes de confiar na história de ontem.',day:['Tenho um causo curto. Antes de começar, preciso avisar que a minha ideia de curto não foi aprovada por ninguém.','Bia me pediu para contar a viagem da caixa depois que ela contar o plantio. Estou praticando essa ordem.'],night:'Já registrei o último nível. O resto da noite não precisa de relatório. Pode sentar e escolher qual causo tolera ouvir.',past:'Aprendi este trabalho com uma pessoa que deixava a marca antiga ao lado da nova. Perguntei por que não apagava logo. Ela disse que a régua precisava lembrar mais do que quem segurava o pincel. Demorei para aplicar isso às histórias que conto.'},
     bia:{first:'Bia. Se veio pela caixa de sementes, posso contar a parte depois da entrega. Plantei aqui na última estação; algumas tentativas deram certo, outras ganharam uma etiqueta comprida. Você não precisa terminar nada na fazenda para visitar a clareira.',day:['Hoje escrevi “não sei ainda” numa etiqueta. Coube melhor que a explicação que eu estava inventando.','Você trouxe uma pergunta ou veio ficar um pouco? As duas coisas cabem aqui. Só não apoie o cotovelo na amostra menor.'],night:'As caixas estão fechadas. Amanhã posso mostrar cada divisão; hoje prefiro falar sem contar sementes ao mesmo tempo.',past:'Quando cheguei, me apresentavam como quem cuidava da caixa de Davi. Ele tinha feito a viagem; eu tinha feito três plantios. Não queria tirar o nome dele. Queria acrescentar o meu. É uma diferença pequena numa etiqueta e enorme quando alguém conta a história.'}
   };
+  const quietTalk={
+    helena:{home:['“Escolhi ficar quando consegui distinguir a nascente pelo som, antes da curva. Parece um motivo pequeno para mudar de vida.”\n\nAlex: “Já parti por motivos menores.”\n\n“Eu sei. Não precisa defender todas as suas partidas para me contar como foi a volta.”','“Agora há mais de uma letra no mapa. Quando saio para medir, sei que alguém pode continuar a página.”\n\nAlex: “É assim que um lugar vira casa?”\n\n“Talvez. Hoje foi assim: voltei, encontrei uma anotação e não precisei começar tudo sozinha.”'],plans:['“Quero mapear as mudanças, não fingir que a nascente vai obedecer ao desenho. Uma folha para cada estação, com espaço para quem discordar.”\n\nAlex: “E se eu perder a data?”\n\n“Avise. Uma data pode mudar; um silêncio não explica por quê.”','“Na próxima rodada, Bia escolhe a pergunta. Tenho vontade de levar três respostas prontas.”\n\nAlex: “Leve um lápis.”\n\n“E você?”\n\n“Levo notícia, mesmo que eu ainda não tenha uma resposta.”']},
+    davi:{home:['“Aprendi a reconhecer estas curvas carregando caixas. Lembro de cada lugar onde sentei para trocar a carga de braço.”\n\nAlex: “Seu mapa tem bancos demais.”\n\n“Tem os bancos de que precisava. Uma rota que esquece o cansaço só funciona no papel.”','“Hoje Bia contou o plantio antes de eu contar a travessia. Quando chegou minha vez, o causo ficou menor.”\n\nAlex: “Sobreviveu?”\n\n“Sobreviveu melhor. Sobrou tempo para ouvir uma história que eu ainda não sabia.”'],plans:['“Quero ensinar alguém a ler a régua sem ficar atrás corrigindo cada número antes de terminar.”\n\nAlex: “A parte difícil é a régua?”\n\n“É dar dois passos para trás. Estou treinando aqui, onde não atrapalho a medição.”','“A revisão já pode acontecer sem mim. Pensei em inventar outra tarefa para preencher o horário.”\n\nAlex: “E inventou?”\n\n“Um passeio. Sem régua. Ainda estou decidindo onde guardar as mãos.”']},
+    bia:{home:['“Na primeira semana, eu só via espaço vazio entre as árvores. Agora reconheço onde cada tentativa começou.”\n\nAlex: “Até as que não nasceram?”\n\n“Principalmente. Ali aprendi a fazer uma pergunta melhor. Não vou fingir que era só chão esperando por mim.”','“Deixei uma caixa vazia para quem chegar. Quase escrevi uma lista de instruções por cima.”\n\nAlex: “O que escreveu?”\n\n“‘Conte como foi’. Rosa vai reconhecer a frase. Desta vez a resposta pode voltar para cá.”'],plans:['“Quero apresentar uma experiência sem esconder o primeiro plantio que falhou.”\n\nAlex: “Posso levar uma lista dos meus?”\n\n“Pode levar um. Precisamos deixar tempo para os erros das outras pessoas.”','“A próxima experiência começa com uma dúvida minha. Gosto de receber ajuda; só não quero terceirizar a pergunta.”\n\nAlex: “Onde eu entro?”\n\n“Você pode ficar, observar e discordar. Se topar, regamos depois da conversa.”']}
+  };
   let adapter={},state,dialogue=null,revision=0;
   const freshRecord=()=>({status:'offered',acceptedAt:null,choice:null,counts:{},paid:false});
   function context(value){const raw=plain(value)?value:adapter.readState?.()||{};return{season:raw.season==='cold'?'cold':'hot',region:REGIONS.includes(raw.region)?raw.region:'farm',scene:text(raw.scene,24)||'main',name:text(raw.playerName||raw.name,40)||'Alex',x:Number.isFinite(raw.x)?raw.x:NaN,y:Number.isFinite(raw.y)?raw.y:NaN,timeOfDay:Number.isFinite(raw.timeOfDay)?raw.timeOfDay:12,active:raw.active!==false,paused:raw.paused===true};}
@@ -10874,8 +11122,8 @@ body.hud-game #legend{display:none !important;}
   function close(options={}){dialogue=null;if(!options.silent)emit('onDialogue',null);return null;}
   function greeting(npcId){const voice=voices[npcId],def=next(npcId);if(!voice)return'';const r=def&&state.missions[def.id];if(r?.status==='ready')return'Você voltou com o combinado pronto. Quero ouvir o que encontrou antes de abrir outra página.\n\n'+objectiveLine(def,r);if(r?.status==='active')return def.choices[r.choice].reply+'\n\n'+objectiveLine(def,r);const finished=[...arcs[npcId]].reverse().find(d=>state.missions[d.id].status==='completed');if(finished)return finished.choices[state.missions[finished.id].choice].echo;if(state.visits[npcId]<=1)return voice.first;const hour=context().timeOfDay;return hour<6||hour>=20?voice.night:voice.day[state.visits[npcId]%voice.day.length];}
   function conversationResponse(npcId){const lines=[];for(const def of missions){const r=state.missions[def.id];if(r.acceptedAt===null||!['active','ready'].includes(r.status))continue;if(objectives(def,r).some(g=>g.event==='talk'&&g.match.npcId===npcId)&&talkResponses[def.id]?.[npcId])lines.push(talkResponses[def.id][npcId]);}return lines.join('\n\n');}
-  function menu(npcId){if(!Object.hasOwn(byId,npcId))return null;const def=next(npcId),choices=[];if(def)choices.push({id:'frontier:mission:'+def.id+':offer',label:(state.missions[def.id].status==='ready'?'Concluir: ':'Nosso próximo passo: ')+def.title});else choices.push({id:'frontier:memory',label:'O que ficou do nosso combinado?'});const r=state.recurring[npcId],job=recurring[npcId];choices.push({id:'frontier:job:'+npcId+':offer',label:r?.status==='completed'?'Nosso pedido desta estação foi cumprido':r?.status==='ready'?'Entregar: '+job.title:'Pedido da estação: '+job.title},{id:'frontier:past',label:'Posso ouvir um pouco da sua história?'},{id:'frontier:journal',label:'Relembrar os caminhos da água'},{id:'frontier:close',label:'Até depois'});const response=conversationResponse(npcId);return display(npcId,(response?response+'\n\n':'')+greeting(npcId),choices);}
-  function interact(npcId){if(!Object.hasOwn(byId,npcId))return null;state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);if(!state.met.includes(npcId))state.met.push(npcId);record('talk',{npcId});changed();return menu(npcId);}
+  function menu(npcId){if(!Object.hasOwn(byId,npcId))return null;const def=next(npcId),choices=[];if(def)choices.push({id:'frontier:mission:'+def.id+':offer',label:(state.missions[def.id].status==='ready'?'Concluir: ':'Nosso próximo passo: ')+def.title});else choices.push({id:'frontier:memory',label:'O que ficou do nosso combinado?'});const r=state.recurring[npcId],job=recurring[npcId];choices.push({id:'frontier:job:'+npcId+':offer',label:r?.status==='completed'?'Nosso pedido desta estação foi cumprido':r?.status==='ready'?'Entregar: '+job.title:'Pedido da estação: '+job.title},{id:'frontier:past',label:'Posso ouvir um pouco da sua história?'},{id:'frontier:quiet:home',label:'O que faz você ficar neste lugar?'},{id:'frontier:quiet:plans',label:'O que você quer fazer daqui para frente?'},{id:'frontier:journal',label:'Relembrar os caminhos da água'},{id:'frontier:close',label:'Até depois'});const response=[conversationResponse(npcId),window.FarmVillageStories?.conversationResponse?.(npcId)].filter(Boolean).join('\n\n');return display(npcId,(response?response+'\n\n':'')+greeting(npcId),choices);}
+  function interact(npcId){if(!Object.hasOwn(byId,npcId))return null;state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);if(!state.met.includes(npcId))state.met.push(npcId);record('talk',{npcId});window.FarmVillageStories?.record('talk',{npcId});changed();return menu(npcId);}
   function validTarget(kind,key){if(kind==='mission'){if(!Object.hasOwn(missionById,key))return false;return next(missionById[key].npcId)?.id===key;}return kind==='job'&&Object.hasOwn(recurring,key);}
   function target(kind,key){return kind==='mission'?{def:missionById[key],record:state.missions[key]}:{def:recurring[key],record:state.recurring[key]||freshRecord()};}
   function offer(kind,key){if(!validTarget(kind,key))return menu(dialogue?.npcId);const {def,record:r}=target(kind,key),prefix='frontier:'+kind+':'+key,choices=[];let message=def.offer;if(r.status==='offered'){if(def.choices)def.choices.forEach((c,i)=>choices.push({id:prefix+':accept:'+i,label:c.label}));else choices.push({id:prefix+':accept:0',label:'Aceitar o pedido desta estação'});}else if(r.status==='ready'){message=objectiveLine(def,r)+'\n\nEstá pronto. Vamos conferir e concluir o combinado?';choices.push({id:prefix+':claim',label:'Concluir e contar o resultado'});}else if(r.status==='completed')message=def.ending+'\n\nNa próxima estação podemos combinar outra rodada.';else message=(def.choices?.[r.choice]?.reply||def.offer)+'\n\n'+objectiveLine(def,r);choices.push({id:'frontier:menu',label:'Voltar à conversa'},{id:'frontier:close',label:'Continuar pelo mundo'});return display(def.npcId,message,choices,def.title);}
@@ -10883,9 +11131,9 @@ body.hud-game #legend{display:none !important;}
   function claim(kind,key){if(!validTarget(kind,key))return menu(dialogue?.npcId);const {def,record:r}=target(kind,key);if(r.status!=='ready'||r.paid)return offer(kind,key);r.paid=true;r.status='completed';state.coinsEarned=Math.min(LIMIT,state.coinsEarned+def.coins);const ending=def.choices?.[r.choice]?.ending||def.ending,id=kind+':'+key+(kind==='job'?':'+state.cycleId:'');journal('finish:'+id,def.npcId,def.title,ending);changed();emit('reward',{kind:'frontier-'+kind,id:'frontier:'+id,npcId:def.npcId,coins:def.coins,label:def.title});return display(def.npcId,ending+(def.alex?'\n\n'+def.alex:''),[{id:'frontier:menu',label:'Continuar a conversa'},{id:'frontier:close',label:'Voltar ao mundo'}],def.title);}
   function landmark(id){if(!Object.hasOwn(landmarkById,id))return null;const def=landmarkById[id],placed=window.FarmOpenWorld?.landmarks?.find?.(d=>d.id===id)||window.FarmFrontierWorld?.landmarks?.find?.(d=>d.id===id);return placed?{...def,x:placed.x,y:placed.y}:def;}
   function near(def){const c=context();return c.active&&c.scene==='main'&&Number.isFinite(c.x)&&Number.isFinite(c.y)&&Math.hypot(c.x-def.x,c.y-def.y)<=40;}
-  function inspect(id){const def=landmark(id);if(!def||!near(def))return false;record('inspect',{clueId:id});const row=state.surveys[id],choices=[{id:'frontier:survey:'+id,label:row.cooldown>0?'Nova revisão em '+Math.ceil(row.cooldown)+' s de jogo ativo':def.action},{id:'frontier:close',label:'Guardar a observação'}];display(def.npcId,def.text,choices,def.title);return true;}
+  function inspect(id){const def=landmark(id);if(!def||!near(def))return false;record('inspect',{clueId:id});window.FarmVillageStories?.record('inspect',{clueId:id});const row=state.surveys[id],choices=[{id:'frontier:survey:'+id,label:row.cooldown>0?'Nova revisão em '+Math.ceil(row.cooldown)+' s de jogo ativo':def.action},{id:'frontier:close',label:'Guardar a observação'}];display(def.npcId,def.text,choices,def.title);return true;}
   function survey(id){const def=landmark(id);if(!def||!near(def))return false;const row=state.surveys[id];if(row.cooldown>0){display(def.npcId,'A observação anterior já está registrada. Deixe o lugar mudar antes de fazer outra revisão. Faltam '+Math.ceil(row.cooldown)+' segundos de jogo ativo.',[{id:'frontier:close',label:'Continuar a exploração'}],def.title);return false;}row.rounds=Math.min(LIMIT,row.rounds+1);row.cooldown=180;record('survey',{landmarkId:id,round:row.rounds,eventId:'frontier:survey:'+id+':'+row.rounds});changed();display(def.npcId,def.result,[{id:'frontier:close',label:'Guardar o registro e continuar'}],def.title);return true;}
-  function choose(id){if(!dialogue?.choices.some(c=>c.id===id))return currentDialogue();const npcId=dialogue.npcId;if(id==='frontier:close')return close();if(id==='frontier:menu')return menu(npcId);if(id==='frontier:past')return display(npcId,voices[npcId].past,[{id:'frontier:menu',label:'Voltar à conversa'}],'Antes deste encontro');if(id==='frontier:memory'){const def=arcs[npcId].at(-1),r=state.missions[def.id];return display(npcId,r.status==='completed'?def.choices[r.choice].ending:voices[npcId].first,[{id:'frontier:menu',label:'Voltar à conversa'}],'O que continuou');}if(id==='frontier:journal')return display(npcId,state.journal.length?state.journal.slice(-12).map(r=>r.title+'\n'+r.text).join('\n\n'):'Os caminhos estão abertos. Posso conhecer as pessoas e escolher um primeiro combinado sem terminar a investigação da fazenda.',[{id:'frontier:menu',label:'Voltar à conversa'}],'Caminhos da água');if(id.startsWith('frontier:survey:')){survey(id.slice(16));return currentDialogue();}const match=/^frontier:(mission|job):([a-z-]+):(offer|accept|claim)(?::([01]))?$/.exec(id);if(!match)return currentDialogue();return match[3]==='offer'?offer(match[1],match[2]):match[3]==='accept'?accept(match[1],match[2],Number(match[4])):claim(match[1],match[2]);}
+  function choose(id){if(!dialogue?.choices.some(c=>c.id===id))return currentDialogue();const npcId=dialogue.npcId;if(id==='frontier:close')return close();if(id==='frontier:menu')return menu(npcId);if(id.startsWith('frontier:quiet:')){const topic=id.slice(15),lines=quietTalk[npcId]?.[topic];if(!lines)return currentDialogue();const finished=arcs[npcId].every(d=>state.missions[d.id].paid);return display(npcId,lines[finished?1:0],[{id:'frontier:menu',label:'Continuar a conversa'},{id:'frontier:close',label:'Até depois'}],topic==='home'?'Um lugar para ficar':'A próxima estação');}if(id==='frontier:past')return display(npcId,voices[npcId].past,[{id:'frontier:menu',label:'Voltar à conversa'}],'Antes deste encontro');if(id==='frontier:memory'){const def=arcs[npcId].at(-1),r=state.missions[def.id];return display(npcId,r.status==='completed'?def.choices[r.choice].ending:voices[npcId].first,[{id:'frontier:menu',label:'Voltar à conversa'}],'O que continuou');}if(id==='frontier:journal')return display(npcId,state.journal.length?state.journal.slice(-12).map(r=>r.title+'\n'+r.text).join('\n\n'):'Os caminhos estão abertos. Posso conhecer as pessoas e escolher um primeiro combinado sem terminar a investigação da fazenda.',[{id:'frontier:menu',label:'Voltar à conversa'}],'Caminhos da água');if(id.startsWith('frontier:survey:')){survey(id.slice(16));return currentDialogue();}const match=/^frontier:(mission|job):([a-z-]+):(offer|accept|claim)(?::([01]))?$/.exec(id);if(!match)return currentDialogue();return match[3]==='offer'?offer(match[1],match[2]):match[3]==='accept'?accept(match[1],match[2],Number(match[4])):claim(match[1],match[2]);}
   function newSeason(value){const nextSeason=value.season;if(!['hot','cold'].includes(nextSeason))return false;const cycle=number(value.cycleId,Number.MAX_SAFE_INTEGER);if(nextSeason===state.season&&(!cycle||cycle<=state.cycleId))return false;state.season=nextSeason;state.cycleId=Math.min(Number.MAX_SAFE_INTEGER,Math.max(state.cycleId+1,cycle));state.recurring={};changed();return true;}
   function progress(def,r,event,payload,amount){if(!r||r.status!=='active'||r.acceptedAt===null||state.sequence<=r.acceptedAt)return false;let dirty=false;for(const g of objectives(def,r)){if(g.event!==event||!Object.entries(g.match).every(([k,v])=>payload[k]===v))continue;const n=number(r.counts[g.id],g.goal);r.counts[g.id]=Math.min(g.goal,n+amount);dirty=dirty||r.counts[g.id]!==n;}if(dirty&&complete(def,r))r.status='ready';return dirty;}
   function record(event,payload={}){if(!plain(payload))return false;if(event==='season')return newSeason(payload);if(!['visit','talk','inspect','survey','plant','water','harvest','collect','rest','craft','produce','order'].includes(event))return false;const amount=payload.amount===undefined?1:number(payload.amount,50);if(!amount)return false;const uid=text(payload.eventId);if(uid&&state.recentEventIds.includes(uid))return false;if(uid){state.recentEventIds.push(uid);state.recentEventIds=state.recentEventIds.slice(-128);}state.sequence=Math.min(LIMIT,state.sequence+1);let dirty=false;if(event==='inspect'&&Object.hasOwn(landmarkById,payload.clueId)&&!state.clues.includes(payload.clueId)){state.clues.push(payload.clueId);dirty=true;}for(const id of IDS){const def=next(id);if(def)dirty=progress(def,state.missions[def.id],event,payload,amount)||dirty;if(state.recurring[id])dirty=progress(recurring[id],state.recurring[id],event,payload,amount)||dirty;}if(dirty)changed();return dirty;}
@@ -11072,6 +11320,227 @@ body.hud-game #legend{display:none !important;}
     icon,
     info:()=>({version:1,keys:keys.slice(),seedVariants:seeds.slice(),cacheSize:cache.size,cacheLimit:limit})
   });
+})();
+
+/* =================================
+   src/modules/48-village-stories.js
+   ================================= */
+/* Vozes do vale: seis histórias opcionais em três encontros.
+   Estado puro. Ações físicas pertencem ao jogo; só eventos posteriores ao
+   aceite da etapa contam. A entrega final paga uma vez, nunca ao restaurar. */
+(function(){
+  'use strict';
+  const VERSION=1,MAX=1000000,MAX_SEQUENCE=Number.MAX_SAFE_INTEGER;
+  const IDS=['rosa','lia','tomas','ines','caio','nico'];
+  const EVENTS=['talk','visit','inspect','collect','water','harvest','rest','produce','care'];
+  const clone=value=>JSON.parse(JSON.stringify(value));
+  const plain=value=>!!value&&typeof value==='object'&&!Array.isArray(value);
+  const own=(value,key)=>plain(value)&&Object.hasOwn(value,key)?value[key]:undefined;
+  const num=(value,max=MAX)=>Number.isFinite(value)?Math.max(0,Math.min(max,Math.floor(value))):0;
+  const text=(value,max=120)=>typeof value==='string'?value.slice(0,max):'';
+  const goal=(id,label,event,amount=1,match={})=>({id,text:label,event,goal:amount,match});
+  const talk=id=>goal('talk-'+id,'Converse com '+({rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',helena:'Helena',davi:'Davi',bia:'Bia'})[id],'talk',1,{npcId:id});
+  const inspect=(id,label)=>goal('inspect-'+id,label,'inspect',1,{clueId:id});
+  const visit=(region,label)=>goal('visit-'+region,label,'visit',1,{region});
+  const rest=()=>goal('rest','Complete uma pausa protegida','rest',1,{safe:true});
+  const care=action=>goal('care-'+action,({pet:'Faça carinho em um animal que aceite o contato',feed:'Alimente um animal que precise de feno',shear:'Tosquie uma ovelha pronta para a tosquia'})[action],'care',1,{kind:'animal',action});
+  const stage=(title,offer,objectives,done)=>({title,offer,objectives,done});
+  const characters={
+    rosa:{name:'Rosa',role:'Avó e guardiã das sementes',greeting:'Rosa afasta uma caixa para abrir espaço no banco.\n\n“Pode sentar sem trazer uma solução, Alex. Hoje aceito até uma história que não chegou ao fim.”',
+      past:['“Quando você era pequeno, eu dizia que as sementes dormiam. Você passou uma tarde cochichando perto da caixa para não acordá-las.”\n\nAlex: “E você deixou.”\n\n“Deixei. Depois tive de explicar por que podíamos sacudir a caixa sem pedir desculpa. Às vezes uma explicação bonita precisa de uma segunda conversa.”','“Lembrei do seu cochicho perto das sementes. Você queria cuidar direito sem saber ainda como.”\n\nAlex: “Algumas coisas resistem ao tempo.”\n\n“Resistem. Agora você pergunta. É uma melhora considerável para as sementes e para mim.”'],
+      routine:['“Começo pelas caixas mais antigas. Se olhar só as novas, esqueço o que prometi plantar.”\n\nAlex: “E quando sobra serviço?”\n\n“Marco o que fica para amanhã. Estou aprendendo a não chamar toda sobra de fracasso.”','“Hoje conferi a caixa uma vez. Uma.”\n\nAlex: “Devo registrar o feito?”\n\n“Pode. Mas registre também que sentei para conversar antes de acabar a lista.”'],
+      dream:['“Quero ouvir outras pessoas discutindo qual semente vai para qual canteiro. Um dia, posso até discordar e continuar sentada.”\n\nAlex: “Esse é o plano mais ousado que ouvi de você.”\n\n“Guarde a ironia. Vai precisar dela quando eu perguntar pela terceira vez se puseram a etiqueta.”','“Quero uma Casa em que alguém possa dizer ‘Rosa, hoje eu cuido’ e eu acredite.”\n\nAlex: “Você já tem candidatos.”\n\n“Tenho. Meu trabalho agora é deixar que terminem uma frase sem eu procurar a chave.”']},
+    lia:{name:'Lia',role:'Bióloga do vale',greeting:'Lia prende uma folha que insiste em virar com o vento.\n\n“Estou decidindo se isto é uma anotação incompleta ou uma ótima pergunta. Hoje me parecem a mesma coisa.”',
+      past:['“Meu primeiro caderno tinha uma coluna chamada ‘coisas que dão errado’. Enchi antes das outras.”\n\nAlex: “Um caderno honesto.”\n\n“Um título injusto. Muitas eram diferenças que eu ainda não sabia observar. Troquei o nome da coluna. A letra continuou péssima.”','“Encontrei o primeiro caderno. Desta vez consegui ler uma tentativa ruim sem sentir vontade de arrancar a página.”\n\nAlex: “Vai guardar?”\n\n“Vou levar à mesa. Alguém pode precisar ver que eu também comecei sem uma resposta pronta.”'],
+      routine:['“Olho a horta antes de conferir minhas anotações. É um pequeno truque para não enxergar só o que eu esperava.”\n\nAlex: “Funciona?”\n\n“Às vezes. Nas outras, escrevo que não funcionou. Essa parte também precisa entrar.”','“Acrescentei ‘quem estava aqui’ à página de hoje. Você percebeu uma coisa, Davi outra. Vou manter as duas assinaturas.”\n\nAlex: “Mesmo quando discordamos?”\n\n“Principalmente se conseguirmos explicar em quê.”'],
+      dream:['“Quero alguém lendo uma página minha e dizendo ‘posso tentar’. Se a pessoa só disser ‘que bonito’, talvez eu tenha escondido os passos.”\n\nAlex: “Também posso dizer os dois?”\n\n“Pode. Nessa ordem, eu provavelmente aceito melhor.”','“Quero comparar uma estação inteira com quem trabalha em cada região. Não prometo a conclusão.”\n\nAlex: “Prometer a próxima conversa serve?”\n\n“Serve. Se tiver data e espaço para mudar de ideia, serve muito.”']},
+    tomas:{name:'Tomás',role:'Marceneiro da comunidade',greeting:'Tomás vira um lápis gasto entre os dedos.\n\n“Tenho cinco medidas desta tábua. Na sexta, descobri que estava medindo a outra. Antes que pergunte: sim, vou contar a Nico.”',
+      past:['“Aprendi o ofício segurando a ponta das tábuas. Passei meses achando que era a parte sem importância.”\n\nAlex: “Até largar uma?”\n\n“Até alguém largar a minha. A lição foi excelente. O móvel, menos.”','“Contei a Nico a história da tábua. Ele perguntou se eu agradecia a quem segura a ponta hoje.”\n\nAlex: “Pergunta perigosa.”\n\n“Pergunta justa. Tenho andado com um bocado de agradecimento atrasado.”'],
+      routine:['“Confiro o que ficou frouxo antes de começar coisa nova. Dá menos vontade de mostrar, mas costuma evitar um serviço maior.”\n\nAlex: “E depois?”\n\n“Procuro o lápis. Essa etapa não melhora com experiência.”','“Deixei um espaço na bancada para outro par de mãos. O lápis desapareceu de novo.”\n\nAlex: “Vai culpar a parceria?”\n\n“Não. Estava atrás da minha orelha. Seria uma acusação difícil de sustentar.”'],
+      dream:['“Quero fazer uma cadeira que continue boa quando ninguém lembrar quem fez.”\n\nAlex: “Você não deixaria uma assinatura escondida?”\n\n“Pequena. Debaixo. Sou desprendido, não um santo.”','“Talvez minha melhor peça seja alguém sabendo repetir o encaixe sem me chamar.”\n\nAlex: “Vai sentir falta?”\n\n“Vou. Posso sentir falta e ensinar direito ao mesmo tempo.”']},
+    ines:{name:'Inês',role:'Guia da montanha',greeting:'Inês olha primeiro para suas botas, depois para seu rosto.\n\n“Não é inspeção. Aprendi que a pressa costuma aparecer nas botas antes de chegar à conversa.”',
+      past:['“Na primeira ronda sozinha, levei três cordas e esqueci o lanche. Voltei convencida de que o caminho tinha ficado mais comprido.”\n\nAlex: “Descobriu a causa?”\n\n“Rosa pôs um prato na mesa antes da minha explicação. Uma investigação muito eficiente.”','“Ainda conto a história das três cordas a quem quer começar. Nico perguntou se eu tinha vergonha.”\n\nAlex: “Tem?”\n\n“De ter esquecido, não. De ter fingido por anos que nunca esquecia, um pouco.”'],
+      routine:['“Confiro a volta antes da ida. Onde posso parar, quem sabe que saí, quando o caminho deixa de ser uma boa ideia.”\n\nAlex: “Parece menos heroico contado assim.”\n\n“Ótimo. Uma ronda boa não precisa render um resgate.”','“Avisei meu horário e já deixei uma alternativa se o tempo mudar. Agora posso conversar sem achar que cada minuto é uma falha.”\n\nAlex: “Está gostando?”\n\n“Da conversa? Sim. De admitir isso com tanta facilidade, ainda estou aprendendo.”'],
+      dream:['“Quero passar pela montanha sem ser a única pessoa capaz de explicar suas marcas.”\n\nAlex: “E depois?”\n\n“Depois talvez eu faça uma caminhada só para ver a montanha. Faz tempo.”','“Na próxima caminhada, quero escolher um trecho bonito, não apenas um trecho necessário.”\n\nAlex: “Posso ir?”\n\n“Pode. Leve lanche. Estou tentando construir uma reputação melhor nessa parte.”']},
+    caio:{name:'Caio',role:'Agricultor do oásis',greeting:'Caio ajeita um recipiente na sombra.\n\n“Se veio cobrar a história que comecei ontem, ela continua devendo um final. Posso oferecer o meio.”',
+      past:['“Quando cheguei, escondia as sementes que não germinavam. Achei que Rosa ia tomar a caixa de volta.”\n\nAlex: “E ela?”\n\n“Trouxe as que não tinham germinado com ela. Passei vergonha por ter inventado sozinho uma cobrança que ninguém fez.”','“Mostrei a Bia meu primeiro registro. Tem uma página quase vazia.”\n\nAlex: “Você esqueceu de anotar?”\n\n“Não. Não nasceu quase nada. Desta vez deixei a página ali para a conversa começar no lugar certo.”'],
+      routine:['“Olho os recipientes de fora para dentro. Sombra, tampa, reserva. Se me apresso na primeira parte, invento trabalho para a terceira.”\n\nAlex: “Parece experiência.”\n\n“Parece. Algumas experiências usam a roupa de um erro repetido.”','“Hoje anotei também o que não preciso trazer na próxima viagem. Descobri uma grande utilidade para conversar: às vezes a caixa fica mais leve.”\n\nAlex: “E o orgulho?”\n\n“Esse ainda ocupa um canto. Estamos negociando.”'],
+      dream:['“Quero que venham ao oásis para saber como fazemos as coisas. Não apenas quando falta algo.”\n\nAlex: “Posso começar ficando um pouco?”\n\n“Pode. Já é uma pergunta melhor que ‘quanto você tem’.”','“Quero chegar à Casa com uma ideia ruim e ainda ter lugar à mesa.”\n\nAlex: “Tenho experiência com as duas coisas.”\n\n“Então sente perto. Podemos evitar que inventem perfeição como condição de entrada.”']},
+    nico:{name:'Nico',role:'Aprendiz curioso',greeting:'Nico fecha o caderno depressa, pensa melhor e abre de novo.\n\n“Pode olhar. Só não confunda as setas: esta é um caminho e aquela é uma tentativa de desenhar uma galinha.”',
+      past:['“Minha primeira placa dizia ‘por aqui’ dos dois lados. Eu achei que cobria todas as possibilidades.”\n\nAlex: “Cobria muito bem a possibilidade de se perder.”\n\n“Tomás falou quase isso. Guardei. Quero saber rir dela antes de fazer a próxima.”','“Mostrei a placa dos dois lados para Helena. Ela perguntou para quem eu estava tentando explicar o caminho.”\n\nAlex: “Boa pergunta.”\n\n“Pois é. Eu tinha desenhado só para mim e esperado que todo mundo adivinhasse.”'],
+      routine:['“Anoto três coisas que quero fazer. Depois risco duas da lista de hoje.”\n\nAlex: “Quem ensinou?”\n\n“Rosa. Eu ainda anoto as duas no verso. Ela sabe. Acho que faz parte do acordo.”','“Terminei uma página antes de abrir outra. Não resolveu todas as ideias da minha cabeça, mas agora uma delas consegue sair de lá.”\n\nAlex: “Ela parece contente?”\n\n“Tem uma galinha no canto. Eu também.”'],
+      dream:['“Quero que alguém use meu mapa e chegue onde queria. Não precisa dizer que ficou bonito.”\n\nAlex: “Nem um pouco?”\n\n“Pode dizer um pouco. Depois de chegar.”','“Quero aprender a desenhar um lugar sem achar que ele só existe quando eu olho.”\n\nAlex: “É um mapa grande.”\n\n“Eu sei. Comecei deixando espaço para outras pessoas escreverem.”']}
+  };
+  const arcs=[
+    {id:'dobra-rosa',npcId:'rosa',title:'O endereço que ficou na dobra',coins:12,
+      offer:'“Encontrei uma palavra incompleta na dobra da minha carta: ‘para’. O resto sumiu. Não é uma nova ameaça, Alex. É uma lembrança me incomodando. Antes de escrever seu nome, eu usava aquele papel para separar sementes. Quero descobrir para quem imaginei mandar a primeira porção.”\n\nAlex: “Uma investigação de correspondência sem endereço. Parece adequada à minha experiência.”',
+      choices:[
+        {label:'Seguir o rascunho até as pessoas que estão começando.',summary:'Rosa quer que a próxima carta acolha primeiras tentativas.',stages:[
+          stage('Uma palavra pela metade','“Releia o envelope e peça a Nico que olhe o canto dobrado. Ele costuma notar o pedaço que os adultos decidem chamar de detalhe.”',[inspect('carta-perdida','Releia o envelope junto à casa'),talk('nico')],'“Nico lembrou: eu escrevia ‘para a primeira tentativa’. Não tinha esquecido uma pessoa. Tinha esperado tanto pela ocasião certa que esqueci o convite.”\n\nAlex: “Desta vez ele pode sair da gaveta.”'),
+          stage('Uma carta que cabe na mão','“Faça duas colheitas novas. Quero acompanhar uma tentativa de verdade antes de escrever como se toda semente obedecesse ao envelope.”',[goal('harvest','Faça 2 colheitas novas','harvest',2)],'“O papel antigo prometia uma colheita bonita. Vou começar diferente: ‘Conte como foi, inclusive se não der certo’.”\n\nAlex: “Dá mais vontade de responder.”'),
+          stage('O nome de quem recebe','“Converse com Bia e recolha uma produção da fazenda. Quero ouvir como ela recebe uma amostra, e lembrar que há trabalho depois da entrega. Você guarda o que recolher; precisamos da experiência, não de cobrar a caixa.”',[talk('bia'),goal('produce','Recolha 1 produção pronta da fazenda','produce')],'“Bia quer espaço para contar o que mudou depois que recebeu as sementes. Acho que minha carta precisava mais desse espaço do que de uma frase bonita.”')],
+          ending:'Rosa deixa uma linha em branco no rascunho.\n\n“Esta é para quem receber. A primeira tentativa não termina quando sai da minha mão.”\n\nAlex: “E a próxima carta?”\n\n“Vai com uma pergunta, sem prazo para uma resposta perfeita. Como deveria ter ido a sua.”',echo:'“No rascunho da próxima carta, a maior parte da folha está vazia. Bia vai gostar. Eu estou aprendendo.”'},
+        {label:'Reconstruir o caminho das reservas com o oásis.',summary:'Rosa quer escrever uma carta de mão dupla para o oásis.',stages:[
+          stage('O outro lado do envelope','“Releia o envelope e pergunte a Caio como ele marcava as primeiras caixas. Pode ter guardado a metade da lembrança que eu embrulhei errado.”',[inspect('carta-perdida','Releia o envelope junto à casa'),talk('caio')],'“Caio lembrou de uma etiqueta parecida. A reserva era para circular quando precisássemos; eu comecei a tratá-la como uma encomenda minha.”\n\nAlex: “Podemos corrigir o endereço e o costume.”'),
+          stage('A espera de cada lugar','“Regue duas plantas novas. Quero começar a carta pelo cuidado que existe aqui, sem usar nosso tempo como medida para o oásis.”',[goal('water','Faça a primeira rega de 2 plantas','water',2)],'“Escrevi ‘aqui regamos assim’. Antes eu teria escrito ‘faça assim’. Duas palavras pequenas estavam dando ordens demais.”'),
+          stage('Uma pergunta na volta','“Visite o deserto e converse com Caio outra vez. Pergunte o que ele gostaria de saber da nossa próxima tentativa. Não leve uma promessa no lugar da resposta dele.”',[visit('desert','Visite o deserto depois deste combinado'),talk('caio')],'“Ele quer saber o que não funcionou também. Passei tanto tempo escolhendo a melhor notícia que quase deixei de mandar notícia alguma.”')],
+          ending:'“Vou escrever a Caio sobre o canteiro inteiro”, diz Rosa. “Ele escolhe o que comparar com o oásis. A resposta pode discordar de mim.”\n\nAlex: “Você vai guardar a carta?”\n\n“A resposta, sim. A minha precisa sair.”',echo:'“A próxima carta para o oásis já começa com uma pergunta. Tive vontade de pôr a resposta embaixo. Resisti.”'}]},
+    {id:'margem-lia',npcId:'lia',title:'Dois nomes para a mesma água',coins:14,
+      offer:'“No caderno, uma linha diz ‘água da mata’. Noutra cópia, ‘água da margem’. Quase anotei uma contradição. Helena acha que estamos olhando trechos da mesma rota em dias diferentes.”\n\nAlex: “Uma água com dois nomes. Já viajei com menos documentos.”\n\n“Vamos observar antes de dar razão ao papel.”',
+      choices:[
+        {label:'Seguir da nascente para a horta.',summary:'Lia compara o caminho da água a partir da mata.',stages:[
+          stage('A legenda que viajou','“Releia o caderno da horta e converse com Helena. Precisamos saber o que foi anotado e o que só pareceu óbvio a quem copiou.”',[inspect('horta-caderno','Releia o caderno da horta'),talk('helena')],'“Helena tinha registrado o lugar e a data. A cópia guardou o lugar. A água não trocou de identidade; perdemos parte da frase.”'),
+          stage('Começar pela nascente','“Vá à Mata das Nascentes e leia os dois riscos da nascente. Não precisa concluir que o risco mais novo é sempre o melhor. Descubra o que cada um estava tentando guardar.”',[visit('forest','Visite a Mata das Nascentes'),inspect('open_spring','Leia o marco dos dois riscos na nascente')],'“Duas marcas, duas ocasiões. Alex, é um alívio quando uma diferença deixa de precisar de um culpado.”\n\nAlex: “Ainda temos a água para observar. Ela não parece ofendida.”'),
+          stage('De volta ao canteiro','“Faça duas primeiras regas e converse com Davi. Quero que a anotação da horta consiga conversar com a da vereda, sem fingir que são o mesmo lugar.”',[goal('water','Faça a primeira rega de 2 plantas','water',2),talk('davi')],'“Davi pediu que eu mantenha a data ao lado da observação. Parece simples. Foi justamente o pedaço simples que deixamos cair.”')],
+          ending:'Lia escreve o título antes dos números: “Da nascente ao canteiro — uma observação de cada lugar”.\n\n“Não provamos tudo sobre essa água. Conseguimos fazer uma pergunta que outra pessoa pode conferir.”\n\nAlex: “E deixamos a data viajar junto.”\n\n“Desta vez, sim.”',echo:'“A página da nascente tem lugar, data e autoria. Não ficou mais elegante. Ficou possível de conferir.”'},
+        {label:'Começar pelo que a água deixa na vereda.',summary:'Lia compara o caminho da água a partir da margem.',stages:[
+          stage('Uma margem no caderno','“Leia o caderno da horta e procure Davi. Quero saber se ‘margem’ era um nome de lugar ou uma condição no dia da anotação.”',[inspect('horta-caderno','Releia o caderno da horta'),talk('davi')],'“Era o lugar de onde leram a régua naquele dia. Copiaram o nome como se o chão nunca mudasse.”\n\nAlex: “O papel andou mais firme do que a certeza.”'),
+          stage('A régua e o caminho','“Visite as Veredas e leia a régua de água. Ela mede um nível; não promete uma passagem. Quero deixar essa diferença clara na nossa página.”',[visit('wetland','Visite as Veredas'),inspect('open_water_gauge','Leia a régua de água da vereda')],'“Agora consigo escrever a nota sem transformá-la num atalho. Um registro pode orientar sem prometer o que não mediu.”'),
+          stage('Quem recebe a comparação','“Faça duas colheitas novas e converse com Bia. Ela precisa comparar tentativas da clareira, não apenas receber uma tabela que parece pronta.”',[goal('harvest','Faça 2 colheitas novas','harvest',2),talk('bia')],'“Bia pediu uma coluna para o que mudou entre tentativas. Não para explicar tudo à força; para saber onde procurar melhor.”')],
+          ending:'“Nossa página começa na vereda”, diz Lia, “e termina com uma pergunta de Bia. Gosto de não ser a única voz da última linha.”\n\nAlex: “Você deixou uma coluna vazia.”\n\n“É onde vai a próxima observação. Já não acho que toda margem vazia seja falta de trabalho.”',echo:'“Mantive a pergunta de Bia na última coluna. Quem pegar a página vai encontrar uma comparação aberta, não uma conclusão emprestada.”'}]},
+    {id:'risco-tomas',npcId:'tomas',title:'O quarto risco da ponte',coins:14,
+      offer:'“Os três riscos da placa eu reconheço. O risco curto ao lado me fez gastar uma manhã. Não é uma rachadura, nem outra rota. Alguém marcava ali onde esperar por companhia.”\n\nAlex: “Uma placa dizendo para não sair?”\n\n“Uma placa dizendo que atravessar junto também é uma escolha. Eu tinha esquecido essa parte do trabalho.”',
+      choices:[
+        {label:'Guardar a história de quem esperava na ponte.',summary:'Tomás prepara com Nico um relato sobre o ponto de encontro.',stages:[
+          stage('Quem parava aqui','“Observe a ponte sobre o rio e converse com Inês. Ela pode lembrar quem costumava chegar antes. Não raspe a marca: a curiosidade ainda não exige lixa.”',[inspect('bridge-crossing','Observe a ponte do rio com E'),talk('ines')],'“Inês esperava os carregadores mais lentos. Eu olhava a ponte como passagem; ela precisava também de um lugar de encontro.”'),
+          stage('O trabalho das duas margens','“Colete dois pedaços de madeira e visite as Veredas. A madeira continua sua. Quero comparar o trabalho que conheço com o caminho que Davi precisa manter.”',[goal('wood','Colete 2 madeiras novas','collect',2,{item:'wood'}),visit('wetland','Visite as Veredas depois deste combinado')],'“Uma ponte aparece mais que o caminho até ela. Isso não faz o resto do trabalho menor.”\n\nAlex: “Talvez o quarto risco seja a parte que faltava no seu desenho.”'),
+          stage('Desenhar a espera','“Faça uma pausa protegida e conte a Nico o que observamos. Quero que ele desenhe a espera como parte da viagem, não como falha de quem está atrasado.”',[rest(),talk('nico')],'“Nico desenhou duas figuras antes de desenhar a ponte. Disse que precisava saber quem estava indo.”\n\nAlex: “Parece um bom começo para uma placa.”')],
+          ending:'Tomás guarda o rascunho junto das medidas.\n\n“O quarto risco fica na história da ponte. Não vou inventar uma seta para substituir a conversa que ele lembrava.”\n\nAlex: “Quem chega primeiro espera?”\n\n“Espera, pergunta e combina. A madeira é a parte fácil.”',echo:'“Nico ainda está escolhendo como desenhar alguém esperando sem parecer que perdeu o caminho. Pela primeira vez, não sugeri uma seta.”'},
+        {label:'Comparar as marcas da ponte com as da água.',summary:'Tomás distingue manutenção, orientação e registro de água.',stages:[
+          stage('Uma marca não é toda marca','“Observe a ponte sobre o rio e converse com Davi. Quero separar meu risco de encaixe das anotações que acompanham a água.”',[inspect('bridge-crossing','Observe a ponte do rio com E'),talk('davi')],'“Davi distinguiu a marca datada do risco de espera. Eu estava tentando fazer uma legenda servir a dois trabalhos.”'),
+          stage('A medida que não promete','“Leia a régua na vereda e converse com Inês. Nível registrado e caminho seguro não são frases intercambiáveis. Ela precisa poder explicar a diferença a quem viaja.”',[inspect('open_water_gauge','Leia a régua de água da vereda'),talk('ines')],'“Inês perguntou de quando era a anotação. É a pergunta que minha primeira legenda não deixava fazer.”'),
+          stage('Deixar uma explicação útil','“Recolha uma produção da fazenda e converse com Rosa. Ela conhece quem passa carregando coisas e pode dizer qual parte da explicação continuou obscura.”',[goal('produce','Recolha 1 produção pronta','produce'),talk('rosa')],'“Rosa leu meu rascunho e perguntou onde procurar ajuda. Eu tinha explicado a madeira inteira e esquecido as pessoas.”')],
+          ending:'“A nova explicação fica no nosso relato”, diz Tomás. “Uma marca registra água; outra lembra onde combinar a travessia. Nenhuma dispensa olhar o caminho de hoje.”\n\nAlex: “E o quarto risco?”\n\n“Continua pequeno. Só deixou de ser irrelevante.”',echo:'“No meu relato da ponte há uma pergunta que Rosa acrescentou: ‘com quem posso conferir?’ Foi a linha mais útil que eu não escrevi.”'}]},
+    {id:'curva-ines',npcId:'ines',title:'O som depois da curva',coins:12,
+      offer:'“Quando o vento passa pela cabana, às vezes escuto dois assobios. Durante anos achei que lembrava de alguém chamando. Hoje reconheci o ritmo: era o aviso que dávamos antes de voltar.”\n\nAlex: “Você andava ouvindo uma despedida?”\n\n“Talvez um retorno. Quero conferir com alguém antes de fazer do vento uma testemunha.”',
+      choices:[
+        {label:'Reencontrar o aviso pela rota da montanha.',summary:'Inês reconstrói o aviso de retorno com Rosa.',stages:[
+          stage('O recado e a lembrança','“Leia a fita da cabana e converse com Rosa. Pergunte pelo aviso, não por uma pessoa desaparecida. Não quero que uma lembrança incerta vire um susto na mesa.”',[inspect('cabana-fita','Leia a fita na cabana da montanha'),talk('rosa')],'“Rosa lembra dos dois assobios. O primeiro avisava que partíamos; o segundo, que alguém tinha respondido. Não era coragem. Era uma conversa curta.”'),
+          stage('Voltar a olhar a rota','“Visite a montanha e colete um gelo no ponto de coleta. Vá preparado. Quero pensar na antiga rota enquanto fazemos uma viagem que termina com a volta.”',[visit('mountain','Visite a montanha depois deste combinado'),goal('ice','Colete 1 gelo na montanha','collect',1,{item:'ice'})],'“Eu lembrava do sinal de quem saía. Tinha esquecido de escutar o de quem ficava.”\n\nAlex: “Essa metade da história tem gente esperando.”'),
+          stage('Uma resposta na casa','“Faça uma pausa protegida e converse com Rosa outra vez. Quero combinar o retorno em palavras claras. Não precisamos depender de quem reconhece um assobio antigo.”',[rest(),talk('rosa')],'“Ela pediu só que eu avisasse. Eu estava preparando um discurso inteiro sobre independência para uma pergunta sobre o horário.”')],
+          ending:'Inês ri antes de guardar a fita.\n\n“Os dois assobios vão continuar me lembrando da rota. O próximo aviso vai com destino e horário.”\n\nAlex: “Menos poético.”\n\n“Mais fácil de responder. Hoje prefiro isso.”',echo:'“Ouvi o vento da cabana outra vez. Desta vez pensei em quem respondia. A montanha pareceu menos vazia.”'},
+        {label:'Escutar como outros lugares combinam a volta.',summary:'Inês compara seus avisos com as rotas de Caio e Helena.',stages:[
+          stage('A lembrança de outra margem','“Leia a fita da cabana e converse com Caio. Quero saber como ele combinava as viagens, sem presumir que todo caminho usava o nosso sinal.”',[inspect('cabana-fita','Leia a fita na cabana da montanha'),talk('caio')],'“Caio deixava um recado com destino. O meu assobio seria só um ruído para quem não conhecia a combinação. Eu chamava isso de sinal universal.”'),
+          stage('Uma rota, outra legenda','“Visite a mata e converse com Helena. Ela conhece o problema de uma legenda que parece clara só para quem escreveu.”',[visit('forest','Visite a Mata das Nascentes'),talk('helena')],'“Helena disse que o mapa mais preciso ainda precisa dizer a quem serve. Vou levar essa pergunta para a próxima ronda.”'),
+          stage('Explicar sem testar coragem','“Converse com Nico e recolha uma produção pronta. Use uma viagem comum como exemplo: sair, cuidar da tarefa, voltar. Ele não precisa de uma história de perigo para aprender a combinar um caminho.”',[talk('nico'),goal('produce','Recolha 1 produção pronta da fazenda','produce')],'“Nico perguntou como avisar se mudasse de ideia. Era a pergunta que eu não fazia quando começava. Achei que voltar antes fosse reprovar na minha própria prova.”')],
+          ending:'“Vamos começar cada viagem perguntando como nos comunicamos”, diz Inês. “O aviso pode mudar de lugar para lugar. O acordo precisa ser entendido.”\n\nAlex: “E o vento?”\n\n“Pode continuar assobiando. Não vou deixá-lo encarregado das mensagens.”',echo:'“Nico me explicou de volta o combinado da viagem. Acrescentou como avisar se o plano mudar. Mantive a ideia dele.”'}]},
+    {id:'caixa-caio',npcId:'caio',title:'A caixa que não cobrava retorno',coins:10,
+      offer:'“Uma das reservas chegou ao oásis na semana em que eu cuidava de um animal doente. Não tinha tempo de responder. Passei anos lembrando da caixa como uma dívida. Rosa disse ontem: ‘era para você ter menos coisa para resolver’.”\n\nAlex: “Sua contabilidade tornou o presente muito pesado.”\n\n“Pois é. Quero reaprender a ler aquela etiqueta.”',
+      choices:[
+        {label:'Ligar a reserva ao cuidado de quem faz a viagem.',summary:'Caio combina com Davi uma reserva acompanhada de conversa.',stages:[
+          stage('O que a etiqueta dizia','“Leia a caixa do oásis e converse com Rosa. Preciso ouvir a história que existe, não a cobrança que acrescentei sozinho.”',[inspect('oasis-caixa','Leia as etiquetas da caixa no oásis'),talk('rosa')],'“Ela nem lembrava o tamanho da porção. Lembrava que eu não tinha conseguido descansar. Contávamos coisas completamente diferentes.”'),
+          stage('Cuidar antes de contar','“Colete água no oásis e alimente um animal que precise de feno. Não é pagamento da antiga caixa. Quero lembrar como o cuidado muda o dia de quem recebe.”',[goal('oasis','Colete 1 água do oásis','collect',1,{item:'oasisWater'}),care('feed')],'“Você precisou olhar se o animal precisava antes de oferecer. Eu fazia o contrário nas trocas: preparava a conta e só depois perguntava pela pessoa.”'),
+          stage('Uma reserva com escuta','“Visite as Veredas e converse com Davi. Quero propor uma reserva que pergunte pelo trabalho da viagem antes de escolher o que mandar.”',[visit('wetland','Visite as Veredas'),talk('davi')],'“Davi pediu que ninguém suponha a necessidade dele olhando só para a caixa. Parece um bom começo. Perguntar primeiro.”')],
+          ending:'Caio copia apenas o começo da velha etiqueta: “Reserva do vale”.\n\n“O restante nós combinamos com quem precisa. Ninguém deve uma história feliz para merecer ajuda.”\n\nAlex: “Nem um pagamento rápido.”\n\n“Nem uma caixa maior na volta.”',echo:'“Davi fez uma pergunta antes de sugerir a próxima reserva. Descobri que essa ordem faz muita diferença.”'},
+        {label:'Conhecer o cuidado que não aparece na produção.',summary:'Caio leva ao diálogo com Bia o trabalho que não cabe na caixa.',stages:[
+          stage('O peso que eu acrescentei','“Leia a caixa do oásis e converse com Lia. Quero separar o que foi entregue do que imaginei que esperavam de mim.”',[inspect('oasis-caixa','Leia as etiquetas da caixa no oásis'),talk('lia')],'“Lia perguntou em qual linha estava escrita a dívida. Não estava. A pergunta mais simples doeu por uma razão muito útil.”'),
+          stage('Antes do resultado','“Faça carinho em um animal que aceite o contato e recolha uma produção pronta. Quero lembrar que atenção não é um botão para tirar mais coisas de alguém.”',[care('pet'),goal('produce','Recolha 1 produção pronta da fazenda','produce')],'“O animal não tinha de pagar pelo carinho. Eu ia fazer uma comparação solene, mas acho que essa frase já fez o serviço.”\n\nAlex: “Podemos deixar alguma solenidade para amanhã.”'),
+          stage('Contar a tentativa inteira','“Faça duas colheitas e converse com Bia. Pergunte pelo trabalho que aconteceu antes do que vemos na caixa. Ela tem mais a contar do que uma quantidade.”',[goal('harvest','Faça 2 colheitas novas','harvest',2),talk('bia')],'“Bia falou das tentativas e das pessoas que ajudaram a manter uma amostra. Eu teria chamado tudo isso só de ‘duas caixas’.”')],
+          ending:'“Na próxima conversa, quero perguntar como foi cuidar”, diz Caio. “A quantidade continua importante. Só não precisa falar sozinha.”\n\nAlex: “Vai caber na etiqueta?”\n\n“Não. Ainda bem que temos uma mesa.”',echo:'“Bia contou uma tentativa que não deu certo. Não procurei imediatamente uma forma de compensar. Fiquei ouvindo. Parece pouco até a gente tentar.”'}]},
+    {id:'mapa-nico',npcId:'nico',title:'O mapa que aprendeu a esperar',coins:8,
+      offer:'“Desenhei todo mundo fazendo alguma coisa útil. Depois percebi que ninguém podia parar dentro do meu mapa. Nem a galinha. Ela estava trabalhando em três cantos.”\n\nAlex: “Uma administração exigente.”\n\n“Quero desenhar o lugar como ele vive. Pode me ajudar a encontrar o que deixei de fora?”',
+      choices:[
+        {label:'Observar os animais antes de desenhar o curral.',summary:'Nico aprende a representar cuidados sem transformar animais em ferramentas.',stages:[
+          stage('O desenho muito ocupado','“Leia meu rascunho e converse com Lia. Quero entender se observar pode ser uma tarefa, mesmo quando volto sem uma coisa nova na mochila.”',[inspect('mapa-nico','Releia o rascunho de Nico'),talk('lia')],'“Lia disse para anotar primeiro o que acontece. Minha galinha com três empregos já foi dispensada de dois. Ela parece satisfeita.”'),
+          stage('Esperar pela resposta','“Faça carinho em um animal e alimente um que precise. Observe a resposta antes de decidir a próxima ação. Não precisa chamar todo mundo de uma vez para a página ficar cheia.”',[care('pet'),care('feed')],'“Você parou para ver se o animal aceitava. Eu ia desenhar só sua mão. Agora a reação também precisa entrar.”\n\nAlex: “É a metade da conversa que não usa palavras.”'),
+          stage('Uma legenda que não manda','“Recolha uma produção pronta e converse com Tomás. Quero escrever uma legenda sobre cuidado sem prometer que todo gesto vira produto na hora.”',[goal('produce','Recolha 1 produção pronta da fazenda','produce'),talk('tomas')],'“Tomás disse que um desenho pode mostrar uma espera sem pedir desculpa por ela. Gostei. A página estava precisando respirar.”')],
+          ending:'Nico aponta para um espaço sem seta.\n\n“Aqui o animal descansa. Ninguém está devendo trabalho para preencher o canto.”\n\nAlex: “Seu mapa ficou menos ocupado.”\n\n“Ficou mais parecido com um lugar em que eu quero morar.”',echo:'“A galinha do mapa continua com um emprego a menos do que eu tinha planejado. Estou pensando em tirar o último.”'},
+        {label:'Deixar a mata mostrar o que o mapa ainda não sabe.',summary:'Nico cria uma legenda que distingue observação e pergunta.',stages:[
+          stage('Uma seta não explica tudo','“Leia meu rascunho e converse com Helena. Quero saber como ela desenha algo que ainda precisa conferir.”',[inspect('mapa-nico','Releia o rascunho de Nico'),talk('helena')],'“Helena usa uma pergunta na margem. Eu achava que um mapa só podia falar com certeza. Isso explica algumas setas muito nervosas.”'),
+          stage('O que cresce entre os caminhos','“Visite a Mata das Nascentes e converse com Bia. Quero ouvir o que ela vê na clareira antes de copiar a mata como um monte de árvores iguais.”',[visit('forest','Visite a Mata das Nascentes'),talk('bia')],'“Bia começou pelos nomes das pessoas que plantaram. Eu tinha levado um lápis verde para resolver a mata inteira.”\n\nAlex: “Ainda pode usar o lápis. Só vai precisar de mais tempo.”'),
+          stage('A página continua depois','“Regue duas plantas novas e converse com Rosa. Quero desenhar uma tentativa que está crescendo, sem inventar a colheita antes da hora.”',[goal('water','Faça a primeira rega de 2 plantas','water',2),talk('rosa')],'“Rosa sugeriu que eu deixe a data. Assim posso voltar à página e ver o que mudou, sem achar que o desenho antigo precisa sumir.”')],
+          ending:'“Esta parte eu vi. Esta, Bia me contou. Esta ainda preciso conferir.” Nico mostra três pequenas legendas.\n\nAlex: “Seu mapa acabou?”\n\n“Esta página, sim. O lugar, espero que não.”',echo:'“Deixei uma pergunta no mapa. Não escondida no verso. Helena disse que já consegue entender onde pode me ajudar.”'}]}
+  ];
+  const byNpc=Object.fromEntries(arcs.map(def=>[def.npcId,def]));
+  const byId=Object.fromEntries(arcs.map(def=>[def.id,def]));
+  const replies={
+    'dobra-rosa':{
+      '0:nico':'“A palavra na dobra da carta? Eu lembro de Rosa separando papel escrito ‘para a primeira tentativa’. Achei que era para mim e escondi três no caderno. Não eram cartas ainda. Eram os embrulhos das amostras.”\n\nAlex: “Você guardou uma pista por engano.”\n\n“Prefiro dizer que preservei um documento sem conhecer sua importância.”',
+      '0:caio':'“A minha primeira caixa tinha essa expressão: ‘para a primeira tentativa’. Não era encomenda. Devia ajudar a reserva a circular. Em algum ponto comecei a contar o que teria de devolver. Rosa começou a esperar uma boa notícia. Ficamos os dois esperando.”',
+      '2:bia':'“Diga a Rosa que quero poder responder depois de plantar. O nome de quem mandou importa, mas não pode cobrir o de quem continuou a tentativa. Se a carta tiver lugar para essa parte, eu tenho o que escrever.”',
+      '2:caio':'“O que quero saber da próxima tentativa de Rosa? O canteiro que não deu certo também. Uma carta só com o melhor resultado me faz achar que sou o único do vale aprendendo ainda.”'},
+    'margem-lia':{
+      '0:helena':'“A anotação original tinha lugar e data. Na cópia, a data desapareceu. ‘Água da mata’ e ‘água da margem’ podem acompanhar a mesma rota sem registrar o mesmo momento. Quero conferir com Lia antes de chamar qualquer linha de errada.”',
+      '0:davi':'“Nesse caderno, ‘margem’ era o ponto de onde lemos a régua naquele dia. Não o nome de uma água diferente. Se Lia copiar a data também, a anotação deixa de parecer uma ordem para procurar o mesmo chão seco em qualquer época.”',
+      '2:davi':'“Sua comparação veio da nascente? Então guarde a data junto. Eu consigo dizer como estava aqui naquele momento; não como a vereda sempre será. A água anda. O registro precisa admitir isso.”',
+      '2:bia':'“Para a página de Lia, quero uma coluna sobre o que mudou entre tentativas. Origem da amostra, cuidado, época. Se misturarmos tudo numa quantidade, até um resultado parecido pode estar contando outra história.”'},
+    'risco-tomas':{
+      '0:ines':'“O risco curto da ponte era nosso lugar de espera. Quem chegava primeiro ficava ali, sem obrigar os carregadores a correr. Tomás olhava para a travessia; eu precisava saber quem ainda faltava chegar. As duas coisas cabiam na mesma ponte.”',
+      '0:davi':'“O risco curto na ponte não era marca de nível. As minhas anotações de água levam uma data. Aquele ponto lembrava onde combinar a saída. Tomás está certo em separar as legendas antes de explicar tudo com uma seta.”',
+      '1:ines':'“A régua registra de quando? Essa é a primeira pergunta que eu faria. Depois olharia a passagem de hoje. Tomás pode explicar a marca; ninguém deve transformar a leitura antiga numa promessa para quem atravessa agora.”',
+      '2:nico':'“Eu desenharia as duas pessoas primeiro. Se uma está esperando a outra, isso também é parte da viagem. Depois coloco a ponte. É estranho: quando começo só pela seta, parece que todo mundo tem de correr.”',
+      '2:rosa':'“A explicação de Tomás precisa responder uma coisa: se eu não entender a marca, com quem posso conferir? Uma tábua não se ofende se eu perguntar. Às vezes é a gente que torna a conversa difícil.”'},
+    'curva-ines':{
+      '0:rosa':'“Dois assobios, sim. Um de quem saía e outro de quem respondia. Inês lembrava de ser corajosa na trilha; eu lembrava de ficar aqui ouvindo. Eu não queria prender ninguém. Queria saber se a voz tinha chegado.”',
+      '2:rosa':'“Não preciso de uma explicação bonita para cada saída da Inês. Quero combinar onde ela vai e quando espera voltar. Se mudar, me avisa quando puder. Uma cadeira não é uma cobrança; pode dizer isso a ela.”',
+      '0:caio':'“Aqui eu deixava um recado com o destino. Se ouvisse o assobio de Inês sem conhecer a combinação, acharia bonito e continuaria trabalhando. Um sinal precisa de alguém que saiba responder.”',
+      '1:helena':'“Pergunte à Inês para quem é o aviso. O desenho mais preciso do meu mapa ainda pode falhar para quem não conhece a legenda. Explicar não diminui o conhecimento de quem guia; deixa outra pessoa entrar nele.”',
+      '2:nico':'“Entendi: digo aonde vou e quando penso voltar. Mas se eu perceber no caminho que era melhor tentar outro dia, como aviso? Quero escrever essa parte também. Meu mapa antigo só aceitava chegar até o fim.”'},
+    'caixa-caio':{
+      '0:rosa':'“Eu lembrava de Caio cansado, não do tamanho da caixa. Ele estava cuidando de um animal e tentando manter todo o resto em dia. Mandei a reserva para tirar uma preocupação da lista. Nunca pedi que ela voltasse mais pesada.”',
+      '0:lia':'“Caio disse que devia devolver a reserva? Mostre em qual linha da etiqueta está a dívida. Se não estiver, precisamos dar outro nome a essa conclusão. Sentir uma cobrança não prova que alguém a fez.”',
+      '2:davi':'“Se Caio quer combinar uma reserva comigo, comece perguntando o que o trabalho exige agora. Não adivinhe pela caixa que levei na estação passada. Eu posso precisar de outra coisa, ou só de alguém para conferir uma dúvida.”',
+      '2:bia':'“Antes destas amostras houve gente regando, uma tentativa que falhou e outra pessoa que guardou parte para recomeçar. Pode contar tudo a Caio. A quantidade que chegou é importante; o trabalho que permitiu chegar também.”'},
+    'mapa-nico':{
+      '0:lia':'“Observar pode ser o trabalho, sim. Peça a Nico para anotar o que aconteceu antes de desenhar o que deveria acontecer. Se a galinha parar, ela não está estragando o mapa. Está mostrando o que o mapa esqueceu.”',
+      '2:tomas':'“Uma boa legenda não precisa prometer produção instantânea. Pode mostrar cuidado, descanso e espera. Nico anda preocupado em preencher todos os espaços. Diga que até um encaixe precisa de folga para funcionar.”',
+      '0:helena':'“Quando preciso conferir algo, ponho uma pergunta na margem. Não escondo no verso. Nico pode distinguir o que viu, o que alguém contou e o que ainda quer observar. Um mapa não perde valor por dizer onde termina a certeza.”',
+      '1:bia':'“Antes de colorir a clareira, conte a Nico quem plantou aqui. Há etiquetas diferentes porque há trabalhos diferentes. Ele pode começar pelo nome das pessoas e depois escolher onde cabem as árvores.”',
+      '2:rosa':'“Se Nico desenhar uma tentativa crescendo, peça que ponha a data. Quando voltar, pode guardar a página antiga ao lado da nova. Não precisa apagar o primeiro desenho para admitir que o lugar mudou.”'}
+  };
+  let adapter={},dialogue=null,revision=0,state;
+  const freshRecord=()=>({status:'offered',choice:null,stage:0,acceptedAt:null,counts:{},paid:false});
+  const REGIONS=['farm','mountain','desert','forest','wetland'];
+  const fresh=()=>({version:VERSION,sequence:0,met:[],visits:Object.fromEntries(IDS.map(id=>[id,0])),arcs:Object.fromEntries(arcs.map(def=>[def.id,freshRecord()])),journal:[],recentEventIds:[],lastRegion:null});
+  function context(value){let raw=value;try{if(!plain(raw))raw=adapter.readState?.();}catch(_){raw=null;}return {name:text(own(raw,'playerName')||own(raw,'name'),40)||'Alex',timeOfDay:Number.isFinite(own(raw,'timeOfDay'))?raw.timeOfDay:12,region:REGIONS.includes(own(raw,'region'))?raw.region:'farm',scene:text(own(raw,'scene'),24)||'main',active:own(raw,'active')!==false,paused:own(raw,'paused')===true};}
+  function emit(name,...args){try{return adapter[name]?.(...args);}catch(error){if(typeof console!=='undefined')console.warn('[Vozes do vale] '+name,error);}}
+  function changed(){revision++;emit('onChange',snapshot());}
+  const row=def=>state.arcs[def.id];
+  const branch=(def,r)=>Number.isInteger(r.choice)?def.choices[r.choice]:null;
+  const currentStage=(def,r)=>branch(def,r)?.stages[r.stage]||null;
+  const objectives=(def,r)=>(currentStage(def,r)?.objectives||[]).map(g=>({...clone(g),n:num(r.counts[g.id],g.goal)}));
+  const complete=(def,r)=>!!currentStage(def,r)&&objectives(def,r).every(g=>g.n>=g.goal);
+  const line=(def,r)=>objectives(def,r).map(g=>(g.n>=g.goal?'✓ ':'• ')+g.text+' · '+g.n+'/'+g.goal).join('\n');
+  function journal(id,npcId,title,message){if(state.journal.some(entry=>entry.id===id))return;state.journal.push({id,npcId,title,text:message,sequence:state.sequence});state.journal=state.journal.slice(-36);}
+  function currentDialogue(){return dialogue?clone(dialogue):null;}
+  function display(npcId,message,choices=[],title){if(!Object.hasOwn(characters,npcId))return null;const c=characters[npcId];dialogue={npcId,speaker:c.name,role:c.role,title:title||'Vozes do vale · '+c.name,text:message.replace(/\bAlex\b/g,()=>context().name),kind:'village',choices:clone(choices),canAdvance:false,expression:npcId==='nico'?'curious':npcId==='tomas'?'thoughtful':'warm',gesture:'explain'};emit('onDialogue',currentDialogue());return currentDialogue();}
+  function close(options={}){const npcId=dialogue?.npcId;dialogue=null;if(!options.silent)emit('onDialogue',null);if(options.returnToMenu&&npcId)emit('onClose',{npcId,returnToMenu:true});return null;}
+  function menuLabel(npcId){if(!Object.hasOwn(byNpc,npcId))return'';const def=byNpc[npcId],r=row(def);return (r.status==='completed'?'Relembrar: ':r.status==='ready'?'Nosso encontro: ':r.status==='active'?'Continuar: ':'Uma história: ')+def.title;}
+  function conversationResponse(npcId){if(!Object.hasOwn(characters,npcId)&&!['helena','davi','bia'].includes(npcId))return'';const responses=[];for(const def of arcs){const r=row(def),s=currentStage(def,r);if(!['active','ready'].includes(r.status)||!s?.objectives.some(g=>g.event==='talk'&&g.match.npcId===npcId))continue;const response=replies[def.id]?.[r.stage+':'+npcId];if(response)responses.push(response);}return responses.slice(-2).join('\n\n').replace(/\bAlex\b/g,()=>context().name);}
+  function menu(npcId){if(!Object.hasOwn(byNpc,npcId))return null;const def=byNpc[npcId],r=row(def),c=characters[npcId];let message=r.paid?branch(def,r).echo:c.greeting;if(r.status==='active')message=currentStage(def,r).offer+'\n\n'+line(def,r);else if(r.status==='ready')message='“Você voltou. Vamos conferir o que encontramos antes de escolher o próximo passo.”\n\n'+line(def,r);const response=conversationResponse(npcId);if(response)message=response+'\n\n'+message;return display(npcId,message,[{id:'village:arc:'+def.id,label:menuLabel(npcId)},{id:'village:topic:past',label:'Uma lembrança de antes da minha volta'},{id:'village:topic:routine',label:'Como foi seu dia?'},{id:'village:topic:dream',label:'O que você ainda quer fazer?'},{id:'village:return',label:'Voltar aos outros assuntos'},{id:'village:close',label:'Até depois'}]);}
+  function interact(npcId){if(!Object.hasOwn(byNpc,npcId))return null;if(!state.met.includes(npcId))state.met.push(npcId);state.visits[npcId]=Math.min(MAX,state.visits[npcId]+1);changed();return menu(npcId);}
+  function offer(def){const r=row(def),choices=[],s=currentStage(def,r);let message=def.offer,title=def.title;if(r.status==='offered')def.choices.forEach((pick,index)=>choices.push({id:'village:accept:'+def.id+':'+index,label:pick.label}));else if(r.status==='completed')message=branch(def,r).ending;else {title=def.title+' · '+(r.stage+1)+'/3 · '+s.title;message=(r.status==='ready'?s.done:s.offer)+'\n\n'+line(def,r);if(r.status==='ready')choices.push({id:'village:'+(r.stage===2?'claim:':'next:')+def.id,label:r.stage===2?'Concluir nossa história':'Combinar o próximo encontro'});}choices.push({id:'village:menu',label:'Voltar à conversa'},{id:'village:close',label:'Continuar pelo mundo'});return display(def.npcId,message,choices,title);}
+  function beginStage(def,r,index){r.stage=index;r.status='active';r.acceptedAt=state.sequence;r.counts=Object.fromEntries(currentStage(def,r).objectives.map(g=>[g.id,0]));journal(def.id+':stage:'+index,def.npcId,def.title+' · '+currentStage(def,r).title,branch(def,r).summary);changed();return offer(def);}
+  function claim(def){const r=row(def);if(r.status!=='ready'||r.stage!==2||r.paid||!complete(def,r))return offer(def);r.paid=true;r.status='completed';journal(def.id+':completed',def.npcId,def.title,branch(def,r).ending);changed();emit('reward',{kind:'village-story',id:'village:'+def.id,npcId:def.npcId,coins:def.coins,label:def.title});return offer(def);}
+  function choose(id){if(typeof id!=='string'||!dialogue?.choices.some(c=>c.id===id))return currentDialogue();const npcId=dialogue.npcId;if(id==='village:close')return close();if(id==='village:return')return close({returnToMenu:true});if(id==='village:menu')return menu(npcId);const topic=/^village:topic:(past|routine|dream)$/.exec(id);if(topic){const c=characters[npcId],r=row(byNpc[npcId]);let message=c[topic[1]][r.paid?1:0];if(topic[1]==='routine'&&(context().timeOfDay<6||context().timeOfDay>=20))message+='\n\n“Por hoje, o resto espera. Podemos continuar outra hora.”';if(r.paid)message+='\n\n'+branch(byNpc[npcId],r).echo;return display(npcId,message,[{id:'village:menu',label:'Continuar a conversa'},{id:'village:close',label:'Até depois'}],{past:'Antes desta volta',routine:'Um dia no vale',dream:'O que ainda vem'}[topic[1]]);}
+    const match=/^village:(arc|accept|next|claim):([a-z-]+)(?::([01]))?$/.exec(id);if(!match||!Object.hasOwn(byId,match[2]))return currentDialogue();const def=byId[match[2]],r=row(def);if(def.npcId!==npcId)return currentDialogue();if(match[1]==='arc')return offer(def);if(match[1]==='accept'&&r.status==='offered'&&match[3]!==undefined){r.choice=Number(match[3]);return beginStage(def,r,0);}if(match[1]==='next'&&r.status==='ready'&&r.stage<2&&complete(def,r))return beginStage(def,r,r.stage+1);if(match[1]==='claim')return claim(def);return offer(def);}
+  function record(event,payload={}){if(!EVENTS.includes(event)||!plain(payload))return false;const rawAmount=own(payload,'amount');if(rawAmount!==undefined&&(!Number.isFinite(rawAmount)||rawAmount<=0||!Number.isInteger(rawAmount)))return false;const amount=rawAmount===undefined?1:Math.min(50,rawAmount),uid=text(own(payload,'eventId'));if(uid&&state.recentEventIds.includes(uid))return false;if(uid){state.recentEventIds.push(uid);state.recentEventIds=state.recentEventIds.slice(-160);}state.sequence=Math.min(MAX_SEQUENCE,state.sequence+1);let dirty=false;for(const def of arcs){const r=row(def);if(r.status!=='active'||r.acceptedAt===null||state.sequence<=r.acceptedAt)continue;for(const g of currentStage(def,r).objectives){if(g.event!==event||!Object.entries(g.match).every(([key,value])=>own(payload,key)===value))continue;const before=num(r.counts[g.id],g.goal);r.counts[g.id]=Math.min(g.goal,before+amount);dirty=dirty||r.counts[g.id]!==before;}if(complete(def,r)){r.status='ready';dirty=true;}}if(dirty)changed();return dirty;}
+  function view(def){const r=row(def),s=currentStage(def,r),list=objectives(def,r);return{id:'village:'+def.id,npcId:def.npcId,title:def.title,description:def.offer,status:r.status==='offered'?'available':r.status,accepted:r.acceptedAt!==null,completed:r.paid,choice:r.choice,stage:r.stage,stageTitle:s?.title||'Escolha um caminho',stageCount:3,objectives:list,objective:r.paid?'História concluída':r.status==='offered'?'Converse e escolha um caminho.':(r.stage+1)+'/3 · '+s.title+'\n'+line(def,r),coins:def.coins,progress:list.reduce((n,g)=>n+g.n,0),goal:list.reduce((n,g)=>n+g.goal,0),consequence:r.paid?branch(def,r).echo:''};}
+  function diaryView(){return {quests:arcs.filter(def=>state.met.includes(def.npcId)&&!row(def).paid).map(view),discoveries:arcs.filter(def=>row(def).paid).map(def=>({id:'village:'+def.id,npcId:def.npcId,title:def.title,text:branch(def,row(def)).ending,response:branch(def,row(def)).echo})),memories:state.journal.map(entry=>({id:'village:'+entry.id,npcId:entry.npcId,text:entry.title+' · '+entry.text})),friendships:Object.fromEntries(IDS.map(id=>[id,row(byNpc[id]).paid?6:row(byNpc[id]).acceptedAt!==null?2:0])),discoveryTotal:arcs.length};}
+  function snapshot(){const completed=arcs.filter(def=>row(def).paid).map(def=>def.id);return {version:VERSION,title:'Vozes do vale',arcs:arcs.map(view),quests:diaryView().quests,completedArcIds:completed,completedQuestIds:completed.slice(),known:state.met.slice(),journal:clone(state.journal),coinsEarned:arcs.filter(def=>row(def).paid).reduce((sum,def)=>sum+def.coins,0)};}
+  function restore(saved){dialogue=null;state=fresh();if(!plain(saved)||own(saved,'version')!==VERSION){emit('onDialogue',null);changed();return false;}state.sequence=num(own(saved,'sequence'),MAX_SEQUENCE);const met=own(saved,'met');state.met=[...new Set((Array.isArray(met)?met:[]).filter(id=>IDS.includes(id)))];const recent=own(saved,'recentEventIds');state.recentEventIds=[...new Set((Array.isArray(recent)?recent:[]).slice(-160).map(value=>text(value)).filter(Boolean))];for(const id of IDS)state.visits[id]=num(own(own(saved,'visits'),id));for(const def of arcs){const raw=own(own(saved,'arcs'),def.id),r=row(def);if(!plain(raw)||!['active','ready','completed'].includes(own(raw,'status'))||![0,1].includes(own(raw,'choice'))||!Number.isInteger(own(raw,'stage'))||raw.stage<0||raw.stage>2||!Number.isFinite(own(raw,'acceptedAt'))||raw.acceptedAt<0)continue;r.choice=raw.choice;r.stage=raw.stage;r.acceptedAt=Math.min(state.sequence,num(raw.acceptedAt,MAX_SEQUENCE));r.paid=raw.status==='completed'&&r.stage===2;r.counts=Object.fromEntries(currentStage(def,r).objectives.map(g=>[g.id,r.paid?g.goal:num(own(own(raw,'counts'),g.id),g.goal)]));r.status=r.paid?'completed':complete(def,r)?'ready':'active';if(!state.met.includes(def.npcId))state.met.push(def.npcId);for(let i=0;i<=r.stage;i++)journal(def.id+':stage:'+i,def.npcId,def.title+' · '+branch(def,r).stages[i].title,branch(def,r).summary);if(r.paid)journal(def.id+':completed',def.npcId,def.title,branch(def,r).ending);}
+    // Textos externos nunca entram nos diálogos; só reordenamos entradas canônicas.
+    const canonical=new Map(state.journal.map(entry=>[entry.id,entry])),seen=new Set(),ordered=[],rawJournal=own(saved,'journal');for(const raw of (Array.isArray(rawJournal)?rawJournal:[]).slice(-36)){const id=own(raw,'id');if(!canonical.has(id)||seen.has(id))continue;seen.add(id);ordered.push({...canonical.get(id),sequence:Math.min(state.sequence,num(own(raw,'sequence'),MAX_SEQUENCE))});}for(const entry of state.journal)if(!seen.has(entry.id))ordered.push(entry);state.journal=ordered.slice(-36);state.lastRegion=context().region;emit('onDialogue',null);changed();return true;}
+  function update(dt,value){if(!Number.isFinite(dt)||dt<=0)return;const c=context(value);if(!c.active||c.paused||dialogue||c.scene!=='main')return;if(c.region!==state.lastRegion){state.lastRegion=c.region;record('visit',{region:c.region});}}
+  function inspectBridge(){
+    // O adaptador só chama após validar alcance e acesso à ponte existente.
+    // Observar não repara, não altera colisão nem distribui material.
+    record('inspect',{clueId:'bridge-crossing'});const c=context();dialogue={npcId:'player',speaker:c.name,role:'Observação da ponte do rio',title:'Uma passagem, mais de uma história',kind:'village',canAdvance:false,expression:'thoughtful',gesture:'observe',text:'Você acompanha a linha das tábuas até a outra margem. Perto dos três riscos gastos há uma marca curta, quase escondida pela madeira escura. Ela não aponta uma nova rota.\n\n“Tomás conhece os encaixes. Inês talvez lembre de quem esperava aqui”, você anota. “A água continua passando; a explicação precisa de gente.”',choices:[{id:'village:close',label:'Guardar a observação e seguir'}]};emit('onDialogue',currentDialogue());return currentDialogue();
+  }
+  function cinematicScenes(){return[
+    {id:'village-ponte',villageMission:'risco-tomas',title:'A espera também faz parte',description:'Tomás e Alex reconhecem a história das pessoas nas marcas da ponte.',chapter:0,region:'farm',scene:'main',focusX:744,focusY:944,cast:['tomas','player'],prop:'notebook',shots:[
+      {speaker:'tomas',line:'Passei tempo demais olhando só para o que sustenta a ponte. Esqueci de perguntar quem precisava atravessar.',expression:'thoughtful',gesture:'point',focus:-1,duration:5.5},
+      {speaker:'player',line:'O quarto risco era pequeno. A conversa que faltava, nem tanto.',expression:'warm',gesture:'nod',focus:1,duration:5.5},
+      {speaker:'tomas',line:'Da próxima vez, começo perguntando. Depois pego a régua. Pode me lembrar se eu inverter.',expression:'warm',gesture:'invite',focus:-1,duration:5.5},
+      {speaker:'player',line:'Lembro. E seguro a outra ponta quando você precisar.',expression:'warm',gesture:'nod',focus:0,duration:5.5}]},
+    {id:'village-mesa',villageMission:'dobra-rosa',title:'A carta que precisa sair',description:'Uma pergunta de Rosa encontra espaço para uma resposta diferente da sua.',chapter:0,region:'farm',scene:'main',focusX:264,focusY:920,cast:['rosa','player'],prop:'notebook',shots:[
+      {speaker:'rosa',line:'Reescrevi o começo três vezes. Agora a carta pergunta em vez de explicar tudo.',expression:'thoughtful',gesture:'explain',focus:-1,duration:5.5},
+      {speaker:'player',line:'A minha resposta levou uma viagem inteira. Ainda cabe?',expression:'warm',gesture:'shrug',focus:1,duration:5.5},
+      {speaker:'rosa',line:'Cabe. Não precisava voltar sabendo o que dizer. Precisava ter a chance de dizer do seu jeito.',expression:'warm',gesture:'invite',focus:-1,duration:5.5},
+      {speaker:'player',line:'Então começo pequeno: quero ficar para a próxima conversa.',expression:'resolved',gesture:'nod',focus:0,duration:5.5}]}
+  ];}
+  state=fresh();
+  window.FarmVillageStories={init(api={}){adapter=plain(api)?api:{};return snapshot();},hasCharacter:id=>Object.hasOwn(byNpc,id),menuLabel,interact,choose,close,currentDialogue,isOpen:()=>!!dialogue,record,update,inspectBridge,cinematicScenes,serialize:()=>clone(state),restore,reset(){state=fresh();close();changed();return snapshot();},snapshot,diaryView,conversationResponse,missionCatalogue:()=>clone(arcs),revision:()=>revision};
 })();
 
 /* =============================
@@ -14033,10 +14502,30 @@ function registerObjectDrawer(type, fn){ OBJECT_DRAWERS[type] = fn; }
 function registerInteraction(type, fn){ INTERACTION_HANDLERS[type] = fn; }
 function registerSceneTrigger(fn){ SCENE_TRIGGERS.push(fn); }
 function registerThermalZone(scene, fn){ THERMAL_ZONES[scene] = fn; }
+// O aviso e E escolhem o mesmo morador, sem conversar através de paredes.
+function reachableNpc(o){
+  if(currentScene!=='main'||!o||o.type!=='story_npc')return false;
+  const distance=Math.hypot(player.x-o.x,player.y-o.y);if(distance>28)return false;
+  for(let i=1,n=Math.max(1,Math.ceil(distance/3));i<=n;i++){
+    const x=player.x+(o.x-player.x)*i/n,y=player.y+(o.y-player.y)*i/n;
+    if([T.FENCE,T.WATER,T.RIVER,T.OASIS].includes(map[Math.floor(y/TS)]?.[Math.floor(x/TS)])||window.FarmWorldDepth?.isBlocked(x,y))return false;
+  }
+  return true;
+}
+function nearInteractionObject(){
+  let best=null,distance=Infinity;
+  for(const o of queryObjects(Object.keys(INTERACTION_HANDLERS))){
+    const d=Math.hypot(player.x-(o.x+(o.w||0)/2),player.y-(o.y+(o.h||0)/2));
+    if(d>=(o.type==='story_npc'?28:26)||d>=distance)continue;
+    if(o.type==='story_npc'&&!reachableNpc(o))continue;
+    best=o;distance=d;
+  }
+  return best;
+}
 function biomeInteractHook(){
   const types = Object.keys(INTERACTION_HANDLERS);
   if(!types.length) return false;
-  const o = nearObj(types, 26);
+  const o = nearInteractionObject();
   if(o && INTERACTION_HANDLERS[o.type]) return INTERACTION_HANDLERS[o.type](o) !== false;
   return false;
 }
@@ -15326,6 +15815,7 @@ function saveGame(auto=false){
       storyCinematics: window.FarmStoryCinematics?.serialize(),
       valleySaga: window.FarmValleySaga?.serialize(),
       frontierStory: window.FarmFrontierStory?.serialize(),
+      villageStories: window.FarmVillageStories?.serialize(),
       farmLife: window.FarmLife?.serialize(),
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
@@ -15412,6 +15902,7 @@ function loadGameFromData(data){
   window.FarmLearningJourney.restore(data.learningJourney,learningContext());
   window.FarmValleySaga?.restore(data.valleySaga);
   window.FarmFrontierStory?.restore(data.frontierStory);
+  window.FarmVillageStories?.restore(data.villageStories);
   window.FarmLife?.restore(data.farmLife);
   window.FarmSkinLearning?.restore(data.skinLearning);
   window.FarmStoryIntegration?.restore(data.storyWorld);
@@ -17175,6 +17666,7 @@ function feedAnimal(animal){
   player.inv.hay--;animal.well=1;
   tickTask('feed');if(isFrio())tickTask('protect');
   window.FarmAnimalLife?.react?.(animal,'feed',player);
+  window.FarmStoryIntegration?.record('care',{kind:'animal',action:'feed',species:animal.kind});
   return true;
 }
 function careForAnimal(action,animal){
@@ -17192,6 +17684,7 @@ function careForAnimal(action,animal){
     tickTask('wool');window.FarmStoryIntegration?.record('collect',{item:'wool',amount:1});
     window.FarmAnimalLife?.react?.(animal,'shear',player);sfx.wool();showToast('1 lã de '+name+' guardada na mochila.','success');
   }else return false;
+  if(action!=='feed')window.FarmStoryIntegration?.record('care',{kind:'animal',action,species:animal.kind});
   if(soundEnabled)window.synthSfx?.animal(animal.kind);
   renderInv();if(action!=='pet')saveGame(true);return true;
 }
@@ -18237,6 +18730,7 @@ function resetSandboxRun(){
   window.FarmActivityReport.close();
   window.FarmValleySaga?.reset();
   window.FarmFrontierStory?.reset();
+  window.FarmVillageStories?.reset();
   window.FarmLife?.reset();
   window.FarmSkinLearning?.reset();
   window.FarmStoryIntegration?.reset();
@@ -23280,8 +23774,9 @@ function drawCinematicWorld(g,view={}){
     window.FarmWorldDepth?.drawGround(g);
     window.FarmWaterLife?.drawSurface(g,left,top,visibleW,visibleH);
     for(const k in crops){const c=crops[k];if(!c)continue;const [x,y]=k.split(',').map(Number);if(x*TS+32>=left&&x*TS-32<=left+visibleW&&y*TS+32>=top&&y*TS-32<=top+visibleH)drawCrop(x,y,c);}
-    const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
+    const visible=objects.filter(o=>o.type!=='story_npc'&&o.type!=='pen'&&o.type!=='bridge'&&o.x+(o.w||0)+128>=left&&o.x-128<=left+visibleW&&o.y+(o.h||0)+128>=top&&o.y-128<=top+visibleH);
     for(const o of objects)if(o.type==='pen'){window.FarmWorldDepth?FarmWorldDepth.drawPenBase(g,o):drawPen(o);if(window.FarmWorldDepth)visible.push(...FarmWorldDepth.penParts(o));}
+    for(const o of objects)if(o.type==='bridge'){FarmWorldDepth?.drawBridgeBase(g,o);visible.push(...(FarmWorldDepth?.bridgeParts(o)||[]));}
     if(view.stage?.prop==='table'){
       let table=null,score=Infinity;
       for(let y=Math.ceil(top+visibleH*.6);y<top+visibleH-23;y+=4)for(let x=Math.ceil(centerX-28);x<=centerX+28;x+=4){
@@ -23515,13 +24010,16 @@ function render(){
     if(window.FarmWorldDepth)FarmWorldDepth.drawPenBase(ctx,o);else drawPen(o);
   }
 
+  for(const o of objects)if(o.type==='bridge')window.FarmWorldDepth?.drawBridgeBase(ctx,o);
+
   // sort by y, including player
   const drawables=_renderDrawables;drawables.length=0;
-  for(const o of objects)if(o.type!=='pen'&&o.x+(o.w||0)+128>=camX&&o.x-128<=camX+visW&&o.y+(o.h||0)+128>=camY&&o.y-128<=camY+visH)drawables.push(o);
+  for(const o of objects)if(o.type!=='pen'&&o.type!=='bridge'&&o.x+(o.w||0)+128>=camX&&o.x-128<=camX+visW&&o.y+(o.h||0)+128>=camY&&o.y-128<=camY+visH)drawables.push(o);
   const restPose=window.FarmRestVisual?.pose(player,currentScene);
   _renderPlayer.x=restPose?.x??player.x;_renderPlayer.y=restPose?restPose.depth-10:player.y;
   drawables.push(_renderPlayer);
   if(window.FarmWorldDepth)for(const o of objects)if(o.type==='pen')drawables.push(...FarmWorldDepth.penParts(o));
+  if(window.FarmWorldDepth)for(const o of objects)if(o.type==='bridge')drawables.push(...FarmWorldDepth.bridgeParts(o));
   if(window.FarmInteriorArt)for(const o of objects)if(o.type==='gh_frame')drawables.push(...FarmInteriorArt.parts(o));
   drawables.sort((a,b)=>{
     const ay = window.FarmWorldDepth?FarmWorldDepth.depth(a):a.y+(a.h||0);
@@ -23679,7 +24177,7 @@ function currentHint(){
   if(player.dead) return 'RENASCER: reiniciar personagem';
   if(player.resting) return 'Descansando... mova-se ou pressione R para parar';
   if(!nearObj(['door_house','door_barn','gh_exit','i_door'],22)){const animalHint=window.FarmAnimalCare?.hint();if(animalHint)return animalHint;}
-  const recurso=nearObj(Object.keys(INTERACTION_HANDLERS),26);
+  const recurso=nearInteractionObject();
   if(recurso && recurso.interactionHint) return 'E: '+recurso.interactionHint;
   const barn = objectAtPlayer(['barn']);
   if(isFrio() && barn && player.inv.wool>=2 && player.inv.coat<1) return 'E: fazer casaco de lã';

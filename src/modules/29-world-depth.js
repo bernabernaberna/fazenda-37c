@@ -188,6 +188,7 @@
   function depth(o){
    if(o.type==='player'||o.type==='story_npc')return o.y+10;
    if(o.type==='world_pen_rail')return o.y;
+   if(o.type==='world_bridge_rail')return o.y+2;
    if(o.type==='mtn_cabin')return o.y+3;
    if(o.type==='animal')return o.y+(['chick','chicken'].includes(o.kind)?4:6);
    if(o.type==='tree'||o.type==='fx_fruittree')return o.y+9;
@@ -209,6 +210,16 @@
   }
   API.registerObjectDrawer('world_pen_rail',(o,g)=>rail(g,o.x,o.y,o.w));
   API.registerObjectDrawer('world_pen_side',(o,g)=>{R(g,P.woodDark,o.x,o.y-21,3,10);R(g,P.woodLight,o.x,o.y-21,1,10);R(g,P.wood,o.x,o.y-12,3,9);});
+
+  // Deck antes dos personagens; corrimãos só nos dois limites do corredor.
+  // São peças efêmeras de desenho, não objetos físicos nem itens de save.
+  function drawBridgeBase(g,o){window.FarmWorldArt.drawBridgeBase(o,g);}
+  function bridgeParts(o){
+   const b=window.FarmWorldArt.bridgeGeometry(o);
+   return [{type:'world_bridge_rail',x:b.x,y:b.y,w:b.w},
+    {type:'world_bridge_rail',x:b.x,y:b.y+b.h,w:b.w}];
+  }
+  API.registerObjectDrawer('world_bridge_rail',(o,g)=>window.FarmWorldArt.drawBridgeRail(o,g));
 
   function drawGround(g){
    if(API.rawScene!=='main')return;
@@ -264,6 +275,12 @@
        volumeProjection(g,o.x,o.y+o.h-2,o.w,o.h,dx,false);break;
       case 'mtn_cabin':volumeProjection(g,o.x-32,o.y,64,68,dx,false);break;
       case 'world_ridge':volumeProjection(g,o.x,o.y+o.h,o.w,o.rise,dx,true);break;
+      case 'world_bridge_rail':
+       // Só a projeção varia com o sol; bases e tábuas não se deslocam.
+       for(const xx of [o.x-3,o.x+Math.floor(o.w/2)-1,o.x+o.w]){
+        g.beginPath();g.moveTo(xx,o.y+1);g.lineTo(xx+3,o.y+1);
+        g.lineTo(xx+3+dx*8,o.y+5);g.lineTo(xx+dx*8,o.y+5);g.closePath();g.fill();
+       }break;
       default:continue;
      }
      count++;
@@ -278,6 +295,6 @@
    if(o.type!=='barn')points.push({x:o.x+o.w-34,y:o.y+64,r:25},{x:o.x+o.w/2,y:o.y+o.h-26,r:16});
    return points;
   }
-  window.FarmWorldDepth=Object.freeze({version:2,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawGroundShadows,drawPenBase,penParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
+  window.FarmWorldDepth=Object.freeze({version:3,get navigationVersion(){return 1+(window.FarmLife?.navigationVersion?.()||0);},footprint,isBlocked,depth,drawSeedHouse,drawGround,drawGroundShadows,drawPenBase,penParts,drawBridgeBase,bridgeParts,windowLights,cacheInfo:()=>({sprites:cache.size})});
  });
 })();
