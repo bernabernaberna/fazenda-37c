@@ -2,8 +2,8 @@
    alvo, duração e fase são transitórios e nunca entram no save. */
 (()=>{
  'use strict';
- const durations=Object.freeze({plant:.50,water:.68,harvest:.56,collect:.55,feed:.62,pet:.90,fish:1.05});
- const contact=Object.freeze({plant:.52,water:.55,harvest:.55,collect:.55,feed:.58,pet:.50,fish:.58});
+ const durations=Object.freeze({plant:.50,water:.68,harvest:.56,collect:.55,feed:.62,pet:.90,fish:1.05,shear:1.10});
+ const contact=Object.freeze({plant:.52,water:.55,harvest:.55,collect:.55,feed:.58,pet:.50,fish:.58,shear:.62});
  let current=null;
  function reset(actor){
   const a=actor||current?.actor;

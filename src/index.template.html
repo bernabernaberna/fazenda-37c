@@ -7890,7 +7890,7 @@ function careForAnimal(action,animal){
     if(animal.kind!=='sheep'||!isFrio()||animal.shorn||(animal.well??.85)<.3)return false;
     animal.shorn=true;animal.woolGrowth=0;animal.well=Math.max(0,(animal.well??.85)-.25);player.inv.wool=(player.inv.wool||0)+1;
     tickTask('wool');window.FarmStoryIntegration?.record('collect',{item:'wool',amount:1});
-    window.FarmAnimalLife?.react?.(animal,'shear',player);sfx.wool();showToast('1 lã de '+name+' guardada na mochila.','success');
+    window.FarmAnimalLife?.react?.(animal,'shear',player);triggerPlayerAction('shear',animal);sfx.wool();showToast('1 lã de '+name+' guardada na mochila.','success');
   }else return false;
   if(action!=='feed')window.FarmStoryIntegration?.record('care',{kind:'animal',action,species:animal.kind});
   if(soundEnabled)window.synthSfx?.animal(animal.kind);
@@ -8639,7 +8639,12 @@ function update(dt){
         const ax=Math.abs(movedX),ay=Math.abs(movedY);
         const horizontal=ax>ay+.001||(Math.abs(ax-ay)<=.001&&(player.dir===1||player.dir===2));
         player.dir=horizontal?(movedX<0?1:2):(movedY<0?3:0);
-        player.anim+=traveled*Math.PI*2/(wantRun?32:24);
+        // O ritmo acompanha a mesma mistura que será desenhada neste quadro.
+        // Assim, apertar Shift não troca o comprimento da passada enquanto
+        // o corpo ainda está terminando a pose de caminhada (e vice-versa).
+        const nextRunMix=(player.gaitRunBlend||0)+(Number(!!wantRun)-(player.gaitRunBlend||0))*(1-Math.exp(-dt/.09));
+        const stride=24+Math.round(Math.max(0,Math.min(1,nextRunMix))*8);
+        player.anim+=traveled*Math.PI*2/stride;
       }
       if(player.moving&&isFrio()){
         player.footTimer -= dt;

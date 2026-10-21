@@ -55,6 +55,8 @@ Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressi
 
 **Arte dos oito biomas (V6.13):** materiais e vegetação próprios para cada região, neve azulada, campos dourados, mata com musgo e costa turquesa. Copas, pinheiros, cactos e palmeiras ganharam volume; observatório, moinho, abrigos e cais têm mais detalhes. As transições de cor são graduais, com a mesma geometria e compatibilidade de saves.
 
+**Personagens e animais (V6.14):** protagonista e nove moradores com roupas, rostos e poses refinados. Caminhada e corrida têm apoio e recuperação dos pés mais naturais, e a tosquia ganhou um gesto próprio. Vacas, ovelhas e galinhas têm anatomia detalhada e 24 poses de locomoção, mantendo os mesmos cuidados, colisões e saves.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

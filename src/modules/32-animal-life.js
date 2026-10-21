@@ -5,7 +5,7 @@
    Curral é obtido do objeto de mundo: nenhum deslocamento FARM_Y0 é reaplicado. */
 (function(){
  'use strict';
- const TAU=Math.PI*2,W=64,H=64,AX=32,AY=48,MAX_SPRITES=768,WOOL_SECONDS=180;
+ const TAU=Math.PI*2,W=64,H=64,AX=32,AY=48,MAX_SPRITES=768,WOOL_SECONDS=180,POSES=24;
  const P={ink:'#233c35',edge:'#496057',cream:'#eee8ca',light:'#fff4d8',shade:'#c5c9ad',dark:'#335044',
   patch:'#385348',patchHi:'#577264',rose:'#c99180',roseHi:'#e5b6a0',roseSh:'#aa796d',horn:'#d7be8c',hoof:'#34483c',
   wool:'#f0e5c1',woolHi:'#fff3d2',woolSh:'#c3bea1',woolDeep:'#9fa98b',skin:'#cba78f',skinHi:'#e0bfa2',
@@ -159,27 +159,34 @@
  }
  function foot(phase,offset,amplitude,lift){
   const t=((phase/TAU+offset)%1+1)%1;
-  if(t<.64)return{x:amplitude*(1-t/.32),up:0};
-  const swing=(t-.64)/.36;return{x:-amplitude+2*amplitude*swing,up:Math.sin(swing*Math.PI)*lift};
+  // Durante o apoio o casco recua na mesma velocidade que o corpo avança.
+  // A recuperação tem aceleração suave e o dedo sobe antes de voltar ao chão.
+  if(t<.64)return{x:amplitude*(1-t/.32),up:0,swing:0};
+  const swing=(t-.64)/.36,ease=swing*swing*(3-2*swing);
+  return{x:-amplitude+2*amplitude*ease,up:Math.sin(swing*Math.PI)*lift,swing};
  }
- function leg(g,x,top,phase,offset,far,species,side,blend,rest){
-  const cow=species==='cow',f=foot(phase,offset,cow?5:species==='sheep'?3.5:2.7,species==='chicken'?3:2.5),ground=far?-3:0;
+ function leg(g,x,top,phase,offset,far,species,side,blend,rest,projection=1){
+  const cow=species==='cow',hen=species==='chicken',f=foot(phase,offset,KIND[species].cycle*.32,hen?2.8:2.2),ground=far?-3:0;
   const stride=f.x*blend,up=f.up*blend,width=species==='chicken'?1:cow?3:2;
-  const endX=x+(side?stride:Math.sin((phase+offset*TAU))*blend),endY=ground-up+(side?0:stride*.55)-(cow?4:3)*rest;
+  const endX=x+(side?stride:Math.sin((phase+offset*TAU))*.4*blend),endY=ground-up+(side?0:stride*projection)-(cow?4:3)*rest;
   if(rest>=.75){const settled=cow?4:3;R(g,far?P.shade:P.cream,x-2,-2-settled,5,2);R(g,species==='chicken'?P.leg:P.hoof,x+1,-settled,3,1);return;}
-  const skin=species==='chicken'?P.leg:far?P.shade:P.cream;
-  stroke(g,P.edge,[[x,top],[x+(side?stride*.35:0),top+(endY-top)*.55],[endX,endY]],width+1);
-  stroke(g,skin,[[x,top],[x+(side?stride*.35:0),top+(endY-top)*.55],[endX,endY-1]],width);
-  R(g,species==='chicken'?P.beak:P.hoof,endX-1,endY,species==='chicken'?4:width+2,1+(species!=='chicken'));
+  const skin=hen?P.leg:species==='sheep'?(far?P.dark:P.patchHi):far?P.shade:P.cream;
+  const kneeX=x+(side?stride*.25+(x<0?-1:1):0),kneeY=top+(endY-top)*.48;
+  const hockX=x+(side?stride*.65+(x<0?1:-1)*f.swing*blend:0),hockY=top+(endY-top)*.76;
+  stroke(g,P.ink,[[x,top],[kneeX,kneeY],[hockX,hockY],[endX,endY]],width+1);
+  stroke(g,skin,[[x,top],[kneeX,kneeY],[hockX,hockY],[endX,endY-1]],width);
+  if(hen){R(g,P.beak,endX-1,endY,4,1);R(g,P.leg,endX-1,endY-1,1,1);}
+  else{R(g,P.hoof,endX-1,endY,width+2,2);R(g,P.edge,endX,endY,width,1);if(!far)R(g,P.ink,endX+1,endY+1,1,1);}
  }
- function cowHead(g,x,y,dir,closed){
+ function cowHead(g,x,y,dir,closed,jaw=0){
   if(dir===2){
    poly(g,P.ink,[[x-3,y-9],[x+5,y-9],[x+9,y-3],[x+10,y+6],[x+6,y+9],[x-2,y+8],[x-5,y+1]]);
    poly(g,P.cream,[[x-2,y-8],[x+4,y-8],[x+7,y-2],[x+8,y+5],[x+5,y+7],[x-2,y+6],[x-4,y]]);
-   R(g,P.shade,x-3,y-5,4,8);R(g,P.light,x+1,y-7,4,5);R(g,P.patch,x+3,y-3,5,5);
-   R(g,P.roseSh,x+1,y+4,9,4);R(g,P.rose,x+1,y+3,8,3);R(g,P.roseHi,x+2,y+3,5,1);R(g,P.ink,x+7,y+4,1,1);
+   R(g,P.shade,x-3,y-5,4,8);R(g,P.light,x+1,y-7,4,5);R(g,P.patch,x+3,y-3,5,5);R(g,P.patchHi,x+3,y-3,2,1);
+   R(g,P.roseSh,x+1,y+4+jaw,9,4);R(g,P.rose,x+1,y+3+jaw,8,3);R(g,P.roseHi,x+2,y+3+jaw,5,1);R(g,P.ink,x+7,y+4+jaw,1,1);
+   R(g,P.roseSh,x+7,y+6+jaw,2,1);R(g,P.cream,x,y+7+jaw,4,1);
    R(g,P.ink,x+5,y-2,2,closed?1:2);if(!closed)R(g,P.light,x+5,y-2,1,1);
-   poly(g,P.edge,[[x-3,y-6],[x-9,y-8],[x-8,y-4],[x-3,y-2]]);R(g,P.rose,x-7,y-6,4,1);
+   poly(g,P.ink,[[x-3,y-6],[x-10,y-8],[x-9,y-4],[x-3,y-2]]);poly(g,P.shade,[[x-4,y-5],[x-9,y-7],[x-8,y-4]]);R(g,P.rose,x-7,y-6,4,1);
    stroke(g,P.horn,[[x-1,y-8],[x-3,y-12],[x-5,y-13]],2);R(g,P.light,x-5,y-13,1,1);
   }else{
    R(g,P.edge,x-8,y-9,16,13);R(g,P.cream,x-7,y-10,14,13);R(g,P.light,x-4,y-10,5,7);
@@ -187,34 +194,38 @@
    poly(g,P.edge,[[x-7,y-7],[x-13,y-9],[x-12,y-5],[x-7,y-3]]);poly(g,P.edge,[[x+7,y-7],[x+13,y-9],[x+12,y-5],[x+7,y-3]]);
    R(g,P.rose,x-11,y-7,3,1);R(g,P.rose,x+8,y-7,3,1);
    stroke(g,P.horn,[[x-5,y-9],[x-8,y-13],[x-9,y-13]],2);stroke(g,P.horn,[[x+5,y-9],[x+8,y-13],[x+9,y-13]],2);
-   if(dir===0){R(g,P.roseSh,x-7,y,14,5);R(g,P.rose,x-6,y-1,12,4);R(g,P.roseHi,x-4,y,7,1);R(g,P.ink,x-4,y+2,1,1);R(g,P.ink,x+4,y+2,1,1);
+   if(dir===0){R(g,P.roseSh,x-7,y+jaw,14,5);R(g,P.rose,x-6,y-1+jaw,12,4);R(g,P.roseHi,x-4,y+jaw,7,1);R(g,P.ink,x-4,y+2+jaw,1,1);R(g,P.ink,x+4,y+2+jaw,1,1);R(g,P.roseSh,x-2,y+3+jaw,5,1);
     R(g,P.ink,x-5,y-4,2,closed?1:2);R(g,P.ink,x+4,y-4,2,closed?1:2);if(!closed){R(g,P.light,x-5,y-4,1,1);R(g,P.light,x+4,y-4,1,1);}}
    else{R(g,P.patch,x-4,y-4,8,5);R(g,P.shade,x-5,y,10,2);}
   }
  }
  function paintCow(g,s){
-  const side=s.dir===2,drop=s.graze,rest=s.restAmount,lift=4*rest,phase=s.phase,b=s.blend;
+  const side=s.dir===2,drop=s.graze*.68,rest=s.restAmount,lift=4*rest,phase=s.phase,b=s.blend,bob=s.body;
   g.save();g.translate(0,lift);
   if(side){
    stroke(g,P.edge,[[-18,-23],[-21,-18],[-20+s.tail,-8]],2);R(g,P.patch,-21+s.tail,-7,3,4);
    leg(g,-10,-13,phase,.5,true,'cow',true,b,rest);leg(g,9,-12,phase,0,true,'cow',true,b,rest);
-   poly(g,P.ink,[[-16,-26],[5,-26],[12,-22],[14,-14],[9,-7],[-12,-7],[-18,-12],[-19,-20]]);
-   poly(g,P.cream,[[-15,-25],[4,-25],[11,-21],[12,-14],[8,-8],[-11,-8],[-17,-12],[-18,-19]]);
-   R(g,P.shade,-14,-12,24,4);R(g,P.light,-12,-25,16,3);R(g,P.light,-16,-22,10,2);
+   g.save();g.translate(0,bob);
+   poly(g,P.ink,[[-16,-26],[-10,-28],[3,-27],[10,-24],[13,-19],[14,-13],[9,-7],[-11,-7],[-17,-10],[-20,-18],[-19,-23]]);
+   poly(g,P.cream,[[-15,-25],[-9,-27],[3,-26],[9,-23],[12,-18],[12,-13],[8,-8],[-10,-8],[-16,-11],[-19,-18],[-18,-22]]);
+   poly(g,P.shade,[[-18,-16],[-13,-12],[-3,-11],[8,-14],[11,-17],[12,-13],[8,-8],[-10,-8],[-16,-11]]);
+   R(g,P.light,-11,-26,13,2);R(g,P.light,-15,-23,12,2);R(g,P.cream,-17,-21,7,4);R(g,P.light,-14,-21,5,1);
    poly(g,P.patch,[[-13,-23],[-6,-24],[-3,-20],[-5,-16],[-12,-16],[-15,-18]]);R(g,P.patchHi,-12,-22,6,2);
    poly(g,P.patch,[[3,-22],[9,-20],[10,-14],[5,-13],[1,-17]]);R(g,P.patchHi,4,-20,3,1);
-   R(g,P.roseSh,-2,-8,10,3);R(g,P.rose,-1,-8,8,2);R(g,P.roseSh,1,-6,1,3);R(g,P.roseSh,5,-6,1,2);
+   R(g,P.patchHi,5,-18,3,2);R(g,P.shade,-15,-12,3,3);R(g,P.edge,-14,-9,3,1);
+   R(g,P.roseSh,-2,-8,10,3);R(g,P.rose,-1,-8,8,2);R(g,P.roseSh,1,-6,1,3);R(g,P.roseSh,5,-6,1,2);g.restore();
    leg(g,-12,-11,phase,.75,false,'cow',true,b,rest);leg(g,8,-10,phase,.25,false,'cow',true,b,rest);
-   poly(g,P.shade,[[7,-21],[14,-23+drop],[18,-15+drop],[10,-10]]);cowHead(g,15,-21+drop,2,s.closed);
+   g.save();g.translate(0,bob);poly(g,P.edge,[[7,-23],[14,-24+drop],[19,-17+drop],[13,-11],[9,-11]]);poly(g,P.shade,[[8,-22],[14,-23+drop],[18,-16+drop],[12,-12],[10,-12]]);R(g,P.cream,11,-22+drop,3,6);cowHead(g,15,-21+drop,2,s.closed,s.jaw);g.restore();
   }else{
-   leg(g,-7,-15,phase,.5,true,'cow',false,b,rest);leg(g,7,-15,phase,0,true,'cow',false,b,rest);
-   if(s.dir===3)cowHead(g,0,-24,3,s.closed);
+   leg(g,-7,-15,phase,.5,true,'cow',false,b,rest,s.dir===3?-1:1);leg(g,7,-15,phase,0,true,'cow',false,b,rest,s.dir===3?-1:1);
+   if(s.dir===3)cowHead(g,0,-24+bob,3,s.closed);
+   g.save();g.translate(0,bob);
    poly(g,P.ink,[[-9,-27],[9,-27],[13,-23],[13,-11],[9,-6],[-9,-6],[-13,-11],[-13,-23]]);
    poly(g,P.cream,[[-8,-26],[8,-26],[12,-22],[12,-11],[8,-7],[-8,-7],[-12,-11],[-12,-22]]);
-   R(g,P.light,-7,-25,7,13);R(g,P.shade,8,-22,3,12);R(g,P.shade,-8,-10,17,3);
+   R(g,P.light,-7,-25,7,3);R(g,P.light,-9,-22,5,8);R(g,P.shade,8,-22,3,12);R(g,P.shade,-8,-10,17,3);R(g,P.shade,-11,-14,3,4);
    poly(g,P.patch,[[-10,-22],[-4,-25],[-1,-20],[-3,-14],[-10,-15]]);R(g,P.patch,5,-17,6,8);R(g,P.patchHi,-8,-22,4,2);
-   leg(g,-8,-9,phase,.75,false,'cow',false,b,rest);leg(g,8,-9,phase,.25,false,'cow',false,b,rest);
-   if(s.dir===0)cowHead(g,0,-13+drop*.4,0,s.closed);
+   g.restore();leg(g,-8,-9,phase,.75,false,'cow',false,b,rest,s.dir===3?-1:1);leg(g,8,-9,phase,.25,false,'cow',false,b,rest,s.dir===3?-1:1);
+   if(s.dir===0)cowHead(g,0,-13+drop*.4+bob,0,s.closed,s.jaw);
    else{stroke(g,P.edge,[[0,-19],[1+s.tail,-10],[s.tail,-3]],2);R(g,P.patch,s.tail-1,-4,3,4);}
   }g.restore();
  }
@@ -223,15 +234,19 @@
   poly(g,shorn?P.skin:P.wool,[[x+4,y+1],[x+w-5,y+1],[x+w-1,y+5],[x+w-1,y+h-4],[x+w-5,y+h-1],[x+4,y+h-1],[x+1,y+h-5],[x+1,y+5]]);
   R(g,shorn?P.roseSh:P.woolSh,x+4,y+h-5,w-8,4);R(g,shorn?P.skinHi:P.woolHi,x+5,y+2,w-12,3);
   if(!shorn){
-   for(let i=0;i<5;i++){const xx=x+3+i*(w-7)/5;R(g,P.edge,xx,y-1+(i%2),5,5);R(g,P.wool,xx,y+(i%2),4,4);R(g,P.woolHi,xx+1,y+(i%2),2,1);}
-   for(let i=0;i<4;i++){const xx=x+3+i*(w-8)/4;R(g,P.woolSh,xx,y+7+(i%2)*3,5,4);R(g,P.woolHi,xx,y+6+(i%2)*3,4,2);}
-  }else{R(g,P.skinHi,x+5,y+7,3,1);R(g,P.roseSh,x+w-7,y+8,1,3);}
+   const count=w>24?5:4;
+   for(let i=0;i<count;i++){const xx=Math.round(x+2+i*(w-7)/(count-1)),yy=y-1+(i%2);R(g,P.edge,xx+1,yy-1,3,1);R(g,P.wool,xx+1,yy,3,5);R(g,P.wool,xx,yy+1,5,4);R(g,P.woolHi,xx+1,yy+1,3,1);}
+   // Mechas largas no lombo, mais escuras apenas sob a barriga. Evita
+   // desenhar uma grade de pequenas manchas que achatava a lã.
+   for(let i=0;i<count-2;i++){const xx=Math.round(x+3+i*(w-11)/(count-3)),yy=y+5+(i%2)*3;R(g,P.woolHi,xx,yy,5,2);R(g,P.wool,xx-1,yy+1,7,3);R(g,P.woolSh,xx+3,yy+3,3,1);}
+   for(let i=0;i<count;i++){const xx=Math.round(x+3+i*(w-9)/(count-1)),yy=y+h-3+(i%2);R(g,P.edge,xx,yy+1,4,2);R(g,P.woolSh,xx,yy,4,2);R(g,P.wool,xx,yy,3,1);}
+  }else{R(g,P.skinHi,x+5,y+7,3,1);R(g,P.roseSh,x+w-7,y+8,1,3);R(g,P.skinHi,x+8,y+4,w-16,2);}
  }
- function sheepHead(g,x,y,dir,closed){
+ function sheepHead(g,x,y,dir,closed,jaw=0){
   const side=dir===2;
   R(g,P.ink,x-(side?2:5),y-6,side?9:10,11);R(g,P.dark,x-(side?1:4),y-5,side?7:8,9);
-  R(g,P.patchHi,x-(side?1:3),y-5,side?5:6,3);R(g,P.ink,x+(side?3:-3),y+3,side?5:6,2);
-  if(side){poly(g,P.edge,[[x-1,y-4],[x-7,y-6],[x-6,y-2],[x-1,y]]);R(g,P.skin,x-5,y-4,3,1);R(g,P.cream,x+4,y-3,2,closed?1:2);if(!closed)R(g,P.ink,x+5,y-2,1,1);}
+  R(g,P.patchHi,x-(side?1:3),y-5,side?5:6,3);R(g,P.ink,x+(side?3:-3),y+3+jaw,side?5:6,2);R(g,P.patchHi,x+(side?3:-2),y+2+jaw,side?3:4,1);
+  if(side){poly(g,P.ink,[[x-1,y-4],[x-8,y-6],[x-7,y-2],[x-1,y]]);R(g,P.patchHi,x-6,y-4,5,1);R(g,P.skin,x-5,y-3,3,1);R(g,P.cream,x+4,y-3,2,closed?1:2);if(!closed)R(g,P.ink,x+5,y-2,1,1);R(g,P.ink,x+6,y+1,1,1);}
   else{R(g,P.edge,x-10,y-5,6,3);R(g,P.edge,x+4,y-5,6,3);R(g,P.skin,x-9,y-4,4,1);R(g,P.skin,x+5,y-4,4,1);
    if(dir===0){R(g,P.cream,x-3,y-2,1,closed?1:2);R(g,P.cream,x+3,y-2,1,closed?1:2);R(g,P.ink,x,y+3,1,1);}}
  }
@@ -239,24 +254,24 @@
   const side=s.dir===2;g.save();g.translate(0,Math.round(s.restAmount*3));
   if(side){
    leg(g,-8,-11,s.phase,.5,true,'sheep',true,s.blend,s.restAmount);leg(g,7,-11,s.phase,0,true,'sheep',true,s.blend,s.restAmount);
-   R(g,P.woolSh,-18,-11,4,3);wool(g,-16,-22,29,15,s.shorn);
+   R(g,P.edge,-19,-12,5,4);R(g,P.woolSh,-18,-12,4,3);g.save();g.translate(0,s.body);wool(g,-16,-22,29,15,s.shorn);g.restore();
    leg(g,-9,-9,s.phase,.75,false,'sheep',true,s.blend,s.restAmount);leg(g,8,-9,s.phase,.25,false,'sheep',true,s.blend,s.restAmount);
-   sheepHead(g,14,-16+s.graze*.8,2,s.closed);
+   poly(g,P.dark,[[8,-19+s.body],[14,-20+s.graze*.65+s.body],[17,-12+s.graze*.65+s.body],[11,-10+s.body]]);sheepHead(g,14,-16+s.graze*.65+s.body,2,s.closed,s.jaw);
   }else{
-   leg(g,-5,-13,s.phase,.5,true,'sheep',false,s.blend,s.restAmount);leg(g,5,-13,s.phase,0,true,'sheep',false,s.blend,s.restAmount);
-   if(s.dir===3)sheepHead(g,0,-23,3,s.closed);
-   wool(g,-10,-24,20,18,s.shorn);leg(g,-7,-8,s.phase,.75,false,'sheep',false,s.blend,s.restAmount);leg(g,7,-8,s.phase,.25,false,'sheep',false,s.blend,s.restAmount);
-   if(s.dir===0)sheepHead(g,0,-12+s.graze*.5,0,s.closed);else{R(g,P.woolSh,-2,-11,4,5);R(g,P.woolHi,-2,-11,3,3);}
+   leg(g,-5,-13,s.phase,.5,true,'sheep',false,s.blend,s.restAmount,s.dir===3?-1:1);leg(g,5,-13,s.phase,0,true,'sheep',false,s.blend,s.restAmount,s.dir===3?-1:1);
+   if(s.dir===3)sheepHead(g,0,-23+s.body,3,s.closed);
+   g.save();g.translate(0,s.body);wool(g,-10,-24,20,18,s.shorn);g.restore();leg(g,-7,-8,s.phase,.75,false,'sheep',false,s.blend,s.restAmount,s.dir===3?-1:1);leg(g,7,-8,s.phase,.25,false,'sheep',false,s.blend,s.restAmount,s.dir===3?-1:1);
+   if(s.dir===0)sheepHead(g,0,-12+s.graze*.5+s.body,0,s.closed,s.jaw);else{R(g,P.edge,-2,-11,5,6);R(g,P.woolSh,-2,-11,4,5);R(g,P.woolHi,-2,-11,3,3);}
   }g.restore();
  }
  function henHead(g,x,y,dir,closed){
   const side=dir===2;R(g,P.edge,x-3,y-4,7,8);R(g,P.cream,x-2,y-4,5,7);R(g,P.light,x-2,y-3,2,4);
   R(g,P.comb,x-2,y-7,5,3);R(g,P.combHi,x-1,y-8,2,2);R(g,P.comb,x,y+3,2,3);
-  if(side){poly(g,P.beak,[[x+3,y],[x+7,y+1],[x+3,y+3]]);R(g,P.ink,x+1,y-1,1,closed?1:2);if(!closed)R(g,P.light,x+1,y-1,1,1);}
+  if(side){poly(g,P.beak,[[x+3,y],[x+7,y+1],[x+3,y+3]]);R(g,P.leg,x+4,y+2,2,1);R(g,P.ink,x,y-1,2,closed?1:2);if(!closed)R(g,P.light,x,y-1,1,1);}
   else if(dir===0){R(g,P.ink,x-2,y-1,1,closed?1:2);R(g,P.ink,x+2,y-1,1,closed?1:2);poly(g,P.beak,[[x-2,y+1],[x+2,y+1],[x,y+4]]);}
  }
  function paintHen(g,s){
-  const side=s.dir===2,bob=s.blend*Math.abs(Math.sin(s.phase))*1;g.save();g.translate(0,Math.round(s.restAmount*3));
+  const side=s.dir===2,bob=-s.body;g.save();g.translate(0,Math.round(s.restAmount*3));
   if(side){
    leg(g,-3,-7,s.phase,.5,true,'chicken',true,s.blend,s.restAmount);
    poly(g,P.edge,[[-8,-10],[-14,-20],[-12,-24],[-7,-17],[-10,-24],[-7,-25],[-3,-16]]);
@@ -264,16 +279,17 @@
    poly(g,P.edge,[[-9,-17],[-4,-20-bob],[4,-20-bob],[9,-14],[7,-7],[2,-4],[-6,-5],[-10,-10]]);
    poly(g,P.hen,[[-8,-16],[-3,-19-bob],[3,-19-bob],[8,-13],[6,-7],[1,-5],[-5,-6],[-9,-10]]);
    poly(g,P.cream,[[-1,-19-bob],[4,-18-bob],[7,-13],[5,-9],[2,-9]]);R(g,P.henHi,-6,-16,7,3);
-   poly(g,P.henSh,[[-6,-13],[1,-15],[5,-11],[2,-7],[-4,-8]]);stroke(g,P.wing,[[-5,-12],[0,-10],[3,-10]],1);R(g,P.henHi,-4,-13,4,2);
+   poly(g,P.henSh,[[-6,-13],[1,-15],[5,-11],[2,-7],[-4,-8]]);stroke(g,P.wing,[[-5,-12],[0,-10],[3,-10]],1);R(g,P.henHi,-4,-13,4,2);R(g,P.wing,-6,-10,3,2);R(g,P.henHi,-4,-9,3,1);R(g,P.henSh,0,-8,2,1);
    leg(g,3,-6,s.phase,0,false,'chicken',true,s.blend,s.restAmount);
-   const drop=s.graze*2;poly(g,P.cream,[[3,-15],[7,-23+drop],[11,-22+drop],[8,-12]]);henHead(g,9,-23+drop,2,s.closed);
+   const drop=s.graze*1.45,reach=Math.round(s.graze*.24),headY=-23+drop+s.body*.5;
+   poly(g,P.edge,[[2,-17],[6+reach,headY-3],[11+reach,headY-2],[10+reach,headY+3],[6,-11]]);poly(g,P.cream,[[3,-16],[7+reach,headY-2],[10+reach,headY-1],[9+reach,headY+2],[7,-12]]);R(g,P.light,6+reach,headY,2,4);henHead(g,9+reach,headY,2,s.closed);
   }else{
-   leg(g,-3,-7,s.phase,.5,false,'chicken',false,s.blend,s.restAmount);leg(g,3,-7,s.phase,0,false,'chicken',false,s.blend,s.restAmount);
+   leg(g,-3,-7,s.phase,.5,false,'chicken',false,s.blend,s.restAmount,s.dir===3?-1:1);leg(g,3,-7,s.phase,0,false,'chicken',false,s.blend,s.restAmount,s.dir===3?-1:1);
    if(s.dir===3)henHead(g,0,-23,3,s.closed);
    poly(g,P.edge,[[-5,-20],[-9,-14],[-8,-7],[-4,-4],[4,-4],[8,-7],[9,-14],[5,-20]]);
    poly(g,P.hen,[[-4,-19],[-8,-14],[-7,-7],[-3,-5],[3,-5],[7,-7],[8,-14],[4,-19]]);
-   R(g,P.cream,-4,-18,8,10);R(g,P.henHi,-3,-17,3,10);R(g,P.henSh,-8,-13,3,6);R(g,P.henSh,6,-13,2,6);
-   if(s.dir===0)henHead(g,0,-22+s.graze*1.8,0,s.closed);
+   R(g,P.cream,-4,-18,8,10);R(g,P.henHi,-3,-17,3,10);R(g,P.henSh,-8,-13,3,6);R(g,P.henSh,6,-13,2,6);R(g,P.wing,-7,-9,2,2);R(g,P.henHi,6,-10,1,2);R(g,P.henSh,-2,-7,5,1);
+   if(s.dir===0)henHead(g,0,-22+s.graze*1.4,0,s.closed);
    else{poly(g,P.dark,[[-5,-9],[-4,-16],[-1,-11],[0,-19],[3,-11],[6,-16],[5,-6]]);R(g,P.henHi,-1,-13,2,7);R(g,P.wing,3,-12,2,4);}
   }g.restore();
  }
@@ -282,14 +298,16 @@
   const kind=kindOf(a),phase=Number(a.animalPhase??a.animT)||0,wantsRest=a.animalActivity==='rest'||a.sleeping||a.asleep||a.dormindo;
   const restAmount=reduced?Number(!!wantsRest):Math.round(clamp(Number.isFinite(a.animalRest)?a.animalRest:Number(!!wantsRest),0,1)*4)/4,rest=restAmount>0;
   const time=Number(a.animalClock)||0,activity=a.animalActivity||'look',moving=!reduced&&!rest&&(a.moving||a.animalBlend>.01);
-  const blend=moving?Math.round(clamp(Number(a.animalBlend??1),0,1)*4)/4:0;
-  const frame=moving?Math.floor(((phase%TAU+TAU)%TAU)/TAU*16)%16:0;
+  const blend=moving?Math.round(clamp(Number(a.animalBlend??1),0,1)*8)/8:0;
+  const frame=moving?Math.floor(((phase%TAU+TAU)%TAU)/TAU*POSES)%POSES:0;
   const grazes=!reduced&&!moving&&!rest&&(activity==='graze'||activity==='peck');
   let graze=reduced?0:Number.isFinite(a.animalGraze)?Math.round(a.animalGraze):grazes?[0,2,5,8,10,8,4,1][Math.floor(time*(kind==='chicken'?4.4:2.2))%8]:0;
   const reactionProgress=reaction?clamp(1-reaction.remaining/reaction.duration,0,1):0;
   if(reaction&&!reduced&&!rest){const depth=reaction.action==='feed'?6:reaction.action==='pet'?3:1;graze=Math.round(Math.sin(reactionProgress*Math.PI)*depth);}
   const dir=Number.isInteger(a.dir)?clamp(a.dir,0,3):(a.facing<0?1:2);
-  return{kind,dir,phase:frame*TAU/16,frame,blend,graze,rest:!!rest,restAmount,shorn:!!a.shorn,
+  const body=reduced?0:moving?Math.round((Math.cos(frame*TAU/POSES*2)-1)*.4*blend):Math.floor(time*.7)%6===5?1:0;
+  const jaw=!reduced&&!moving&&!rest&&(grazes||reaction?.action==='feed')&&Math.sin(time*4.2)>.25?1:0;
+  return{kind,dir,phase:frame*TAU/POSES,frame,blend,graze,rest:!!rest,restAmount,shorn:!!a.shorn,body,jaw,
    closed:restAmount===1||(!reduced&&(Math.floor(time*5)%31===30||(reaction?.action==='pet'&&reactionProgress>.3&&reactionProgress<.75))),
    tail:reduced?0:Math.round(Math.sin(time*.85)),fed:!!a.animalFed,heart:!!a.animalFed||reaction?.action==='pet',
    reaction:reaction?.action||null,reactionRemaining:reaction?.remaining||0};
@@ -303,7 +321,7 @@
    woolGrowth:a.shorn?clamp(Number.isFinite(a.woolGrowth)?a.woolGrowth:0,0,WOOL_SECONDS):0,woolSeconds:WOOL_SECONDS};
  }
  function sprite(s){
-  const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.restAmount,s.shorn,s.closed,s.tail].join(':');if(cache.has(key))return cache.get(key);
+  const key=[s.kind,s.dir,s.frame,s.blend,s.graze,s.restAmount,s.shorn,s.closed,s.tail,s.body,s.jaw].join(':');if(cache.has(key))return cache.get(key);
   let c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.imageSmoothingEnabled=false;g.translate(AX,AY);
   if(s.dir===1)g.scale(-1,1);const canonical={...s,dir:s.dir===1?2:s.dir};
   if(s.kind==='cow')paintCow(g,canonical);else if(s.kind==='sheep')paintSheep(g,canonical);else paintHen(g,canonical);
@@ -323,7 +341,7 @@
   g.restore();
  }
  window.FarmAnimalLife={update,draw,react,snapshot,blocksPlayer,contactRadii:CONTACT,woolSeconds:WOOL_SECONDS,reset(){brains=new WeakMap();},visualState,
-  info(){return{version:4,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
+  info(){return{version:5,cache:cache.size,maxSprites:MAX_SPRITES,bytes:cache.size*W*H*4,poses:POSES,species:Object.keys(KIND),cycle:Object.fromEntries(Object.entries(KIND).map(([key,k])=>[key,k.cycle]))};}
  };
  (window.__farmBiomes=window.__farmBiomes||[]).push(api=>{api.registerObjectDrawer('animal',(animal,g)=>draw(g,animal));});
 })();
