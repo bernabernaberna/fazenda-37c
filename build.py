@@ -31,7 +31,9 @@ Saída:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
+import json
 import os
 import re
 import sys
@@ -90,6 +92,7 @@ MODULE_ORDER = [
     "49-expedition-world.js", # novos biomas, trilhas e locais de descoberta
     "50-expedition-story.js", # expedicoes e continuacoes das historias
     "51-biome-art.js",       # materiais e identidade visual dos oito biomas
+    "54-academic-slides.js", # micrografias licenciadas e questões visuais locais
     "52-academic-histology.js", # banco universitário com justificativas e fontes
     "53-academic-progress.js", # domínio acadêmico persistente e independente
     "47-animal-care.js",     # cuidados individuais do curral
@@ -107,6 +110,33 @@ MODULE_ORDER = [
 def banner(s: str) -> str:
     line = "=" * len(s)
     return f"\n/* {line}\n   {s}\n   {line} */\n"
+
+
+def academic_slide_data() -> str:
+    """Inclui fotografias reais no HTML, sem fetch ou dependência de rede."""
+    asset_root = ROOT / 'assets' / 'histology-v616'
+    manifest = json.loads((asset_root / 'manifest.json').read_text(encoding='utf-8'))
+    images = manifest if isinstance(manifest, list) else manifest['assets']
+    questions = json.loads((SRC / 'data/academic-slides-v616.json').read_text(encoding='utf-8'))
+    if isinstance(questions, dict):
+        questions = questions['questions']
+    assert len(questions) == 12 and len({q['id'] for q in questions}) == 12
+    packed = []
+    used = {q['imageId'] for q in questions}
+    for image in images:
+        if image['id'] not in used:
+            continue
+        path = (asset_root / image['file']).resolve()
+        assert asset_root.resolve() in path.parents, image['file']
+        mime = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}[path.suffix.lower()]
+        raw = path.read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == image['sha256'], image['id']
+        assert image['license'] and image['author'] and image['licenseUrl'].startswith('https://')
+        packed.append({**image, 'dataUrl': 'data:' + mime + ';base64,' + base64.b64encode(raw).decode('ascii')})
+    ids = {image['id'] for image in packed}
+    assert len(ids) == len(packed) and all(q['imageId'] in ids for q in questions)
+    data = json.dumps({'assets': packed, 'questions': questions}, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
+    return 'window.FarmAcademicSlideData=' + data + ';\n'
 
 
 def read_modules() -> str:
@@ -127,6 +157,8 @@ def read_modules() -> str:
         if not p.exists():
             continue
         chunks.append(banner(f"src/modules/{name}"))
+        if name == '54-academic-slides.js':
+            chunks.append(academic_slide_data())
         chunks.append(p.read_text(encoding="utf-8").rstrip() + "\n")
         found += 1
     if found == 0:

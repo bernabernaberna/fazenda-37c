@@ -59,6 +59,8 @@ Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressi
 
 **Histologia acadêmica (V6.15):** nível opcional com 24 questões universitárias, seis temas de pele e anexos, justificativas das quatro alternativas e referências. Domínio e pontuação próprios persistem entre estações; progresso escolar e fazenda permanecem preservados.
 
+**Lâminas reais (V6.16):** 12 novas questões de identificação em seis micrografias licenciadas, com alvo A, ampliação até4× e feedback visual. O nível acadêmico passa a36 questões, preservando as24 anteriores e seus saves. Imagens e explicações funcionam offline; créditos e licenças acompanham os arquivos.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

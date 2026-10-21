@@ -1969,6 +1969,21 @@ body.big-screen::before{ left:0; } body.big-screen::after{ right:0; }
 #histologyAcademicStatus{font-size:12px;line-height:1.5;color:#ebd6b5;}
 #histologyDismiss{margin:12px 8px 0 0;background:#38251c;color:#ffe8b0;border:1px solid #a78757;border-radius:8px;padding:10px;min-height:40px;font:inherit;cursor:pointer;}
 #histologyFeedback li{margin:8px 0;overflow-wrap:anywhere;}
+#histologySlide{margin:12px 0 16px;padding:10px;background:#f5eee4;color:#3a302d;border:1px solid #c4a77b;border-radius:10px;}
+#histologySlide[hidden]{display:none;}
+#histologySlideViewport{max-height:340px;overflow:auto;border:1px solid #baafa3;background:#e9e0d5;overscroll-behavior:contain;touch-action:pan-x pan-y pinch-zoom;}
+#histologySlideStage{position:relative;margin:0 auto;flex:none;}
+#histologySlideImage{display:block;width:100%;height:100%;object-fit:fill;image-rendering:auto;}
+#histologySlideTarget{position:absolute;transform:translate(-50%,-50%);width:22px;height:22px;border:2px dashed #114b6b;border-radius:50%;box-shadow:0 0 0 1px #fff;pointer-events:none;}
+#histologySlideTarget b{position:absolute;bottom:24px;left:0;background:#153f52;color:white;padding:1px 5px;border-radius:4px;font:700 12px system-ui;}
+#histologySlide .slide-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0;}
+#histologySlide button{background:#4c3825;color:#fff4da;border:1px solid #796344;border-radius:6px;min-height:44px;padding:7px 10px;cursor:pointer;font:700 12px 'Trebuchet MS',sans-serif;}
+#histologySlide button:disabled{opacity:.5;cursor:default;}
+#histologySlide button:focus-visible{outline:3px solid #156080;outline-offset:2px;}
+#histologySlideDescription{margin:6px 0;font-size:12px;line-height:1.5;}
+#histologySlideCredit{margin:6px 0 0;font:11px/1.5 system-ui,sans-serif;overflow-wrap:anywhere;}
+#histologySlideCredit a{color:#174e68;}
+#histologySlideError{font:700 13px/1.5 system-ui;color:#843329;}
 
 /* ===== Histology Atlas modal ===== */
 #histologyAtlas{
@@ -2770,7 +2785,7 @@ body.hud-game #legend{display:none !important;}
         <button type="button" data-edu="medio" onclick="setEduLevel('medio')">Médio<small>15–17 · completo</small></button>
         <button type="button" data-edu="academico" onclick="setEduLevel('academico')">Acadêmico<small>Graduação · histologia</small></button>
       </div>
-      <p class="accessHint">Fundamental simplifica o banco escolar. Acadêmico traz 24 questões de histologia da pele, seis temas e justificativas por alternativa. Você pode mudar de nível sem perder o progresso.</p>
+      <p class="accessHint">Fundamental simplifica o banco escolar. Acadêmico traz 36 questões, incluindo 12 de identificação em lâminas reais, seis temas e justificativas por alternativa. Você pode mudar de nível sem perder o progresso.</p>
     </div>
 
     <div class="accessSection"><h3>🤝 Assistência (afeta a jogabilidade)</h3>
@@ -2883,6 +2898,21 @@ body.hud-game #legend{display:none !important;}
     <h3 id="histologyMissionSubtitle">Explique o que aconteceu</h3>
     <p id="histologyAcademicStatus" hidden></p>
     <p id="histologyQuestion"></p>
+    <figure id="histologySlide" hidden>
+      <div id="histologySlideViewport" tabindex="0" aria-label="Lâmina histológica: amplie e deslize para explorar">
+        <div id="histologySlideStage"><img id="histologySlideImage" alt="" draggable="false"><span id="histologySlideTarget" hidden><b>A</b></span></div>
+      </div>
+      <div class="slide-controls" aria-label="Ampliação da lâmina">
+        <button id="histologySlideZoomOut" type="button" onclick="FarmAcademicSlides.setZoom(FarmAcademicSlides.zoom()-1)" aria-label="Reduzir lâmina">−</button>
+        <output id="histologySlideZoomValue" aria-live="polite">1×</output>
+        <button id="histologySlideZoomIn" type="button" onclick="FarmAcademicSlides.setZoom(FarmAcademicSlides.zoom()+1)" aria-label="Ampliar lâmina">+ Ampliar</button>
+        <button id="histologySlideFit" type="button" onclick="FarmAcademicSlides.setZoom(1)">Enquadrar</button>
+        <small>Zoom da imagem até 4×; não é o aumento do microscópio. Deslize para explorar.</small>
+      </div>
+      <figcaption id="histologySlideDescription"></figcaption>
+      <p id="histologySlideError" role="status" hidden></p>
+      <p id="histologySlideCredit"></p>
+    </figure>
     <div id="histologyOptions"></div>
     <div id="histologyFeedback" aria-live="polite"></div>
     <button id="histologyDismiss" onclick="closeHistologyMission()" hidden>Voltar ao mundo</button>
@@ -3646,7 +3676,7 @@ addEventListener('keydown', e=>{
     e.preventDefault();e.stopImmediatePropagation();
     window.FarmWorldMap?.toggle();return;
   }
-  if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ if(e.key==='Escape'&&activeHistologyMission?.academic)closeHistologyMission();if(!['Tab','Enter',' '].includes(e.key))e.preventDefault(); return; }
+  if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ if(e.key==='Escape'&&activeHistologyMission?.academic){if(window.FarmAcademicSlides?.zoom()>1)FarmAcademicSlides.setZoom(1);else closeHistologyMission();}if(!['Tab','Enter',' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))e.preventDefault(); return; }
   // Toggles globais: funcionam mesmo com overlay aberto (fecham/abrem ele próprio)
   if(k==='j'){ e.preventDefault(); toggleJournal(); return; }
   if(k==='m'){ e.preventDefault(); toggleSound(); return; }
@@ -5783,6 +5813,7 @@ function renderHistologyAtlas(){
               <div class="atlas-title">${m.concept || m.subtitle || m.id}</div>
               <div class="atlas-status">${status}</div>
               <div>${desc}</div>
+              ${m.imageId?`<button type="button" onclick="practiceAcademicSlideById('${m.id}')">Identificar nesta lâmina</button>`:''}
             </div>`;
   }).join('');
 }
@@ -5812,6 +5843,7 @@ window.toggleHistologyAtlas = toggleHistologyAtlas;
    O jogo do aluno apenas ENVIA os dados (via window.TeacherMode.submitQuizEvent). */
 
 function resetHistologyMissions(){
+  window.FarmAcademicSlides?.clear();
   window.FarmAcademicProgress?.reset();
   histologyPlayTime=0;_lastHistMissionAt=-1e9;practiceCursor=0;
   histologyScore = 0;
@@ -5827,6 +5859,7 @@ function resetHistologyMissions(){
   renderHistologyHud();
 }
 function restoreHistologyState(data){
+  window.FarmAcademicSlides?.clear();
   window.FarmAcademicProgress?.restore(data?.academicHistology);
   if(['fund','medio','academico'].includes(data?.eduLevel)){eduLevel=data.eduLevel;try{localStorage.setItem(EDU_KEY,eduLevel);}catch(e){}applyEduLevel();}
   histologyPlayTime=Math.max(0,Number(data?.histologyPlayTime)||0);
@@ -5926,7 +5959,7 @@ function openHistologyMission(mission){
   document.getElementById('histologyMissionTitle').textContent=mission.academic?'Histologia acadêmica':'Missão Histológica';
   document.getElementById('histologyMissionSubtitle').textContent=mission.academic?'Caderno de Lia · '+mission.topic:'Explique o que aconteceu';
   const status=document.getElementById('histologyAcademicStatus');
-  if(status){status.hidden=!mission.academic;const a=window.FarmAcademicProgress.snapshot();status.textContent=`${a.mastered}/${a.total} dominadas · ${a.score} pontos acadêmicos · +15 no primeiro acerto de cada questão, sem moedas. ${mission.objective||''}`;}
+  if(status){status.hidden=!mission.academic;const a=window.FarmAcademicProgress.snapshot();status.textContent=`${a.mastered}/${a.total} dominadas · ${a.score} pontos acadêmicos · +15 no primeiro acerto de cada questão, sem moedas. ${mission.imageId?'Observe a lâmina e identifique o campo ou o alvo A.':mission.objective||''}`;}
   if(question) question.textContent = mission.question;
   if(options){
     options.innerHTML = mission.options.map((text,i)=>`<button onclick="answerHistologyMission(${i})"><b>${String.fromCharCode(65+i)})</b> ${text}</button>`).join('');
@@ -5934,14 +5967,15 @@ function openHistologyMission(mission){
   if(feedback){ feedback.classList.remove('show'); feedback.innerHTML = ''; }
   if(cont) cont.classList.remove('show');
   if(panel) panel.classList.add('show');
+  window.FarmAcademicSlides?.show(mission);
   panel?.querySelector('.histologyMissionCard')?.scrollTo(0,0);
-  panel?.querySelector('#histologyOptions button')?.focus({preventScroll:true});
+  (mission.imageId?document.getElementById('histologySlideZoomIn'):panel?.querySelector('#histologyOptions button'))?.focus({preventScroll:true});
 }
 let histologyPreviousFocus=null;
 // O teclado permanece no diálogo, inclusive com explicações extensas no celular.
 document.getElementById('histologyMissionPanel')?.addEventListener('keydown',event=>{
   if(event.key!=='Tab'||!histologyMissionOpen)return;
-  const available=[...event.currentTarget.querySelectorAll('button:not(:disabled),a[href],summary')].filter(n=>n.getClientRects().length);
+  const available=[...event.currentTarget.querySelectorAll('button:not(:disabled),a[href],summary,[tabindex="0"]')].filter(n=>n.getClientRects().length);
   if(!available.length)return;const first=available[0],last=available.at(-1);
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
@@ -6013,8 +6047,10 @@ window.answerHistologyMission = function(index){
   document.getElementById('histologyContinue')?.focus({preventScroll:true});
 }
 function answerAcademicMission(mission,index){
+  if(mission.imageId&&!window.FarmAcademicSlides?.info().ready)return;
   const result=window.FarmAcademicProgress.answer(mission.id,index);if(!result)return;
   mission.answered=true;mission.completed=window.FarmAcademicProgress.get(mission.id).completed;
+  window.FarmAcademicSlides?.explain(mission);
   // Uma resposta real também vale para os pedidos de Lia. Pontos e moedas
   // continuam no currículo próprio, sem conceder a recompensa escolar.
   window.FarmStoryIntegration?.record('quiz',{id:mission.id,correct:result.correct,review:result.review,academic:true});
@@ -6044,6 +6080,7 @@ function answerAcademicMission(mission,index){
   const cont=document.getElementById('histologyContinue');cont?.classList.add('show');cont?.focus({preventScroll:true});
 }
 window.closeHistologyMission = function(){
+  window.FarmAcademicSlides?.clear();
   document.getElementById('histologyMissionPanel')?.classList.remove('show');
   histologyMissionOpen = false;
   activeHistologyMission = null;
@@ -9053,6 +9090,16 @@ window.openActivityReport=function(){
   window.FarmActivityReport.open();
 };
 let practiceCursor=0;
+function practiceAcademicSlideById(id){
+  if(!gameStarted||player.dead||histologyMissionOpen)return;
+  const mission=window.FarmAcademicProgress.get(id);if(!mission?.imageId)return;
+  toggleHistologyAtlas(false);window.FarmActivityReport?.close();if(skinOpen)toggleSkinView();
+  setEduLevel('academico');openHistologyMission(mission);_lastHistMissionAt=histologyPlayTime;
+}
+function practiceAcademicSlides(){
+  if(!gameStarted||player.dead||histologyMissionOpen)return;
+  const mission=window.FarmAcademicProgress.next('visual');if(mission)practiceAcademicSlideById(mission.id);
+}
 function practiceHistology(){
   if(!gameStarted || player.dead || histologyMissionOpen) return;
   if(eduLevel==='academico'){
@@ -15263,6 +15310,7 @@ FarmLearningJourney.reset(learningContext());
 FarmActivityReport.init({
   read(){return {name:player.name,season:currentSeason,coins:player.coins,score:histologyScore,eduLevel,academic:FarmAcademicProgress.snapshot(),tasks:JSON.parse(JSON.stringify(tasks)),journey:FarmLearningJourney.snapshot()};},
   setLevel:setEduLevel,
+  practiceSlides:practiceAcademicSlides,
   practice:practiceHistology
 });
 window.FarmStoryIntegration?.init();
@@ -15270,7 +15318,7 @@ window.FarmSkinLearning?.init({
   readState(){return {player,region:currentRegion(),scene:currentScene,thermal:FarmThermalFeedback.snapshot()};},
   record(type,payload){FarmStoryIntegration?.record(type,payload);},
   onChange(){if(gameStarted)saveGame(true);},
-  close(){if(skinOpen)toggleSkinView();},practice:practiceHistology,draw:drawSkinView,
+  close(){if(skinOpen)toggleSkinView();},practice:practiceHistology,practiceSlides:practiceAcademicSlides,draw:drawSkinView,
   reducedMotion:()=>!!A11Y.reduceMotion
 });
 window.FarmWorldMap?.init({
@@ -15446,7 +15494,7 @@ window.addEventListener('keydown', function(e){
     if(window.FarmActivityReport?.isOpen()){e.preventDefault();e.stopImmediatePropagation();FarmActivityReport.close();return;}
     if(document.getElementById('summary')?.classList.contains('show')){e.preventDefault();e.stopImmediatePropagation();closeSummary();return;}
     if(skinOpen){e.preventDefault();e.stopImmediatePropagation();toggleSkinView();return;}
-    if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ if(activeHistologyMission?.academic)closeHistologyMission();e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ if(window.FarmAcademicSlides?.zoom()>1)FarmAcademicSlides.setZoom(1);else if(activeHistologyMission?.academic)closeHistologyMission();e.preventDefault(); e.stopImmediatePropagation(); return; }
     // Tutorial overlay
     const tut = document.getElementById('tutorialOverlay');
     if(tut && tut.classList.contains('show')){ e.preventDefault(); e.stopImmediatePropagation(); skipTutorial(); return; }

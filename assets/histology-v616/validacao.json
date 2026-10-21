@@ -1,0 +1,108 @@
+{
+  "pass": true,
+  "derivatives": 9,
+  "distinctOriginals": 6,
+  "allBytes": 1203934,
+  "mainBytes": 952870,
+  "checked": [
+    {
+      "id": "pacini",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        1000,
+        748
+      ],
+      "bytes": 238740,
+      "license": "CC0"
+    },
+    {
+      "id": "adiposo-pacini",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        281,
+        1000
+      ],
+      "bytes": 49302,
+      "license": "CC0"
+    },
+    {
+      "id": "pele-pilosa",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        1000,
+        925
+      ],
+      "bytes": 113502,
+      "license": "CC BY-SA 4.0"
+    },
+    {
+      "id": "ductos-sudoriparos",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        1000,
+        895
+      ],
+      "bytes": 103834,
+      "license": "CC BY-SA 4.0"
+    },
+    {
+      "id": "pilosebacea",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        1000,
+        750
+      ],
+      "bytes": 277670,
+      "license": "Domínio público (PD-user)"
+    },
+    {
+      "id": "derme-colagena",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        640,
+        960
+      ],
+      "bytes": 151064,
+      "license": "Domínio público (PD-user)"
+    },
+    {
+      "id": "meissner",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        800,
+        600
+      ],
+      "bytes": 82714,
+      "license": "CC BY 4.0"
+    },
+    {
+      "id": "epiderme-meissner",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        800,
+        395
+      ],
+      "bytes": 50698,
+      "license": "CC BY 4.0"
+    },
+    {
+      "id": "pele-espessa-panorama",
+      "hash": true,
+      "originalHash": true,
+      "size": [
+        982,
+        1000
+      ],
+      "bytes": 136410,
+      "license": "CC BY 4.0"
+    }
+  ]
+}

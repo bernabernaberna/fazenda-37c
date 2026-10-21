@@ -1,0 +1,631 @@
+[
+  {
+    "id": "pacini",
+    "commonsTitle": "Histology of a Pacinian corpuscle.jpg",
+    "originalFile": "originals/pacini.jpg",
+    "originalSha256": "ec6bf6f87a4b6d0e1a05d6e5c130b76712ef02faeedd3f84c78f4c4f1985091d",
+    "info": {
+      "size": 1171376,
+      "width": 2048,
+      "height": 1532,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Histology_of_a_Pacinian_corpuscle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Histology_of_a_Pacinian_corpuscle.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=110259903",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2021-09-20 22:51:43",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Histology of a Pacinian corpuscle",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Lamellar corpuscle|CC-Zero|Mikael Häggström/Micrographs of the skin",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Histology of a Pacinian corpuscle",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2021-09-20 16:22:18",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<figure typeof=\"mw:File/Thumb\"><a href=\"//commons.wikimedia.org/wiki/File:Mikael_H%C3%A4ggstr%C3%B6m_at_pathology_in_2019_(crop).jpg\" class=\"mw-file-description\"><img src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/Mikael_H%C3%A4ggstr%C3%B6m_at_pathology_in_2019_%28crop%29.jpg/250px-Mikael_H%C3%A4ggstr%C3%B6m_at_pathology_in_2019_%28crop%29.jpg?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"135\" height=\"159\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/Mikael_H%C3%A4ggstr%C3%B6m_at_pathology_in_2019_%28crop%29.jpg/330px-Mikael_H%C3%A4ggstr%C3%B6m_at_pathology_in_2019_%28crop%29.jpg?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"1439\" data-file-height=\"1697\"></a><figcaption><a href=\"//commons.wikimedia.org/wiki/User:Mikael_H%C3%A4ggstr%C3%B6m\" title=\"User:Mikael Häggström\">Mikael Häggström</a>, <a href=\"https://en.wikipedia.org/wiki/Medical_Doctor\" class=\"extiw\" title=\"en:Medical Doctor\">M.D.</a> <a href=\"//commons.wikimedia.org/wiki/Mikael_H%C3%A4ggstr%C3%B6m\" class=\"mw-redirect\" title=\"Mikael Häggström\">Author info</a><br> - <a href=\"//commons.wikimedia.org/wiki/User:Mikael_H%C3%A4ggstr%C3%B6m#Reusing_images\" title=\"User:Mikael Häggström\">Reusing images</a><br>- Conflicts of interest:<br>  None</figcaption></figure>\n<a href=\"//commons.wikimedia.org/wiki/User:Mikael_H%C3%A4ggstr%C3%B6m\" title=\"User:Mikael Häggström\">Mikael Häggström</a>, <a href=\"https://en.wikipedia.org/wiki/Medical_Doctor\" class=\"extiw\" title=\"en:Medical Doctor\">M.D.</a><br><b>Consent note</b>: Consent from the patient or patient's relatives is regarded as redundant, because of absence of identifiable features (<a rel=\"nofollow\" class=\"external text\" href=\"https://research.ucr.edu/ori/committees/irb-clin/hipaa/hipaa-phi-identifiers\">List of HIPAA identifiers</a>) in the media and case information (<a rel=\"nofollow\" class=\"external text\" href=\"https://research.ucr.edu/media/34266/hipaa_case_reports.pdf\">See also HIPAA case reports guidance</a>).",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  },
+  {
+    "id": "pele-pilosa",
+    "commonsTitle": "Scalp cross section (negro).jpg",
+    "originalFile": "originals/pele-pilosa.jpg",
+    "originalSha256": "e62abec5724e1139610715f96d65962c19dd107865a0fc42a4f36661e409498c",
+    "info": {
+      "size": 8274628,
+      "width": 3740,
+      "height": 3740,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/e2/Scalp_cross_section_%28negro%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Scalp_cross_section_(negro).jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=65159865",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2017-12-31 15:50:16",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Scalp cross section (negro)",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Hair follicle|H&E stain|Self-published work|Histology of mammal skin|Histology of sebaceous gland|Bright-field optical microscopic images",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Micrography of cross section of scalp. Tissue sample is from negro person due to the higher concentration of melanin.\n<p>On photograph is visible hair folicle with sebaceous gland positioned underneath. Epidermis and dermis clearly visible.\n</p>\nPicture taken through eyepiece of Nikon YS100 microscope with Nikon D7100 with 18-55mm kit lens.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2017-12-18 19:39:58",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Lazar.zenit\" title=\"User:Lazar.zenit\">Lazar.zenit</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  },
+  {
+    "id": "ductos-sudoriparos",
+    "commonsTitle": "Sweat gland histology 2014.jpg",
+    "originalFile": "originals/ductos-sudoriparos.jpg",
+    "originalSha256": "a4ff4d4386530323f6cd4528e1af98003d5b905d425d62f5032f744c2fd51521",
+    "info": {
+      "size": 1049164,
+      "width": 4912,
+      "height": 3264,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/48/Sweat_gland_histology_2014.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Sweat_gland_histology_2014.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=42368734",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2015-08-15 14:18:16",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Sweat gland histology 2014",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Self-published work|Sweat glands|Histology of glands",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Histology of sweat gland showing stratified cuboidal epithelium",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2014-06-10",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Athikhun.suw\" title=\"User:Athikhun.suw\">Athikhun.suw</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  },
+  {
+    "id": "pilosebacea",
+    "commonsTitle": "Insertion of sebaceous glands into hair shaft x10.jpg",
+    "originalFile": "originals/pilosebacea.jpg",
+    "originalSha256": "e4b30e126c8c4d2160fb8201226427be5191778fedca912896d73c8a9c811d5b",
+    "info": {
+      "size": 1094822,
+      "width": 2048,
+      "height": 1536,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Insertion_of_sebaceous_glands_into_hair_shaft_x10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Insertion_of_sebaceous_glands_into_hair_shaft_x10.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=11587958",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2015-02-05 16:45:16",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Insertion of sebaceous glands into hair shaft x10",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "PD-user|Histology of sebaceous gland",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "This is a hematoxylin and eosin stained slide at 10x of the insertion of sebaceous glands into hair shaft in a full, normal pilosebaceous unit, sectioned from tissue also found to have a benign intradermal nevus.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2008-10-18",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Kilbad\" title=\"User:Kilbad\">Kilbad</a>",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "This work is not copyrighted, and permission for use on wikipedia is granted by me, the author",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  },
+  {
+    "id": "meissner",
+    "commonsTitle": "514 Light Micrograph of a Meissner Corpuscle.jpg",
+    "originalFile": "originals/meissner.jpg",
+    "originalSha256": "b43ceef9afd73e3d0adc20492e4c46a624b88d36e90a8bc8f267dd1c5b8737cd",
+    "info": {
+      "size": 487079,
+      "width": 800,
+      "height": 600,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/514_Light_Micrograph_of_a_Meissner_Corpuscle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:514_Light_Micrograph_of_a_Meissner_Corpuscle.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=49891523",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2016-07-03 20:30:05",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "514 Light Micrograph of a Meissner Corpuscle",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Uploaded with VicuñaUploader|Meissner's corpuscle|Histology from CNX Anatomy & Physiology Textbook",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<p>Version 8.25 from the Textbook<br>\nOpenStax Anatomy and Physiology<br>\n</p>\nPublished May 18, 2016<br>",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2016-05-18",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://cnx.org/contents/FPtK1zmh@8.25:fEI3C8Ot@10/Preface\">https://cnx.org/contents/FPtK1zmh@8.25:fEI3C8Ot@10/Preface</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "OpenStax Anatomy and Physiology",
+          "source": "commons-desc-page"
+        },
+        "AuthorCount": {
+          "value": 2,
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "CC BY 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  },
+  {
+    "id": "pele-espessa-panorama",
+    "commonsTitle": "Кожа подушечки пальца (малое увеличение).jpg",
+    "originalFile": "originals/pele-espessa-panorama.jpg",
+    "originalSha256": "bc3a5853e07ba602cf5d5e4ce0622c7bfcbdd0e2f008633e238a400d5c7238e8",
+    "info": {
+      "size": 826147,
+      "width": 2054,
+      "height": 2092,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/8a/%D0%9A%D0%BE%D0%B6%D0%B0_%D0%BF%D0%BE%D0%B4%D1%83%D1%88%D0%B5%D1%87%D0%BA%D0%B8_%D0%BF%D0%B0%D0%BB%D1%8C%D1%86%D0%B0_%28%D0%BC%D0%B0%D0%BB%D0%BE%D0%B5_%D1%83%D0%B2%D0%B5%D0%BB%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:%D0%9A%D0%BE%D0%B6%D0%B0_%D0%BF%D0%BE%D0%B4%D1%83%D1%88%D0%B5%D1%87%D0%BA%D0%B8_%D0%BF%D0%B0%D0%BB%D1%8C%D1%86%D0%B0_(%D0%BC%D0%B0%D0%BB%D0%BE%D0%B5_%D1%83%D0%B2%D0%B5%D0%BB%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D0%B5).jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=117339080",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2022-04-25 18:28:05",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Кожа подушечки пальца (малое увеличение)",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Self-published work|Microscopy images from Russian Science Photo Competition 2022|Images from Wiki Science Competition 2022 in Russia|Anatomy of human fingers|Histology of human skin|Taken with Huawei Honor 20 Lite (Youth Edition)|Uploaded via Campaign:wsc22-ru",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "The skin of the finger pad.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2022-04-11 10:11:35",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:%D0%93%D0%BB%D1%83%D1%89%D0%B5%D0%BD%D0%BA%D0%BE_%D0%90%D1%80%D0%B8%D0%BD%D0%B0&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Глущенко Арина (page does not exist)\">Глущенко Арина</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  },
+  {
+    "id": "pele-espessa-detalhe",
+    "commonsTitle": "Кожа подушечки пальца (большое увеличение).jpg",
+    "originalFile": "originals/pele-espessa-detalhe.jpg",
+    "originalSha256": "bdd9b58d847a1ece2de1c939eb226515586038986629ef42e0fdbfcb78a72625",
+    "info": {
+      "size": 602837,
+      "width": 1937,
+      "height": 2021,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/99/%D0%9A%D0%BE%D0%B6%D0%B0_%D0%BF%D0%BE%D0%B4%D1%83%D1%88%D0%B5%D1%87%D0%BA%D0%B8_%D0%BF%D0%B0%D0%BB%D1%8C%D1%86%D0%B0_%28%D0%B1%D0%BE%D0%BB%D1%8C%D1%88%D0%BE%D0%B5_%D1%83%D0%B2%D0%B5%D0%BB%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:%D0%9A%D0%BE%D0%B6%D0%B0_%D0%BF%D0%BE%D0%B4%D1%83%D1%88%D0%B5%D1%87%D0%BA%D0%B8_%D0%BF%D0%B0%D0%BB%D1%8C%D1%86%D0%B0_(%D0%B1%D0%BE%D0%BB%D1%8C%D1%88%D0%BE%D0%B5_%D1%83%D0%B2%D0%B5%D0%BB%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D0%B5).jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=117339078",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2022-04-25 18:28:05",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Кожа подушечки пальца (большое увеличение)",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Self-published work|Microscopy images from Russian Science Photo Competition 2022|Images from Wiki Science Competition 2022 in Russia|Anatomy of human fingers|Histology of human skin|Taken with Huawei Honor 20 Lite (Youth Edition)|Uploaded via Campaign:wsc22-ru",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "The skin of the finger pad.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2022-04-11 10:12:35",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:%D0%93%D0%BB%D1%83%D1%89%D0%B5%D0%BD%D0%BA%D0%BE_%D0%90%D1%80%D0%B8%D0%BD%D0%B0&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Глущенко Арина (page does not exist)\">Глущенко Арина</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  }
+]

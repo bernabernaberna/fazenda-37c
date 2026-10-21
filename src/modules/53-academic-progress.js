@@ -26,8 +26,10 @@
     records.set(id,entry);
     return {correct,delta:correct&&!review?15:0,review,firstAttempt:!prev};
   }
-  function next(){
-    const all=bank();if(!all.length)return null;
+  function next(mode){
+    const entries=bank(),visual=entries.filter(q=>!!q.imageId),text=entries.filter(q=>!q.imageId),mixed=[];
+    for(let i=0;i<Math.max(visual.length,text.length);i++){if(visual[i])mixed.push(visual[i]);if(text[i])mixed.push(text[i]);}
+    const all=mode==='visual'?visual:mixed;if(!all.length)return null;
     const fresh=all.find(q=>!records.has(q.id));if(fresh)return fresh;
     const pending=all.filter(q=>!records.get(q.id)?.mastered),pool=pending.length?pending:all;
     const chosen=pool[cursor%pool.length];cursor=(cursor+1)%all.length;return chosen;

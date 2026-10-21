@@ -337,8 +337,8 @@
   freezeDeep(SOURCES);
   freezeDeep(QUESTIONS);
   root.FarmAcademicHistology = Object.freeze({
-    version: '6.15.0',
-    questions: function () { return copy(QUESTIONS); },
-    sources: function () { return copy(SOURCES); }
+    version: '6.16.0',
+    questions: function () { return copy(QUESTIONS).concat(root.FarmAcademicSlides?.questions() || []); },
+    sources: function () { return copy(SOURCES).concat(root.FarmAcademicSlides?.sources() || []); }
   });
 })(typeof window !== 'undefined' ? window : globalThis);
