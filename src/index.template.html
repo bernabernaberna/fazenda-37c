@@ -12214,7 +12214,8 @@ function drawGHExit(o){
 // Subtle interaction indicator — no extra door drawn; the painted door on the
 // house/barn IS the door. We just show a glowing welcome step + "E" prompt.
 function drawInteractionStep(x, y, w, label){
-  const t = (Math.sin(performance.now()/360)+1)/2;
+  const now = typeof motionOk==='function'&&!motionOk()?0:performance.now();
+  const t = (Math.sin(now/360)+1)/2;
   // Stone step
   ctx.fillStyle='#5a3a20'; ctx.fillRect(x-w/2, y-2, w, 4);
   ctx.fillStyle='#8a6a3a'; ctx.fillRect(x-w/2+1, y-2, w-2, 1);
@@ -12228,8 +12229,8 @@ function drawInteractionStep(x, y, w, label){
   ctx.save();
   ctx.font = 'bold 8px Trebuchet MS, monospace';
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#1a0905'; ctx.fillText(label, x, y-6+Math.sin(performance.now()/320)*1);
-  ctx.fillStyle = '#ffd98a'; ctx.fillText(label, x, y-7+Math.sin(performance.now()/320)*1);
+  ctx.fillStyle = '#1a0905'; ctx.fillText(label, x, y-6+Math.sin(now/320)*1);
+  ctx.fillStyle = '#ffd98a'; ctx.fillText(label, x, y-7+Math.sin(now/320)*1);
   ctx.restore();
 }
 function drawDoorHouse(o){ drawInteractionStep(o.x, o.y, 18, '[E] Entrar'); }
@@ -14063,10 +14064,17 @@ function _bloomTuning(){
   // entra em cena ~11 tiles antes da neve pura — então não há salto visível.
   const y0 = Math.floor(_camFloatY / TS);
   const y1 = Math.floor((_camFloatY + _visH) / TS);
+  const x0 = Math.floor(_camFloatX / TS);
+  const x1 = Math.floor((_camFloatX + _visW) / TS);
   let pale = 0;
+  const brightness={farm:0,mountain:1,desert:.9,forest:0,wetland:.15,highlands:.8,meadow:.35,coast:.85};
   for(let y = y0; y <= y1; y += 2){
     const row = Math.max(0, Math.min(MH - 1, y));
-    for(const [name, k] of regionWeights(row)) if(name !== 'farm' && k > pale) pale = k;
+    for(const x of [x0,Math.floor((x0+x1)/2),x1]){
+      let sample=0;
+      for(const [name,k]of regionWeights(row,Math.max(0,Math.min(MW-1,x)))) sample+=(brightness[name]||0)*k;
+      pale=Math.max(pale,sample);
+    }
   }
   const tuning={ b: base.b - 0.08*pale, a: base.a - 0.06*pale };
   if(isFrio()){tuning.b=Math.min(.42,tuning.b);tuning.a=Math.min(.15,tuning.a);}

@@ -29,7 +29,7 @@
   return !!read()?.active&&!(typeof cutsceneActive!=='undefined'&&cutsceneActive)&&!(typeof tutorialActive!=='undefined'&&tutorialActive)&&!(typeof histologyMissionOpen!=='undefined'&&histologyMissionOpen)&&!window.FarmStoryUI?.isOpen?.();
  }
  function localName(info){return info.inside?'Dentro de '+(ROOM_NAMES[info.scene]||'um abrigo')+' · entrada no mapa':WORLD_NAMES[info.region]||'Vale';}
- function terrainColor(tile,cold,x,y){
+ function baseTerrainColor(tile,cold,x,y){
   if(!cold&&x>=96&&[T.GRASS,T.GRASS2,T.FLOWER].includes(tile)){const r=window.FarmExpeditionWorld?.regionAt(x,y);if(r==='meadow')return '#b0a166';if(r==='coast')return '#8d9b77';}
   switch(tile){
    case T.WATER:case T.RIVER:case T.OASIS:return COLORS.water;
@@ -40,6 +40,10 @@
    case T.STONE:case T.COBBLE:return '#899685';case T.FENCE:return '#8b7551';
    default:return cold?'#a8b9a4':'#7f9c69';
   }
+ }
+ function terrainColor(tile,cold,x,y){
+  const base=baseTerrainColor(tile,cold,x,y);
+  return window.FarmBiomeArt?.mapColor(tile,cold,x,y,base)||base;
  }
  function buildPlaces(info){
   const objects=info.main.objects,find=type=>objects.find(o=>o.type===type);

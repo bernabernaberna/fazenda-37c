@@ -89,7 +89,8 @@
       // A mesma amostra do patch4px: a margem não cria uma segunda grade.
       x=Math.floor(x/4)*4;y=Math.floor(y/4)*4;
       const value=noise(x,y,170,71)*.72+noise(x,y,54,93)*.28;
-      return pal[Math.min(5,Math.floor(value*6))];
+      const base=pal[Math.min(5,Math.floor(value*6))];
+      return API.rawScene==='main'?window.FarmBiomeArt?.colorAt(kind,cold,x,y,base)||base:base;
     }
     function paintNaturalPatch(g,kind,cold,wx,wy){
       const pal=naturalPalettes[kind==='grass'&&cold?'frostGrass':kind];
@@ -273,11 +274,12 @@
       for(let side=0;side<4;side++){
         const n=neighbors[side];
         if((t===T.PATH||t===T.FIELD)&&green(n)){
+          const local=API.rawScene==='main'?window.FarmBiomeArt?.paletteAt(x*TS+8,y*TS+8,cold):null;
           for(let start=0;start<TS;start+=4){
             const d=1+hash(x,y,side+start)%2;
-            edgeRect(g,cold?P.snowShade:P.leafDark,px,py,side,start,4,d,1);
-            edgeRect(g,cold?P.snow:P.leaf,px,py,side,start,4,0,d);
-            edgeRect(g,cold?P.snowLight:P.sage,px,py,side,start+1,2,0,1);
+            edgeRect(g,cold?P.snowShade:local?.shade||P.leafDark,px,py,side,start,4,d,1);
+            edgeRect(g,local?.ground||(cold?P.snow:P.leaf),px,py,side,start,4,0,d);
+            edgeRect(g,cold?P.snowLight:local?.light||P.sage,px,py,side,start+1,2,0,1);
           }
         }else if(watery(t)&&n!==undefined&&!watery(n)){
           // Cor da margem pertence ao terreno vizinho; a faixa fica DENTRO
@@ -286,7 +288,7 @@
         }else if(n!==undefined&&((t===T.SNOWROCK&&n===T.SNOW)||(t===T.STONE&&(green(n)||n===T.SNOW))||(t===T.CRACKED&&(n===T.SAND||n===T.DUNE)))){
           // A mancha de rocha/solo seco entra no chão em contorno irregular,
           // em vez de revelar o retângulo de tiles pintado no mapa físico.
-          const rim=n===T.SNOW?'#cedfd8':green(n)?(cold?'#a6bdaf':'#68815b'):'#cfb47b';
+          const rim=materialColor(n===T.SNOW?'snow':green(n)?'grass':'sand',cold,x*TS,y*TS);
           for(let start=0;start<TS;start+=2){
             const along=(side%2?y:x)*TS+start,d=2+Math.floor(noise(along,(side%2?x:y)*TS,19,114)*5);
             edgeRect(g,rim,px,py,side,start,2,0,d);
@@ -312,7 +314,7 @@
       const kind=naturalKind(t);
       if(kind){
         const wx=x*TS,wy=y*TS,qx=Math.floor(wx/PATCH),qy=Math.floor(wy/PATCH);
-        const mat=cached(tiles,'patch:'+kind+':'+!!cold+':'+qx+':'+qy,PATCH,PATCH,c=>paintNaturalPatch(c,kind,cold,qx*PATCH,qy*PATCH));
+        const mat=cached(tiles,'patch:'+API.rawScene+':'+kind+':'+!!cold+':'+qx+':'+qy,PATCH,PATCH,c=>paintNaturalPatch(c,kind,cold,qx*PATCH,qy*PATCH));
         g.drawImage(mat,wx-qx*PATCH,wy-qy*PATCH,TS,TS,px,py,TS,TS);
       }else{
         const v=(hash(x,y,t)%4+hash(x>>2,y>>2,t)%3*4)%12;
@@ -322,74 +324,117 @@
       if(API.rawScene==='main'&&(t===T.GRASS||t===T.GRASS2))
         window.FarmOpenWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
       if(API.rawScene==='main')window.FarmExpeditionWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
+      if(API.rawScene==='main')window.FarmBiomeArt?.drawGroundDetails?.(g,px,py,x,y,t,cold);
     });
 
     /* ---------- Vegetação: massas recortadas, folhas em agrupamentos ---------- */
-    function leaves(g,x,y,r,seed,cold,lit){
-      const dark=cold?'#577c74':P.teal,mid=cold?'#84a297':P.leaf;
-      const light=cold?P.snow:P.sage,high=cold?P.snowLight:P.leafLight;
-      const shape=[[-r+3,-r,r*2-6,2],[-r+1,-r+2,r*2-2,3],[-r,-r+5,r*2,5],[-r+1,-r+10,r*2-2,4],[-r+4,-r+14,r*2-8,2]];
-      for(const [dx,dy,w,h] of shape)if(w>0)rect(g,dark,x+dx,y+dy,w,h);
-      rect(g,mid,x-r+2,y-r+2,r*2-6,8);rect(g,mid,x-r+4,y-r+10,r*2-9,3);
-      const bias=lit?4:-3;
-      rect(g,light,x-r+4+bias,y-r+3,r-2,3);rect(g,light,x-r+6+bias,y-r+6,r-3,2);
-      for(let i=0;i<7;i++){
-        const h=hash(seed,i,71),dx=(h%(r*2-6))-r+3,dy=((h>>>5)%10)-r+3;
-        rect(g,i%3?mid:high,x+dx,y+dy,2+(h&1),1);
-      }
-      if(cold){rect(g,high,x-r+4,y-r,r*2-9,2);rect(g,light,x-r+1,y-r+2,r*2-3,2);}
+    // Paletas da vegetação são locais: as cores do solo continuam sob o
+    // controle do cache de terreno. Um perfil gera só três silhuetas estáveis.
+    const PLANTS=Object.freeze({
+      farm:['#264c3c','#3f6546','#63804e','#89a367','#b3bf7d','#846248'],
+      forest:['#183f35','#2c5942','#47764e','#739458','#9bb477','#6a6045'],
+      wetland:['#314d43','#536448','#78815a','#a1a16c','#c3b983','#7e6650'],
+      meadow:['#4c5d37','#697944','#929451','#b5ac67','#d5c68a','#967652'],
+      highlands:['#344f49','#4f6c5a','#738567','#a0a27c','#c2bb90','#826d58'],
+      coast:['#315c50','#4f7b60','#7a9c73','#a8b68a','#d1c69a','#997b56'],
+      mountain:['#2d514c','#4e7467','#7f9b89','#b1c4b0','#dbe5ce','#776754'],
+      desert:['#3b5b46','#607951','#89945b','#b3ac70','#d8c48a','#9b7851']
+    });
+    function plantProfile(x,y){
+      // Estufa e interiores usam coordenadas locais, fora do gradiente do vale.
+      if(API.rawScene&&API.rawScene!=='main')return 'farm';
+      const p=window.FarmBiomeArt?.profileAt?.(x,y),id=p?.dominant||p?.id;
+      if(PLANTS[id])return id;
+      const tx=Math.floor(x/TS),ty=Math.floor(y/TS);
+      return window.FarmExpeditionWorld?.regionAt?.(tx,ty)||window.FarmOpenWorld?.regionAt?.(tx,ty)||
+        (ty<38?'mountain':ty>86?'desert':'farm');
     }
-    function trunk(g){
-      rect(g,P.woodDark,7,0,6,20);rect(g,P.wood,7,1,4,18);
-      rect(g,P.woodLight,7,2,1,12);rect(g,P.woodDark,9,4,1,5);
-      rect(g,P.woodDark,6,18,9,3);rect(g,P.wood,3,20,15,2);
+    function plantColors(id,cold){
+      const p=PLANTS[id]||PLANTS.farm;
+      return cold?[p[0],'#57796c','#8da799',P.snowShade,P.snowLight,p[5]]:p;
+    }
+    function leaves(g,x,y,r,seed,cold,lit,id='farm'){
+      const [edge,dark,mid,light,high]=plantColors(id,cold),top=y-r;
+      // O contorno deixa fendas entre ramos. Faixas largas de sombra embaixo
+      // e luz no ombro dão volume sem espalhar pixels aleatórios pela copa.
+      const lobes=[[-r+4,0,r*2-8,2],[-r+1,2,r*2-2,3],[-r,5,r*2,5],[-r+1,10,r*2-2,3],[-r+4,13,r*2-8,3]];
+      for(const [dx,dy,w,h]of lobes)if(w>0)rect(g,edge,x+dx,top+dy,w,h);
+      rect(g,dark,x-r+2,top+3,r*2-5,9);rect(g,mid,x-r+3,top+2,r*2-8,7);
+      rect(g,mid,x-r+5,top+9,r*2-11,3);
+      const left=lit?x+1:x-r+3,shoulder=Math.max(4,r-2);
+      rect(g,light,left,top+3,shoulder,3);rect(g,light,left+2,top+6,shoulder-2,2);
+      rect(g,high,left+2,top+3,Math.max(2,shoulder-5),1);
+      for(let i=0;i<4;i++){
+        const n=hash(seed,i,71),dx=n%(r*2-8)-r+4,dy=(n>>>5)%8+3;
+        rect(g,i%2?dark:light,x+dx,top+dy,3+(n&1),1);
+        if(i===1)rect(g,edge,x+dx+2,top+dy+1,2,1);
+      }
+      if(cold){
+        rect(g,P.snow,x-r+5,top,r*2-11,2);rect(g,P.snowLight,x-r+6,top,r*2-14,1);
+        rect(g,P.snow,x-r+2,top+2,r-3,2);rect(g,P.snowShade,x+2,top+6,Math.max(2,r-6),1);
+      }
+    }
+    function trunk(g,id,cold){
+      const p=plantColors(id,cold),wet=id==='wetland';
+      rect(g,P.woodDark,7,0,6,20);rect(g,p[5],7,1,4,18);
+      rect(g,P.woodLight,7,2,1,11);rect(g,P.woodDark,9,5,1,5);
+      rect(g,P.woodDark,6,18,9,3);rect(g,p[5],3,20,15,2);
       rect(g,P.woodDark,2,21,4,2);rect(g,P.woodDark,14,21,5,2);
-      rect(g,P.wood,4,6,5,3);rect(g,P.wood,12,3,5,3);
+      rect(g,P.woodLight,4,20,4,1);rect(g,P.wood,4,6,5,3);rect(g,P.wood,12,3,5,3);
+      rect(g,p[1],11,12,2,6);rect(g,p[2],11,13,1,3);
+      if(wet){rect(g,P.woodDark,4,16,2,5);rect(g,p[5],2,20,4,1);rect(g,P.woodDark,15,17,2,5);}
     }
-    function treeCanopy(g,v,cold,lit,fruit){
-      const clusters=[[27,34,12],[13,29,11],[41,29,11],[20,20,11],[34,17,12],[27,10,10],[12,20,8],[44,20,8]];
+    function treeCanopy(g,v,cold,lit,fruit,id){
+      const p=plantColors(id,cold),wet=id==='wetland';
+      // Galhos na massa inferior: aparecem nas fendas, sem alargar a copa.
+      rect(g,p[0],25,28,5,14);rect(g,p[5],26,29,2,12);
+      rect(g,p[0],15,31,12,3);rect(g,p[0],29,26,10,3);
+      const clusters=[[27,37,12],[13,31,11],[41,31,11],[19,22,11],[34,20,12],[27,11,10],[11,22,8],[45,23,8]];
       for(let i=0;i<clusters.length;i++){
-        const [x,y,r]=clusters[i];leaves(g,x+(v===1&&i%2?1:0),y,r,hash(v,i),cold,lit);
+        const [x,y,r]=clusters[i],dx=v===1&&i%2?1:v===2&&i%3===0?-1:0;
+        leaves(g,x+dx,y+(wet&&i<3?1:0),r,hash(v,i),cold,lit,id);
       }
+      // Um ramo à sombra separa o volume de baixo das folhas iluminadas.
+      rect(g,p[0],23,34,4,1);rect(g,p[1],28,38,5,1);
       if(!cold&&fruit!==3){
         const color=fruit===0?P.berry:fruit===1?P.clay:P.amber;
-        for(const [x,y] of [[13,24],[34,13],[40,29],[25,34],[20,21]]){
+        for(const [x,y]of [[13,25],[34,15],[40,31],[25,36],[20,23]]){
           rect(g,P.woodDark,x,y-1,1,2);rect(g,color,x-1,y,3,3);rect(g,P.cream,x-1,y,1,1);
         }
       }
     }
     function drawTreeArt(o,g,fruitOverride){
       if(offscreen(g,o.x-70,o.y-55,140,95))return;
-      const cold=winter(),v=hash(o.x,o.y)%3;
+      const cold=winter(),v=hash(o.x,o.y)%3,id=plantProfile(o.x,o.y);
       // Só contato das raízes. A projeção da copa, inclusive a elipse
       // térmica exata, é desenhada por FarmWorldDepth antes dos objetos.
       rect(g,'rgba(24,59,54,.2)',o.x-8,o.y+10,17,3);
-      blit(g,'trunk',o.x-10,o.y-10,20,24,trunk);
+      blit(g,'trunk:'+id+':'+cold,o.x-10,o.y-10,20,24,c=>trunk(c,id,cold));
       const lit=typeof sunLitDir==='function'&&sunLitDir()>0.05;
-      const fruit=fruitOverride===undefined?((o.x>>4)+(o.y>>4)*3)&3:fruitOverride;
+      const fruit=fruitOverride===undefined?(['forest','wetland','highlands'].includes(id)?3:((o.x>>4)+(o.y>>4)*3)&3):fruitOverride;
       const sway=still()?0:Math.round(Math.sin(performance.now()/800+v+o.x*.013));
       const large=o.shadeR>26?1:0;
-      const img=cached(sprites,'canopy:'+v+':'+cold+':'+lit+':'+fruit,56,50,c=>treeCanopy(c,v,cold,lit,fruit));
+      const img=cached(sprites,'canopy:'+id+':'+v+':'+cold+':'+lit+':'+fruit,56,50,c=>treeCanopy(c,v,cold,lit,fruit,id));
       g.drawImage(img,Math.round(o.x-28+sway-large),Math.round(o.y-46-large),56+large*2,50+large*2);drawn++;
     }
     API.registerObjectDrawer('tree',(o,g)=>drawTreeArt(o,g));
     API.registerObjectDrawer('fx_fruittree',(o,g)=>drawTreeArt(o,g,o.kind?2:1));
-    function bushPaint(g,cold,ripe){
+    function bushPaint(g,cold,ripe,id){
       rect(g,'rgba(24,59,54,.2)',3,19,22,3);
-      leaves(g,10,14,8,61,cold,false);leaves(g,20,13,8,71,cold,false);leaves(g,15,9,7,83,cold,false);
+      leaves(g,10,14,8,61,cold,false,id);leaves(g,20,13,8,71,cold,false,id);leaves(g,15,9,7,83,cold,false,id);
       if(ripe&&!cold)for(const [x,y]of [[6,13],[13,9],[19,14],[11,17],[22,10]]){
         rect(g,P.berry,x,y,2,2);rect(g,P.clayLight,x,y,1,1);
       }
     }
     for(const type of ['bush','fx_berry']) API.registerObjectDrawer(type,(o,g)=>{
-      const cold=winter(),ripe=type==='fx_berry'?!(o._pickT&&performance.now()-o._pickT<25000):hash(o.x,o.y)%2===0;
-      blit(g,'bush:'+cold+':'+ripe,o.x-15,o.y-17,30,24,c=>bushPaint(c,cold,ripe));
+      const cold=winter(),id=plantProfile(o.x,o.y),ripe=type==='fx_berry'?!(o._pickT&&performance.now()-o._pickT<25000):hash(o.x,o.y)%2===0;
+      blit(g,'bush:'+id+':'+cold+':'+ripe,o.x-15,o.y-17,30,24,c=>bushPaint(c,cold,ripe,id));
     });
     API.registerObjectDrawer('flower',(o,g)=>{
-      const cold=winter(),v=(o.seed||0)%3;
-      blit(g,'flower:'+cold+':'+v,o.x-7,o.y-11,15,17,c=>{
+      const cold=winter(),v=(o.seed||0)%3,id=plantProfile(o.x,o.y),p=plantColors(id,cold);
+      blit(g,'flower:'+id+':'+cold+':'+v,o.x-7,o.y-11,15,17,c=>{
         for(const [x,y]of [[3,9],[10,6],[7,12]]){
-          rect(c,cold?P.woodLight:P.leafDark,x,y,1,5);rect(c,P.sage,x-1,y+3,3,1);
+          rect(c,cold?P.woodLight:p[1],x,y,1,5);rect(c,p[2],x-1,y+3,3,1);
           if(cold){rect(c,P.snowLight,x-1,y,3,1);continue;}
           const pal=[P.berry,P.amber,P.cream];rect(c,pal[v],x-2,y-2,5,1);
           rect(c,pal[v],x-1,y-3,3,3);rect(c,P.cream,x,y-2,1,1);
@@ -696,20 +741,35 @@
 
     /* ---------- Montanha: agulhas, neve recortada e cabana de toras ---------- */
     API.registerObjectDrawer('mtn_pine',(o,g)=>{
-      const wide=o.s>1.1?1:0;
-      blit(g,'pine:'+wide,o.x-25-wide*2,o.y-66,50+wide*4,73,c=>{
+      const wide=o.s>1.1?1:0,id=plantProfile(o.x,o.y),v=hash(o.x,o.y)%3;
+      const snow=winter()||id==='mountain'||API.tileAt(Math.floor(o.x/TS),Math.floor(o.y/TS))===T.SNOW;
+      const lit=typeof sunLitDir==='function'&&sunLitDir()>0.05,p=plantColors(id,false);
+      blit(g,'pine:'+id+':'+wide+':'+v+':'+snow+':'+lit,o.x-25-wide*2,o.y-66,50+wide*4,73,c=>{
         const cx=25+wide*2;rect(c,'rgba(24,59,54,.18)',cx-5,66,10,3);
-        rect(c,P.woodDark,cx-3,53,6,14);rect(c,P.woodLight,cx-3,55,2,12);
+        rect(c,P.woodDark,cx-3,51,6,17);rect(c,p[5],cx-3,53,4,14);
+        rect(c,P.woodLight,cx-3,54,1,12);rect(c,P.woodDark,cx-6,67,13,2);
         for(let tier=0;tier<5;tier++){
-          const yy=55-tier*10,r=21-tier*3+wide;
-          for(let row=0;row<12;row+=2){
-            const half=Math.max(2,Math.floor(r*(row+3)/14));
-            rect(c,P.ink,cx-half,yy-12+row,half*2,2);
-            rect(c,tier%2?P.teal:P.leafDark,cx-half+2,yy-12+row,Math.max(1,half*2-5),1);
+          const yy=57-tier*10,r=21-tier*3+wide,tip=yy-15;
+          for(let row=0;row<14;row+=2){
+            const half=Math.max(2,Math.floor(r*(row+4)/17));
+            rect(c,p[0],cx-half,tip+row,half*2+1,2);
+            rect(c,p[1],cx-half+2,tip+row,Math.max(1,half*2-4),2);
+            const shoulder=lit?cx+1:cx-half+2;
+            if(row%4===0&&row<11)rect(c,p[2],shoulder,tip+row,Math.max(1,half-2),1);
+            if(row>5&&row%4===0){rect(c,p[0],cx-half-2,tip+row+1,4,1);rect(c,p[0],cx+half-1,tip+row+1,4,1);}
           }
-          for(let b=-r+3;b<r-2;b+=5){rect(c,P.snowShade,cx+b,yy-5,5,2);rect(c,P.snow,cx+b,yy-6,4,2);}
-          rect(c,P.snowLight,cx-2,yy-12,5,2);rect(c,P.sage,cx-7,yy-2,3,1);
+          rect(c,p[0],cx-1,tip+4,2,11);rect(c,p[1],cx,tip+3,1,10);
+          // Ramos carregam neve em pequenas prateleiras; não há faixas
+          // brancas atravessando o pinheiro inteiro como uma escada.
+          for(let b=-r+4;b<r-3;b+=8){
+            const dy=((b+tier+v)&3),by=yy-4-dy;
+            rect(c,snow?P.snowShade:p[1],cx+b,by+1,6,2);
+            rect(c,snow?P.snow:p[3],cx+b,by,5,1);
+            if(snow)rect(c,P.snowLight,cx+b+1,by,3,1);
+          }
+          rect(c,snow?P.snowLight:p[3],cx-1,tip,3,2);
         }
+        if(id==='highlands'){rect(c,'#b7b28b',cx-1,60,2,2);rect(c,'#87916f',cx+1,56,1,3);}
       });
     });
     function rock(g,w,h,snow,desert){
@@ -737,39 +797,57 @@
 
     /* ---------- Deserto: nervuras, frondes e estratos quentes ---------- */
     API.registerObjectDrawer('des_cactus',(o,g)=>{
-      const kind=o.kind||'pear';blit(g,'cactus:'+kind,o.x-18,o.y-40,36,46,c=>{
-        rect(c,'rgba(24,59,54,.16)',5,40,28,3);
+      const kind=['saguaro','barrel','pear'].includes(o.kind)?o.kind:'pear',v=hash(o.x,o.y)%3;
+      blit(g,'cactus:'+kind+':'+v,o.x-18,o.y-40,36,46,c=>{
+        rect(c,'rgba(60,68,43,.18)',6,40,25,3);
         function stem(x,y,w,h){
-          rect(c,P.ink,x,y,w,h);rect(c,P.teal,x+1,y+1,w-2,h-2);rect(c,P.sage,x+2,y+1,2,h-2);
-          for(let i=3;i<h-2;i+=5){rect(c,P.cream,x+w-2,y+i,1,1);rect(c,P.leafLight,x+2,y+i+2,1,1);}
+          rect(c,'#355b47',x+1,y,w-2,h);rect(c,'#355b47',x,y+2,w,h-4);
+          rect(c,'#698956',x+1,y+1,w-3,h-2);rect(c,'#9da66b',x+2,y+2,2,h-4);
+          rect(c,'#4d744b',x+w-3,y+2,2,h-4);
+          for(let xx=x+5;xx<x+w-3;xx+=4)rect(c,'#466d46',xx,y+3,1,h-5);
+          for(let i=4;i<h-3;i+=6){rect(c,'#d1c38c',x+w-2,y+i,1,1);rect(c,'#c2bf83',x+2,y+i+2,1,1);}
         }
         if(kind==='saguaro'){
           stem(14,6,9,34);stem(4,15,6,15);stem(26,13,6,20);
-          rect(c,P.teal,8,26,9,5);rect(c,P.teal,20,28,9,5);rect(c,P.sage,9,26,7,1);
+          rect(c,'#698956',8,26,9,5);rect(c,'#698956',20,28,9,5);rect(c,'#9da66b',9,26,7,1);
           rect(c,P.berry,15,4,6,3);rect(c,P.cream,17,3,2,2);
         }else if(kind==='barrel'){
-          stem(7,23,22,17);rect(c,P.teal,10,20,16,4);
-          for(let x=10;x<28;x+=4)rect(c,P.ink,x,25,1,13);
+          stem(7,23,22,17);rect(c,'#698956',10,20,16,4);rect(c,'#9da66b',12,21,6,2);
+          for(let x=10;x<28;x+=4){rect(c,'#466d46',x,25,1,13);rect(c,'#9da66b',x+1,25,1,10);}
           rect(c,P.amber,14,18,7,3);rect(c,P.cream,16,17,3,2);
         }else{
           stem(14,27,8,13);stem(5,18,12,14);stem(21,12,10,17);
           rect(c,P.berry,9,15,4,3);rect(c,P.clayLight,24,10,4,3);
         }
+        rect(c,'#a68e60',13,40,13,1);rect(c,'#bca873',8+v*3,42,4,1);
+        if(v===1){rect(c,'#945a61',18,4,3,2);rect(c,'#e2c38b',19,3,1,2);}
       });
     });
     API.registerObjectDrawer('des_palm',(o,g)=>{
-      blit(g,'palm',o.x-29,o.y-62,58,68,c=>{
+      const id=plantProfile(o.x,o.y),coastal=id==='coast',v=hash(o.x,o.y)%3;
+      const phase=still()?0:Math.floor(performance.now()/420+v)%4;
+      const bend=phase===1?1:phase===3?-1:0,p=plantColors(id,false);
+      blit(g,'palm:'+id+':'+v+':'+bend,o.x-29,o.y-62,58,68,c=>{
         rect(c,'rgba(24,59,54,.2)',28,61,8,3);
-        for(let y=18;y<62;y+=3){const xx=27+Math.floor((y-18)/14);rect(c,P.woodDark,xx,y,5,3);rect(c,P.woodLight,xx,y,2,2);}
-        rect(c,P.wood,25,18,8,8);
-        // Cada fronde tem uma nervura escalonada e folíolos em pares.
-        for(const [dir,rise,len]of [[-1,-1,21],[1,-1,21],[-1,1,25],[1,1,25],[-1,0,25],[1,0,25]]){
+        for(let y=18;y<62;y+=3){
+          const xx=27+Math.floor((y-18)/14);rect(c,P.woodDark,xx,y,5,3);rect(c,P.woodLight,xx,y,2,2);
+          rect(c,'#ac8e60',xx,y,3,1);rect(c,P.wood,xx+2,y+2,2,1);
+        }
+        rect(c,P.woodDark,28,61,8,3);rect(c,P.woodLight,26,62,5,1);rect(c,P.wood,25,18,8,8);
+        // Frondes arqueadas e assimétricas, com nervuras expostas. Só as
+        // pontas mudam um pixel: tronco, raízes e sombra ficam ancorados.
+        for(const [dir,rise,len]of [[-1,-1,20],[1,-1,22],[-1,1,25],[1,1,24],[-1,0,25],[1,0,24]]){
           for(let step=0;step<len;step+=2){
-            const xx=29+dir*step,yy=18+Math.floor(rise*step/3)+Math.floor(step*step/180);
-            rect(c,P.teal,xx,yy,3,3);rect(c,P.sage,xx,yy,2,1);
-            if(step>5){rect(c,P.leafDark,xx-dir,yy+2,3,4);rect(c,P.sage,xx-dir,yy+2,1,2);}
+            const tip=step>15?bend:0,xx=29+dir*step+tip+(coastal&&step>12?1:0);
+            const yy=18+Math.floor(rise*step/3)+Math.floor(step*step/142);
+            rect(c,p[0],xx,yy,3,3);rect(c,p[2],xx,yy,2,1);
+            if(step>5){
+              const leaflet=step<14?5:3;rect(c,p[1],xx-dir,yy+2,3,leaflet);
+              rect(c,p[3],xx-dir,yy+2,1,Math.max(1,leaflet-2));
+            }
           }
         }
+        rect(c,p[0],26,17,8,3);rect(c,p[2],28,16,4,2);
         rect(c,P.woodDark,25,21,4,4);rect(c,P.wood,31,22,4,4);rect(c,P.amber,25,21,1,1);
       });
     });
@@ -804,11 +882,14 @@
           if(x<camX||y<camY||x+5>camX+visW||y+4>camY+visH)continue;
           if(!green(API.tileAt(Math.floor(x/TS),Math.floor(y/TS))))continue;
           const sway=reducedMotion?0:Math.round(Math.sin(phase+seed%97)*Math.min(1.4,wind*.8));
-          const dark=cold?P.snowShade:P.leafDark,light=cold?P.snow:P.sage;
+          const id=plantProfile(x,y),p=plantColors(id,cold),dark=cold?P.snowShade:p[1],light=cold?P.snow:p[2];
           // Base plantada; só as pontas cedem ao vento, sem deslizar o tufo.
           rect(g,dark,x,y+3,5,1);rect(g,dark,x+1,y+1,1,3);rect(g,dark,x+3,y+2,1,2);
           rect(g,dark,x+1+sway,y,1,2);rect(g,light,x+1+sway,y,1,1);
           rect(g,light,x+3+sway,y+1,1,1);
+          if(!cold&&(id==='meadow'||id==='wetland')){
+            rect(g,p[3],x+3+sway,y,1,1);rect(g,dark,x+3,y+1,1,2);
+          }
           atmosphere.anchors.push({x,y,sway});atmosphere.count++;
         }
       }

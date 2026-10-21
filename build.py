@@ -89,6 +89,7 @@ MODULE_ORDER = [
     "48-village-stories.js", # vínculos pessoais, etapas e novas conversas
     "49-expedition-world.js", # novos biomas, trilhas e locais de descoberta
     "50-expedition-story.js", # expedicoes e continuacoes das historias
+    "51-biome-art.js",       # materiais e identidade visual dos oito biomas
     "47-animal-care.js",     # cuidados individuais do curral
     "46-inventory.js",      # mochila acessível, detalhes e atalhos explícitos
     "50-window-glow.js",      # warm halos from house/barn windows at night

@@ -3,7 +3,7 @@
 (function(){
   (window.__farmBiomes=window.__farmBiomes||[]).push(function(API){
     'use strict';
-    const T=API.T,TS=API.TS,masks=new Map(),anchors=new Map();
+    const T=API.T,TS=API.TS,masks=new Map(),anchors=new Map(),reflectionColors=new Map();
     let sourceMap=null,groups=0,cellStride=1;
     const MAX_GROUPS=96;
     const wet=t=>t===T.WATER||t===T.RIVER||t===T.OASIS||t===T.ICE;
@@ -13,7 +13,14 @@
     const rect=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
     function sync(){
       const next=API.scenes[API.rawScene]?.map;
-      if(next!==sourceMap){sourceMap=next;masks.clear();anchors.clear();}
+      if(next!==sourceMap){sourceMap=next;masks.clear();anchors.clear();reflectionColors.clear();}
+    }
+    function reflectionAt(cx,cy,x,y){
+      const art=window.FarmBiomeArt;if(!art)return null;
+      const key=cx+','+cy;let palette=reflectionColors.get(key);if(palette)return palette;
+      palette=art.paletteAt(x,y,false);
+      if(reflectionColors.size>=256)reflectionColors.delete(reflectionColors.keys().next().value);
+      reflectionColors.set(key,palette);return palette;
     }
     function mask(tx,ty){
       sync();
@@ -100,16 +107,17 @@
           if(!liquid(tile)||!surfaceAt(x,y))continue;
           const oasis=tile===T.OASIS,phase=Math.floor(time*(oasis?.55:.85)+seed%17)%6;
           const dy=oasis?(phase===4?1:0):Math.floor(phase/2),dx=oasis?0:(phase%3)-1;
-          const color=oasis?(phase<2?'#54988c':phase>3?'#4c8e84':'#73ab99'):
+          const palette=reflectionAt(cx,cy,x,y);
+          const color=palette?(phase===2||phase===3?palette.waterLight:palette.water):oasis?(phase<2?'#54988c':phase>3?'#4c8e84':'#73ab99'):
             (phase<2?'#508e87':phase>3?'#4b8983':'#629d93');
           const length=3+(seed>>>16)%4+(phase===2||phase===3?2:0);
           waterRect(g,color,x+dx,y+dy,length);
-          if(phase===2)waterRect(g,oasis?'#5d9d8f':'#538f87',x+dx+2,y+dy-1,2);
+          if(phase===2)waterRect(g,palette?.waterLight||(oasis?'#5d9d8f':'#538f87'),x+dx+2,y+dy-1,2);
           // Reflexo comprido e quebrado, raro. Oásis quase imóvel; corrente
           // do rio avança poucos pixels e some antes de reiniciar o ciclo.
           if(seed%7===0&&phase>0&&phase<4){
-            waterRect(g,oasis?'#649e8b':'#689b91',x+dx-2,y+dy+3,3);
-            waterRect(g,oasis?'#76ab98':'#76a89b',x+dx+4,y+dy+3,3+(phase%2));
+            waterRect(g,palette?.water||(oasis?'#649e8b':'#689b91'),x+dx-2,y+dy+3,3);
+            waterRect(g,palette?.waterLight||(oasis?'#76ab98':'#76a89b'),x+dx+4,y+dy+3,3+(phase%2));
           }
           groups++;
         }
@@ -166,6 +174,6 @@
     API.registerObjectDrawer('river_cattail',drawCattail);
     API.registerObjectDrawer('fishing_spot',drawFishing);
     window.FarmWaterLife=Object.freeze({drawSurface,fishingTarget,surfaceAt,
-      info:()=>({tileMasks:masks.size,maskBytes:masks.size*TS*2,anchors:anchors.size,maxAnchors:64,groups,maxGroups:MAX_GROUPS,cellStride})});
+      info:()=>({tileMasks:masks.size,maskBytes:masks.size*TS*2,anchors:anchors.size,maxAnchors:64,reflectionPalettes:reflectionColors.size,maxReflectionPalettes:256,groups,maxGroups:MAX_GROUPS,cellStride})});
   });
 })();

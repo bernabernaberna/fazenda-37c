@@ -53,6 +53,8 @@ Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressi
 
 **Além das três margens:** o vale cresceu 50%, para 144×124 tiles. Explore a Serra dos Ecos, os Campos do Vento e a Costa das Conchas: nove lugares, seis passarelas e três expedições com dois caminhos e três encontros cada. Rosa, Lia e Inês iniciam os combinados; os nove moradores participam das descobertas. Os lugares têm observações registradas no caderno, recursos renováveis, destinos no mapa e duas cenas novas. Saves antigos continuam compatíveis.
 
+**Arte dos oito biomas (V6.13):** materiais e vegetação próprios para cada região, neve azulada, campos dourados, mata com musgo e costa turquesa. Copas, pinheiros, cactos e palmeiras ganharam volume; observatório, moinho, abrigos e cais têm mais detalhes. As transições de cor são graduais, com a mesma geometria e compatibilidade de saves.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

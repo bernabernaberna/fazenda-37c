@@ -134,33 +134,29 @@
   const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(x,y,w,h);};
   function drawTerrainDetails(g,px,py,x,y,t,cold){
    if(API.rawScene!=='main'||x<ORIGINAL_WIDTH||x>=WIDTH||y<28||y>=HEIGHT||![T.GRASS,T.GRASS2].includes(t))return;
-   // Folhiço e solo úmido distinguem os habitats usando o cache de terreno.
-   // Não cria tufos novos, props, animação, colisão ou sorteios por câmera.
+   // Pequenos grupos de folhas, musgo e palha repousam no mesmo terreno.
+   // Formas partidas, baixa frequência e posição mundial evitam o efeito de grade.
    const edge=smooth((x-60)/7)*smooth((y-28)/12);if(edge<=0)return;
    const wet=smooth((y-78)/12),seed=hash(x,y),detail=hash(x*13+7,y*17+5),straw=wet>.5;
-   const px1=px+3+((detail>>>7)%8),py1=py+3+((detail>>>17)%8);
+   const xx=px+3+((detail>>>7)%8),yy=py+3+((detail>>>17)%8);
    g.save();g.globalAlpha*=edge*(cold?.55:1);
-   if(detail%11===0){
-    // Filetes irregulares de solo entre folhas. Não há sobreposição de
-    // transparências nem carimbo repetido nos quatro tiles de um bloco.
+   if(detail%17===0){
     const flip=(detail>>>4)&1?1:-1;
-    g.fillStyle=straw?'rgba(115,108,74,.10)':'rgba(43,78,58,.10)';
-    g.fillRect(px1,py1,3,1);g.fillRect(px1-flip,py1+1,5,1);g.fillRect(px1+flip,py1+2,2,1);
+    R(g,straw?'#7b8264':'#596f50',xx,yy,3,1);R(g,straw?'#8b8b65':'#6b7e58',xx-flip,yy+1,5,1);
+    R(g,straw?'#95916d':'#829065',xx+flip,yy+2,2,1);
    }
-   if(seed%7===0){
-    R(g,straw?'#7d805a':'#687650',px1,py1,4,1);
-    R(g,straw?'#959067':'#7e8360',px1+1,py1-1,2,1);
-    if((seed>>>9)%2===0)R(g,straw?'#727955':'#576a4d',px1+3,py1+2,2,1);
+   if(seed%11===0){
+    // Folhas deitadas: nervura e ponta gastas, sem brotos fluorescentes.
+    R(g,straw?'#948b65':'#89916b',xx,yy,3,1);R(g,straw?'#a49b72':'#9da27b',xx+1,yy-1,2,1);
+    R(g,straw?'#717b5c':'#687b54',xx+2,yy+1,2,1);
+    if((seed>>>9)%2===0){R(g,straw?'#a09872':'#8c9871',xx+4,yy+3,2,1);R(g,'#718061',xx+5,yy+4,1,1);}
    }
-   // Capilaridade na borda da água: poucos filetes escuros indicam chão
-   // molhado. O contorno físico e o desenho de oito vizinhos ficam intactos.
    const water=v=>v===T.WATER||v===T.RIVER||v===T.OASIS;
-   if(straw&&seed%3===0){
-    const north=water(API.tileAt(x,y-1)),south=water(API.tileAt(x,y+1));
-    const west=water(API.tileAt(x-1,y)),east=water(API.tileAt(x+1,y));
-    g.fillStyle='rgba(66,85,65,.29)';
-    if(north||south){const yy=py+(north?3:S-5);g.fillRect(px+3,yy,5,1);g.fillRect(px+4,yy+1,2,1);}
-    if(west||east){const xx=px+(west?3:S-5);g.fillRect(xx,py+6,1,4);g.fillRect(xx+1,py+7,1,2);}
+   if(straw&&seed%4===0){
+    const n=water(API.tileAt(x,y-1)),s=water(API.tileAt(x,y+1)),w=water(API.tileAt(x-1,y)),e=water(API.tileAt(x+1,y));
+    // Musgo segue a margem, nunca cobre o recorte físico da água.
+    if(n||s){const by=py+(n?3:S-5);R(g,'#6f8265',px+4,by,4,1);R(g,'#87916b',px+5,by+1,2,1);}
+    if(w||e){const bx=px+(w?3:S-5);R(g,'#6f8265',bx,py+7,1,3);R(g,'#87916b',bx+1,py+8,1,1);}
    }
    g.restore();
   }
@@ -192,20 +188,22 @@
   });
   API.registerObjectDrawer('open_world_landmark',(o,g)=>{
    const x=Math.round(o.x),y=Math.round(o.y),cold=API.isFrio();
-   R(g,'rgba(24,59,54,.18)',x-8,y+3,16,2);
+   R(g,'rgba(24,59,54,.16)',x-7,y+3,14,2);R(g,'rgba(24,59,54,.09)',x-10,y+4,20,1);
    if(o.landmarkId==='open_spring'){
-    // Pedra de referência gravada: três marcas de água em tons gastos.
-    R(g,'#4f625d',x-7,y-5,14,8);R(g,cold?'#a0bebc':'#74817a',x-5,y-8,10,10);
-    R(g,'#a3b0a0',x-4,y-8,7,2);R(g,'#5b9386',x-3,y-4,6,1);R(g,'#669a8e',x-3,y-1,4,1);
+    // Rocha arredondada por água: bordas em degraus e níveis gravados.
+    R(g,'#4f625d',x-7,y-3,14,6);R(g,cold?'#a0bebc':'#7e8c80',x-6,y-7,12,8);
+    R(g,cold?'#bacdc1':'#a4b09a',x-4,y-9,8,3);R(g,'#65786a',x+4,y-5,2,7);
+    R(g,'#b5bea3',x-4,y-8,6,1);R(g,'#4d756c',x-3,y-4,6,1);R(g,'#80a99a',x-3,y-3,4,1);
+    R(g,'#4d756c',x-3,y-1,5,1);R(g,'#91af9b',x-2,y,2,1);R(g,'#71815e',x-6,y+1,3,1);
    }else if(o.landmarkId==='open_seed_memory'){
-    // Uma caixa baixa de latas, sem nova construção ou área de colisão.
-    R(g,'#57453c',x-9,y-4,18,8);R(g,'#886548',x-8,y-3,16,5);R(g,'#b99161',x-9,y-5,18,2);
-    R(g,'#74817a',x-6,y-10,5,7);R(g,'#a8b5a0',x-6,y-10,5,2);R(g,'#ad6650',x+1,y-8,5,5);
-    R(g,'#eee2b8',x-5,y-6,3,2);R(g,'#d0b98c',x+2,y-8,3,1);
+    R(g,'#57453c',x-9,y-4,18,8);R(g,'#8c6d50',x-8,y-3,16,5);R(g,'#c1a077',x-9,y-5,18,2);
+    R(g,'#6c5642',x-7,y,14,1);R(g,'#b3956c',x-5,y-2,8,1);R(g,'#49574e',x-8,y-3,1,1);R(g,'#49574e',x+7,y-3,1,1);
+    R(g,'#566d64',x-6,y-10,5,7);R(g,'#a8b5a0',x-6,y-10,5,2);R(g,'#8ca28d',x-5,y-8,3,3);
+    R(g,'#ad765c',x+1,y-8,5,5);R(g,'#d0b08a',x+1,y-8,5,1);R(g,'#eee2b8',x-5,y-6,3,2);R(g,'#ead8b1',x+2,y-6,3,2);
    }else{
-    R(g,'#57453c',x-2,y-18,4,22);R(g,'#b99161',x-1,y-17,2,19);
-    R(g,'#eee2b8',x-1,y-15,2,1);R(g,'#eee2b8',x-1,y-11,2,1);R(g,'#eee2b8',x-1,y-7,2,1);
-    R(g,'#5b9386',x-2,y-3,4,2);R(g,'#74817a',x-4,y+3,8,2);
+    R(g,'#574d3f',x-2,y-18,4,22);R(g,'#ab9167',x-1,y-17,2,19);R(g,'#c3ad80',x-1,y-17,1,18);
+    for(let k=0;k<4;k++){R(g,'#eee2b8',x-1,y-15+k*4,2,1);if(k%2===0)R(g,'#5f6552',x+1,y-15+k*4,1,1);}
+    R(g,'#5b9386',x-2,y-3,4,2);R(g,'#60766a',x-4,y+3,8,2);R(g,'#a0b39a',x-3,y+2,6,1);
    }
   });
   window.FarmOpenWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,npcSpawns,routes,drawTerrainDetails,
