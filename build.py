@@ -90,6 +90,8 @@ MODULE_ORDER = [
     "49-expedition-world.js", # novos biomas, trilhas e locais de descoberta
     "50-expedition-story.js", # expedicoes e continuacoes das historias
     "51-biome-art.js",       # materiais e identidade visual dos oito biomas
+    "52-academic-histology.js", # banco universitário com justificativas e fontes
+    "53-academic-progress.js", # domínio acadêmico persistente e independente
     "47-animal-care.js",     # cuidados individuais do curral
     "46-inventory.js",      # mochila acessível, detalhes e atalhos explícitos
     "50-window-glow.js",      # warm halos from house/barn windows at night

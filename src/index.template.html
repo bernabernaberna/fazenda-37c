@@ -813,7 +813,7 @@ body.access-colorblind #tempStatus{display:inline-flex !important;}
 .accessCard .accessGrid button small{display:block;font-weight:600;font-size:10px;opacity:.8;margin-top:2px;}
 .accessHint{font-size:11px;color:#e3c990;margin:2px 0 0;line-height:1.4;}
 /* ===== Seletor de nível escolar (Fundamental/Médio) ===== */
-.eduPick{display:flex;gap:8px;flex:1;}
+.eduPick{display:flex;gap:8px;flex:1;flex-wrap:wrap;}
 .eduPick button{flex:1;background:#2a1d10;color:#ffd98a;border:2px solid #6b4a26;border-radius:8px;padding:7px 8px;font-family:inherit;font-weight:bold;cursor:pointer;font-size:12px;line-height:1.2;text-align:center;}
 .eduPick button small{display:block;font-weight:600;font-size:9px;opacity:.75;margin-top:2px;}
 .eduPick button.eduActive{background:#ffd98a;color:#3a2812;border-color:#ffcf5a;box-shadow:0 0 0 2px rgba(255,207,90,.35);}
@@ -1964,6 +1964,11 @@ body.big-screen::before{ left:0; } body.big-screen::after{ right:0; }
   cursor:pointer !important;
 }
 #histologyContinue.show{display:inline-block !important;}
+#histologyMissionPanel.academic .histologyMissionCard{width:min(760px,94vw) !important;box-sizing:border-box;}
+#histologyMissionPanel.academic #histologyOptions button{font-size:14px !important;line-height:1.45;min-height:44px;}
+#histologyAcademicStatus{font-size:12px;line-height:1.5;color:#ebd6b5;}
+#histologyDismiss{margin:12px 8px 0 0;background:#38251c;color:#ffe8b0;border:1px solid #a78757;border-radius:8px;padding:10px;min-height:40px;font:inherit;cursor:pointer;}
+#histologyFeedback li{margin:8px 0;overflow-wrap:anywhere;}
 
 /* ===== Histology Atlas modal ===== */
 #histologyAtlas{
@@ -2561,6 +2566,7 @@ body.hud-game #legend{display:none !important;}
       <div class="eduPick">
         <button type="button" data-edu="fund"  onclick="setEduLevel('fund')">Fundamental<small>11–14 anos · mais simples</small></button>
         <button type="button" data-edu="medio" onclick="setEduLevel('medio')">Médio<small>15–17 anos · completo</small></button>
+        <button type="button" data-edu="academico" onclick="setEduLevel('academico')">Acadêmico<small>Graduação · histologia</small></button>
       </div>
     </div>
     <div class="cs-nameRow">
@@ -2762,8 +2768,9 @@ body.hud-game #legend{display:none !important;}
       <div class="eduPick">
         <button type="button" data-edu="fund"  onclick="setEduLevel('fund')">Fundamental<small>11–14 · mais simples</small></button>
         <button type="button" data-edu="medio" onclick="setEduLevel('medio')">Médio<small>15–17 · completo</small></button>
+        <button type="button" data-edu="academico" onclick="setEduLevel('academico')">Acadêmico<small>Graduação · histologia</small></button>
       </div>
-      <p class="accessHint">No Fundamental, as perguntas mais avançadas (termos técnicos pesados) ficam de fora do quiz.</p>
+      <p class="accessHint">Fundamental simplifica o banco escolar. Acadêmico traz 24 questões de histologia da pele, seis temas e justificativas por alternativa. Você pode mudar de nível sem perder o progresso.</p>
     </div>
 
     <div class="accessSection"><h3>🤝 Assistência (afeta a jogabilidade)</h3>
@@ -2869,14 +2876,16 @@ body.hud-game #legend{display:none !important;}
   <button onclick="respawnPlayer()">VOLTAR À FAZENDA</button>
 </div></div>
 
-<div id="histologyMissionPanel">
-  <div class="histologyMissionCard">
+<div id="histologyMissionPanel" role="dialog" aria-modal="true" aria-labelledby="histologyMissionTitle">
+  <div class="histologyMissionCard" tabindex="-1">
     <span class="missionBadge">MISSÕES HISTOLÓGICAS</span>
-    <h2>Missão Histológica</h2>
-    <h3>Explique o que aconteceu</h3>
+    <h2 id="histologyMissionTitle">Missão Histológica</h2>
+    <h3 id="histologyMissionSubtitle">Explique o que aconteceu</h3>
+    <p id="histologyAcademicStatus" hidden></p>
     <p id="histologyQuestion"></p>
     <div id="histologyOptions"></div>
-    <div id="histologyFeedback"></div>
+    <div id="histologyFeedback" aria-live="polite"></div>
+    <button id="histologyDismiss" onclick="closeHistologyMission()" hidden>Voltar ao mundo</button>
     <button id="histologyContinue" onclick="closeHistologyMission()">Continuar</button>
   </div>
 </div>
@@ -3637,7 +3646,7 @@ addEventListener('keydown', e=>{
     e.preventDefault();e.stopImmediatePropagation();
     window.FarmWorldMap?.toggle();return;
   }
-  if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ e.preventDefault(); return; }
+  if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ if(e.key==='Escape'&&activeHistologyMission?.academic)closeHistologyMission();if(!['Tab','Enter',' '].includes(e.key))e.preventDefault(); return; }
   // Toggles globais: funcionam mesmo com overlay aberto (fecham/abrem ele próprio)
   if(k==='j'){ e.preventDefault(); toggleJournal(); return; }
   if(k==='m'){ e.preventDefault(); toggleSound(); return; }
@@ -3748,28 +3757,40 @@ applyA11y();
    Médio (15–17): conteúdo completo, todas as dificuldades.
    ============================================================ */
 const EDU_KEY = 'farm37_edulevel';
-let eduLevel = (()=>{ try { const v = localStorage.getItem(EDU_KEY); return (v==='fund'||v==='medio') ? v : 'medio'; } catch(e){ return 'medio'; } })();
-function eduLabel(){ return eduLevel==='fund' ? 'Fundamental' : 'Médio'; }
+let eduLevel = (()=>{ try { const v = localStorage.getItem(EDU_KEY); return ['fund','medio','academico'].includes(v) ? v : 'medio'; } catch(e){ return 'medio'; } })();
+function eduLabel(){ return eduLevel==='academico'?'Acadêmico':eduLevel==='fund' ? 'Fundamental' : 'Médio'; }
 function applyEduLevel(){
   // botões do seletor (tela de personagem + configurações) refletem o estado
   document.querySelectorAll('[data-edu]').forEach(b=>{
     b.classList.toggle('eduActive', b.getAttribute('data-edu')===eduLevel);
+    b.setAttribute('aria-pressed',String(b.getAttribute('data-edu')===eduLevel));
   });
   const badge = document.getElementById('eduLevelBadge');
   if(badge) badge.textContent = 'Nível: ' + eduLabel();
 }
 function setEduLevel(lvl){
-  if(lvl!=='fund' && lvl!=='medio') return;
+  if(!['fund','medio','academico'].includes(lvl)) return false;
+  if(typeof histologyMissionOpen!=='undefined'&&histologyMissionOpen)return false;
   eduLevel = lvl;
   try { localStorage.setItem(EDU_KEY, lvl); } catch(e){}
   applyEduLevel();
+  // Não deixe uma questão escolar pendente atravessar a troca de currículo.
+  if(typeof histologyMissionQueue!=='undefined')histologyMissionQueue.splice(0).forEach(m=>m.queued=false);
+  if(typeof histologyMissions!=='undefined'){
+    renderHistologyHud();renderHistologyAtlas();window.FarmActivityReport?.refresh();
+    if(gameStarted)saveGame(true);
+  }
+  return true;
 }
 window.setEduLevel = setEduLevel;
 // Uma missão é elegível para o nível atual? (Fundamental oculta as avançadas)
 function missionAllowedForLevel(m){
+  if(m?.academic)return eduLevel==='academico';
+  if(eduLevel==='academico')return false;
   if(eduLevel==='fund' && m && m.difficulty==='avancado') return false;
   return true;
 }
+function activeHistologyBank(){return eduLevel==='academico'?window.FarmAcademicProgress.bank():histologyMissions;}
 window.applyEduLevel = applyEduLevel;
 applyEduLevel();
 
@@ -5643,6 +5664,15 @@ window.histoRankInfo = histoRankInfo;
 function renderHistologyHud(){
   const score = document.getElementById('histologyScoreVal');
   const count = document.getElementById('histologyConceptCount');
+  const academic=eduLevel==='academico'?window.FarmAcademicProgress.snapshot():null;
+  if(academic){
+    if(score)score.textContent=`${academic.score} pts acadêmicos`;
+    if(count)count.textContent=`${academic.mastered}/${academic.total} conceitos dominados`;
+    const rt=document.getElementById('histoRankTitle'),ri=document.getElementById('histoRankIcon'),xf=document.getElementById('histoXpFill');
+    if(rt)rt.textContent='Acadêmico · '+(academic.mastered===academic.total?'Currículo concluído':'Histologia da pele');
+    if(ri)ri.textContent='🎓';if(xf)xf.style.width=(academic.mastered/Math.max(1,academic.total)*100).toFixed(1)+'%';
+    return;
+  }
   if(score) score.textContent = `${histologyScore} pts`;
   if(count) count.textContent = `${unlockedConcepts.size} conceito${unlockedConcepts.size===1?'':'s'}`;
   const info = histoRankInfo(histologyScore);
@@ -5724,21 +5754,22 @@ function toggleHistologyAtlas(force){
 function renderHistologyAtlas(){
   const grid = document.getElementById('atlasGrid');
   if(!grid) return;
-  const total = histologyMissions.length;
-  const unlocked = histologyMissions.filter(m=>m.completed).length;
+  const bank=activeHistologyBank();
+  const total = bank.length;
+  const unlocked = bank.filter(m=>m.completed).length;
   // Header
   const pt = document.getElementById('atlasProgressText');
   if(pt) pt.textContent = `${unlocked} / ${total} conceitos`;
   const pf = document.getElementById('atlasProgressFill');
   if(pf) pf.style.width = (unlocked/total * 100).toFixed(1) + '%';
   // Filtered list
-  const visible = histologyMissions.filter(m =>
+  const visible = bank.filter(m =>
     atlasCurrentCat === 'all' || m.category === atlasCurrentCat
   );
   grid.innerHTML = visible.map(m => {
     const isUnlocked = !!m.completed;
     const cat = ATLAS_CATEGORY_LABELS[m.category] || 'GERAL';
-    const diff = m.difficulty === 'avancado' ? '★★★'
+    const diff = m.academic?'Acadêmico':m.difficulty === 'avancado' ? '★★★'
                : m.difficulty === 'intermediario' ? '★★'
                : '★';
     const status = isUnlocked
@@ -5781,6 +5812,7 @@ window.toggleHistologyAtlas = toggleHistologyAtlas;
    O jogo do aluno apenas ENVIA os dados (via window.TeacherMode.submitQuizEvent). */
 
 function resetHistologyMissions(){
+  window.FarmAcademicProgress?.reset();
   histologyPlayTime=0;_lastHistMissionAt=-1e9;practiceCursor=0;
   histologyScore = 0;
   homeostasisTimer = 0;
@@ -5795,6 +5827,8 @@ function resetHistologyMissions(){
   renderHistologyHud();
 }
 function restoreHistologyState(data){
+  window.FarmAcademicProgress?.restore(data?.academicHistology);
+  if(['fund','medio','academico'].includes(data?.eduLevel)){eduLevel=data.eduLevel;try{localStorage.setItem(EDU_KEY,eduLevel);}catch(e){}applyEduLevel();}
   histologyPlayTime=Math.max(0,Number(data?.histologyPlayTime)||0);
   _lastHistMissionAt=Number.isFinite(data?.lastHistMissionAt)?Math.min(histologyPlayTime,data.lastHistMissionAt):-1e9;
   histologyScore = Number(data?.histologyScore)||0;
@@ -5852,12 +5886,14 @@ function checkHistologyMissions(dt=0, shade=false, shelter=false){
     // progressão "fácil → intermediária → difícil".
     const rank = { basico:0, intermediario:1, avancado:2 };
     let chosen = null, chosenKey = Infinity;
-    for(let i=0;i<histologyMissions.length;i++){
-      const mission = histologyMissions[i];
+    const academic=eduLevel==='academico'?window.FarmAcademicProgress.snapshot():null;
+    const bank=academic?(academic.mastered<academic.total?[window.FarmAcademicProgress.next()].filter(Boolean):[]):activeHistologyBank();
+    for(let i=0;i<bank.length;i++){
+      const mission = bank[i];
       if(mission.completed || mission.queued) continue;
       if(!missionAllowedForLevel(mission)) continue;   // modo Fundamental oculta avançadas
       let ok = false;
-      try{ ok = !!mission.trigger(); }catch(err){ ok = false; }
+      try{ ok = mission.academic ? true : !!mission.trigger(); }catch(err){ ok = false; }
       if(!ok) continue;
       const dr = (rank[mission.difficulty] !== undefined) ? rank[mission.difficulty] : 1;
       const key = dr * 1000 + i;   // ordena por dificuldade e, em empate, pela ordem do array
@@ -5872,6 +5908,7 @@ function checkHistologyMissions(dt=0, shade=false, shelter=false){
 }
 function openHistologyMission(mission){
   if(!mission) return;
+  histologyPreviousFocus=document.activeElement;
   activeHistologyMission = mission;
   histologyMissionOpen = true;
   mission.queued = false;
@@ -5884,6 +5921,12 @@ function openHistologyMission(mission){
   const options = document.getElementById('histologyOptions');
   const feedback = document.getElementById('histologyFeedback');
   const cont = document.getElementById('histologyContinue');
+  panel?.classList.toggle('academic',!!mission.academic);
+  const dismiss=document.getElementById('histologyDismiss');if(dismiss)dismiss.hidden=!mission.academic;
+  document.getElementById('histologyMissionTitle').textContent=mission.academic?'Histologia acadêmica':'Missão Histológica';
+  document.getElementById('histologyMissionSubtitle').textContent=mission.academic?'Caderno de Lia · '+mission.topic:'Explique o que aconteceu';
+  const status=document.getElementById('histologyAcademicStatus');
+  if(status){status.hidden=!mission.academic;const a=window.FarmAcademicProgress.snapshot();status.textContent=`${a.mastered}/${a.total} dominadas · ${a.score} pontos acadêmicos · +15 no primeiro acerto de cada questão, sem moedas. ${mission.objective||''}`;}
   if(question) question.textContent = mission.question;
   if(options){
     options.innerHTML = mission.options.map((text,i)=>`<button onclick="answerHistologyMission(${i})"><b>${String.fromCharCode(65+i)})</b> ${text}</button>`).join('');
@@ -5891,10 +5934,22 @@ function openHistologyMission(mission){
   if(feedback){ feedback.classList.remove('show'); feedback.innerHTML = ''; }
   if(cont) cont.classList.remove('show');
   if(panel) panel.classList.add('show');
+  panel?.querySelector('.histologyMissionCard')?.scrollTo(0,0);
+  panel?.querySelector('#histologyOptions button')?.focus({preventScroll:true});
 }
+let histologyPreviousFocus=null;
+// O teclado permanece no diálogo, inclusive com explicações extensas no celular.
+document.getElementById('histologyMissionPanel')?.addEventListener('keydown',event=>{
+  if(event.key!=='Tab'||!histologyMissionOpen)return;
+  const available=[...event.currentTarget.querySelectorAll('button:not(:disabled),a[href],summary')].filter(n=>n.getClientRects().length);
+  if(!available.length)return;const first=available[0],last=available.at(-1);
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
 window.answerHistologyMission = function(index){
   const mission = activeHistologyMission;
   if(!mission || mission.answered || !Number.isInteger(index) || index<0 || index>=mission.options.length) return;
+  if(mission.academic){answerAcademicMission(mission,index);return;}
   const review = mission.completed;
   mission.answered = true;
   mission.completed = true;
@@ -5908,7 +5963,7 @@ window.answerHistologyMission = function(index){
   const hadConcept = unlockedConcepts.has(mission.concept);
   histologyScore = Math.max(0, histologyScore + delta);
   if(correct) unlockedConcepts.add(mission.concept);
-  window.FarmLearningJourney.quizAnswered({id:mission.id,correct,concept:mission.concept});
+  const quizCoins=window.FarmLearningJourney.quizAnswered({id:mission.id,correct,concept:mission.concept});
   window.FarmStoryIntegration?.record('quiz',{id:mission.id,correct,review});
   // Enfileira comemorações — disparam ao FECHAR a missão (após ler a explicação),
   // pra não cobrir o modal do quiz.
@@ -5950,16 +6005,49 @@ window.answerHistologyMission = function(index){
   });
   const feedback = document.getElementById('histologyFeedback');
   if(feedback){
-    feedback.innerHTML = `<b>${correct?'✓ Resposta correta!':'✗ Vamos rever o conceito.'} ${review?'Revisão sem novos pontos.':correct?'+10 pontos e +10 moedas.':'−5 pontos.'}</b><br>${correct ? mission.explanationCorrect : mission.explanationWrong}<br><b>Conceito:</b> ${mission.concept}`;
+    feedback.innerHTML = `<b>${correct?'✓ Resposta correta!':'✗ Vamos rever o conceito.'} ${review?'Revisão sem novos pontos.':correct?'+10 pontos e +'+quizCoins+' moedas.':'−5 pontos.'}</b><br>${correct ? mission.explanationCorrect : mission.explanationWrong}<br><b>Conceito:</b> ${mission.concept}`;
     feedback.classList.add('show');
   }
   document.getElementById('histologyContinue')?.classList.add('show');
   renderHistologyHud();
+  document.getElementById('histologyContinue')?.focus({preventScroll:true});
+}
+function answerAcademicMission(mission,index){
+  const result=window.FarmAcademicProgress.answer(mission.id,index);if(!result)return;
+  mission.answered=true;mission.completed=window.FarmAcademicProgress.get(mission.id).completed;
+  // Uma resposta real também vale para os pedidos de Lia. Pontos e moedas
+  // continuam no currículo próprio, sem conceder a recompensa escolar.
+  window.FarmStoryIntegration?.record('quiz',{id:mission.id,correct:result.correct,review:result.review,academic:true});
+  document.querySelectorAll('#histologyOptions button').forEach((button,i)=>{button.disabled=true;button.classList.toggle('correct',i===mission.correctIndex);button.classList.toggle('wrong',i===index&&!result.correct);});
+  const feedback=document.getElementById('histologyFeedback');
+  if(feedback){
+    feedback.replaceChildren();
+    const add=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;feedback.append(n);return n;};
+    add('b',(result.correct?'✓ Correto. ':'Vamos revisar. ')+(result.delta?'+15 pontos acadêmicos.':result.review?'Conceito já dominado: revisão sem novos pontos.':'Sem perda de pontos. Você poderá tentar novamente.'));
+    add('p',result.correct?mission.explanationCorrect:mission.explanationWrong);
+    add('p','Conceito: '+mission.concept);
+    const list=add('ul','');list.setAttribute('aria-label','Justificativas das alternativas');list.style.paddingLeft='0';list.style.listStyle='none';
+    mission.rationale.forEach((why,i)=>{const li=document.createElement('li');li.textContent=String.fromCharCode(65+i)+') '+why;list.append(li);});
+    const sources=add('p','Fontes para consulta: ');
+    const registry=window.FarmAcademicHistology.sources();
+    mission.sourceIds.forEach((id,i)=>{const s=registry.find(s=>s.id===id);if(!s)return;if(i)sources.append(document.createTextNode(' · '));const a=document.createElement('a');a.textContent=s.title;a.href=s.url;a.target='_blank';a.rel='noopener noreferrer';a.style.color='#b7dbff';sources.append(a);});
+    add('small','O conteúdo e as justificativas funcionam offline. Os links de referência precisam de internet.');feedback.classList.add('show');
+  }
+  const a=window.FarmAcademicProgress.snapshot(),status=document.getElementById('histologyAcademicStatus');
+  if(status)status.textContent=`${a.mastered}/${a.total} dominadas · ${a.score} pontos acadêmicos · ${a.attempted} ${a.attempted===1?'questão respondida':'questões respondidas'}.`;
+  try{window.TeacherMode?.submitQuizEvent({missionId:mission.id,concept:'Acadêmico · '+mission.concept,category:mission.category,difficulty:'avancado',correct:result.correct,score:result.delta});}catch(e){}
+  // O esquema remoto existente usa o enum avançado; o currículo fica explícito
+  // no conceito e no ID, sem exigir migração ou alterar a política de consentimento.
+  try{if(window.synthSfx)result.correct?synthSfx.chimeOk():synthSfx.chimeBad();}catch(e){}
+  renderHistologyHud();window.FarmActivityReport?.refresh();saveGame(true);
+  const dismiss=document.getElementById('histologyDismiss');if(dismiss)dismiss.hidden=true;
+  const cont=document.getElementById('histologyContinue');cont?.classList.add('show');cont?.focus({preventScroll:true});
 }
 window.closeHistologyMission = function(){
   document.getElementById('histologyMissionPanel')?.classList.remove('show');
   histologyMissionOpen = false;
   activeHistologyMission = null;
+  histologyPreviousFocus?.focus?.({preventScroll:true});histologyPreviousFocus=null;
   renderHistologyHud();
   // Clear the queue — we don't immediately chain into another mission.
   // The cooldown in checkHistologyMissions controls when the next one can fire.
@@ -6009,6 +6097,8 @@ function saveGame(auto=false){
       stats: JSON.parse(JSON.stringify(stats)),
       journalUnlocked:[...journalUnlocked],
       histologyScore,
+      eduLevel,
+      academicHistology:window.FarmAcademicProgress.serialize(),
       unlockedConcepts:[...unlockedConcepts],
       histologyCompleted: histologyMissions.filter(m=>m.completed).map(m=>m.id),
       learningJourney: window.FarmLearningJourney.serialize(),
@@ -8562,7 +8652,7 @@ function drawSongbirds(){
 }
 
 function update(dt){
-  if(player.dead || readingPanelOpen()){player.moving=false;player.running=false;updateAudioState();return;}
+  if(player.dead || histologyMissionOpen || readingPanelOpen()){player.moving=false;player.running=false;updateAudioState();return;}
   // O gesto espera enquanto o aluno lê a questão, assim como a ação do jogador.
   if(!histologyMissionOpen){
     if(player.actionTimer > 0){ player.actionTimer = Math.max(0, player.actionTimer - dt); }
@@ -8897,7 +8987,7 @@ function learningContext(){
 }
 function readingPanelOpen(){
   const shown=id=>!!document.getElementById(id)?.classList.contains('show');
-  return window.FarmAnimalCare?.isOpen() || window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || skinOpen || journalOpen || inventoryOpen || shopOpen
+  return histologyMissionOpen || window.FarmAnimalCare?.isOpen() || window.FarmWorldMap?.isOpen() || window.FarmStoryCinematics?.isOpen() || window.FarmStoryIntegration?.isOpen() || window.FarmActivityReport?.isOpen() || skinOpen || journalOpen || inventoryOpen || shopOpen
     || ['summary','accessMenu','achPanel','creditsPanel','tutorialOverlay'].some(shown);
 }
 function resetSeasonTasks(list){
@@ -8965,6 +9055,11 @@ window.openActivityReport=function(){
 let practiceCursor=0;
 function practiceHistology(){
   if(!gameStarted || player.dead || histologyMissionOpen) return;
+  if(eduLevel==='academico'){
+    const mission=window.FarmAcademicProgress.next();if(!mission)return;
+    showAlert('Caderno de Lia: observe a descrição e justifique a estrutura.');
+    openHistologyMission(mission);_lastHistMissionAt=histologyPlayTime;return;
+  }
   const rank={basico:0,intermediario:1,avancado:2};
   const available=histologyMissions.filter(m=>missionAllowedForLevel(m)).sort((a,b)=>rank[a.difficulty]-rank[b.difficulty]);
   const fresh=available.find(m=>!m.completed);
@@ -15023,7 +15118,7 @@ function loop(now){
   const reportPaused=readingPanelOpen();
   if(gameStarted && !isPaused && !cutsceneActive && !reportPaused){
     update(dt);
-    if(typeof updateWeather === 'function') updateWeather(dt);
+    if(!histologyMissionOpen && typeof updateWeather === 'function') updateWeather(dt);
     // O clima roda após update: inclui seu efeito na tendência e verifica os
     // mesmos limites térmicos imediatamente, sem esperar pela próxima frame.
     if(!player.dead && !histologyMissionOpen){
@@ -15166,7 +15261,8 @@ FarmLearningJourney.init({
 });
 FarmLearningJourney.reset(learningContext());
 FarmActivityReport.init({
-  read(){return {name:player.name,season:currentSeason,coins:player.coins,score:histologyScore,tasks:JSON.parse(JSON.stringify(tasks)),journey:FarmLearningJourney.snapshot()};},
+  read(){return {name:player.name,season:currentSeason,coins:player.coins,score:histologyScore,eduLevel,academic:FarmAcademicProgress.snapshot(),tasks:JSON.parse(JSON.stringify(tasks)),journey:FarmLearningJourney.snapshot()};},
+  setLevel:setEduLevel,
   practice:practiceHistology
 });
 window.FarmStoryIntegration?.init();
@@ -15350,7 +15446,7 @@ window.addEventListener('keydown', function(e){
     if(window.FarmActivityReport?.isOpen()){e.preventDefault();e.stopImmediatePropagation();FarmActivityReport.close();return;}
     if(document.getElementById('summary')?.classList.contains('show')){e.preventDefault();e.stopImmediatePropagation();closeSummary();return;}
     if(skinOpen){e.preventDefault();e.stopImmediatePropagation();toggleSkinView();return;}
-    if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if(typeof histologyMissionOpen !== 'undefined' && histologyMissionOpen){ if(activeHistologyMission?.academic)closeHistologyMission();e.preventDefault(); e.stopImmediatePropagation(); return; }
     // Tutorial overlay
     const tut = document.getElementById('tutorialOverlay');
     if(tut && tut.classList.contains('show')){ e.preventDefault(); e.stopImmediatePropagation(); skipTutorial(); return; }

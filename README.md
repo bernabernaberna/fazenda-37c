@@ -57,6 +57,8 @@ Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressi
 
 **Personagens e animais (V6.14):** protagonista e nove moradores com roupas, rostos e poses refinados. Caminhada e corrida têm apoio e recuperação dos pés mais naturais, e a tosquia ganhou um gesto próprio. Vacas, ovelhas e galinhas têm anatomia detalhada e 24 poses de locomoção, mantendo os mesmos cuidados, colisões e saves.
 
+**Histologia acadêmica (V6.15):** nível opcional com 24 questões universitárias, seis temas de pele e anexos, justificativas das quatro alternativas e referências. Domínio e pontuação próprios persistem entre estações; progresso escolar e fazenda permanecem preservados.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

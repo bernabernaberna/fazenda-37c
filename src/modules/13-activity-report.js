@@ -41,11 +41,12 @@
     });
     panel.addEventListener('keydown',event=>{
       if(event.key!=='Tab') return;
-      const buttons=[...panel.querySelectorAll('button:not([disabled])')];
+      const buttons=[...panel.querySelectorAll('button:not([disabled]),select')];
       const first=buttons[0], last=buttons[buttons.length-1];
       if(event.shiftKey && document.activeElement===first){event.preventDefault();last?.focus();}
       else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}
     });
+    panel.addEventListener('change',event=>{if(event.target.matches('[data-ar-level]'))api.setLevel?.(event.target.value);});
   }
   function render(){
     if(!isOpen()) return;
@@ -55,21 +56,28 @@
     const done=actions.filter(t=>t.done).length;
     const answers=Array.isArray(a.answers)?a.answers:[];
     const history=(Array.isArray(j.history)?j.history:[]).slice().reverse();
+    const academic=d.academic||{topics:[],records:[]};
     const contents=`<div class="ar-head"><div><small>FAZENDA 37 °C · SEU MUNDO CONTINUA</small><h2 id="activityReportTitle">Progresso e relatório</h2><p>${esc(d.name||'Jogador')} · Ciclo ${number(a.id)||1} · Estação ${station(d.season)}</p></div><button data-ar="close">Voltar ao mundo</button></div>
+      <label>Nível de estudo <select data-ar-level aria-label="Nível de estudo">${[['fund','Fundamental'],['medio','Médio'],['academico','Acadêmico · histologia']].map(([v,t])=>`<option value="${v}" ${d.eduLevel===v?'selected':''}>${t}</option>`).join('')}</select></label>
+      <h3>Histologia acadêmica · Caderno de Lia</h3><p><b>${number(academic.mastered)}/${number(academic.total)} conceitos dominados</b> · ${number(academic.score)} pontos acadêmicos · questões respondidas: ${number(academic.attempted)} · ${number(academic.firstCorrect)} acertos na primeira tentativa.</p>
+      <p><small>24 questões sobre reconhecimento microscópico, células, tecidos, anexos e reparo. Primeiro acerto de cada questão: +15 pontos acadêmicos, sem moedas. Revisões não repetem pontos. O domínio permanece entre as estações e os níveis.</small></p>
+      <ul class="ar-tasks">${(academic.topics||[]).map(t=>`<li>${esc(t.topic)}: <b>${number(t.mastered)}/${number(t.total)}</b></li>`).join('')}</ul>
       <div class="ar-metrics"><div class="ar-metric"><b>${done}/${actions.length}</b><span>Tarefas deste ciclo</span></div><div class="ar-metric"><b>${correct} / ${wrong}</b><span>Acertos / erros registrados</span></div><div class="ar-metric"><b>${total?Math.round(correct/total*100)+'%':'—'}</b><span>Acerto nas primeiras tentativas por ciclo</span></div><div class="ar-metric"><b>${number(life.coinsEarned)}</b><span>Moedas ganhas com tarefas e quizzes</span></div></div>
       <div class="ar-strip">${j.milestoneReached?'★ Marco alcançado: tarefas no calor e no frio + 3 acertos. Continue explorando e melhorando a fazenda.':'Seu próximo marco: concluir tarefas no calor e no frio e acertar 3 quizzes. Você pode explorar por quanto tempo quiser.'}</div>
       <h3>Agora na fazenda</h3><p>Saldo: <b>${number(d.coins)} moedas</b> · Histologia: <b>${number(d.score)} pontos</b> · Ciclos concluídos: <b>${number(life.seasonsCompleted?.hot)} quentes / ${number(life.seasonsCompleted?.cold)} frios</b>.</p>
       <ul class="ar-tasks">${tasks.map(t=>`<li class="${t.done?'ar-done':''}">${t.done?'✓ ':''}${esc(t.text)} <b>(${number(t.n)}/${number(t.goal)})</b></li>`).join('')}</ul>
-      <p><small>Tarefa concluída: +5 moedas. Acerto em quiz: +10 moedas. Cada objetivo paga uma vez por ciclo; a próxima estação renova as tarefas e as questões. Equipamentos que você já possui continuam disponíveis.</small></p>
+      <p><small>Tarefa concluída: +5 moedas. No banco escolar, acerto em quiz: +10 moedas, uma vez por questão no ciclo. A próxima estação renova esse banco. Equipamentos que você já possui continuam disponíveis.</small></p>
       <h3>Respostas deste ciclo</h3>${answers.length?`<div class="ar-table-wrap"><table><thead><tr><th>Conceito</th><th>Primeira resposta</th></tr></thead><tbody>${answers.map(q=>`<tr><td>${esc(q.concept||q.id)}</td><td>${q.correct===null?'Registro anterior sem resultado':q.correct?'✓ Acerto':'Rever o conceito'}</td></tr>`).join('')}</tbody></table></div>`:'<p>Ainda sem respostas. Use <b>Praticar histologia</b> ou encontre quizzes durante a exploração.</p>'}
       <h3>Temperatura observada neste ciclo</h3><p>Média amostral: <b>${temp(temperature.samples?temperature.sum/temperature.samples:null)}</b> · Mínima: <b>${temp(temperature.min)}</b> · Máxima: <b>${temp(temperature.max)}</b>.</p>
       <h3>Histórico de estações</h3>${history.length?`<div class="ar-table-wrap"><table><thead><tr><th>Ciclo</th><th>Estação</th><th>Tarefas</th><th>Acertos / erros</th><th>Moedas</th></tr></thead><tbody>${history.map(r=>`<tr><td>${number(r.cycleId)}</td><td>${station(r.season)}</td><td>${r.completed?'Concluídas':'Parciais'}</td><td>${number(r.quizCorrect)} / ${number(r.quizWrong)}</td><td>${number(r.coinsEarned)}</td></tr>`).join('')}</tbody></table></div>`:'<p>O primeiro registro aparece ao concluir as tarefas ou virar a estação.</p>'}
       <div class="ar-actions"><button data-ar="practice">Praticar histologia</button><button data-ar="json" class="ar-secondary">Exportar JSON</button><button data-ar="csv" class="ar-secondary">Exportar CSV</button></div>
       <p class="ar-foot">Este relatório usa os registros locais desta partida. Acertos de jogos antigos sem resultado salvo não são estimados. O histórico guarda até 60 estações e os totais continuam acumulando. Exportar baixa um arquivo neste aparelho; use um apelido para apresentar ou compartilhar. Os registros descrevem o jogo e precisam de interpretação pedagógica.</p>`;
     // Mantém o foco caso um evento de progresso atualize o relatório aberto.
+    const levelFocused=document.activeElement?.hasAttribute('data-ar-level');
     const focused=document.activeElement?.dataset?.ar;
     panel.querySelector('.ar-card').innerHTML=contents;
     if(focused) panel.querySelector('[data-ar="'+focused+'"]')?.focus();
+    if(levelFocused)panel.querySelector('[data-ar-level]')?.focus();
   }
   function open(){ make(); previousFocus=document.activeElement; panel.classList.add('show'); render(); panel.querySelector('button')?.focus(); }
   function close(){ if(!panel) return; panel.classList.remove('show'); previousFocus?.focus?.({preventScroll:true}); }
@@ -88,6 +96,7 @@
       for(const t of r.tasks||[]) rows.push([r.cycleId,station(r.season),'tarefa',t.text||t.id,t.done?'concluida':number(t.n)+'/'+number(t.goal),'']);
       for(const q of r.answers||[]) rows.push([r.cycleId,station(r.season),'quiz',q.concept||q.id,q.correct===null?'legado sem resultado':q.correct?'acerto':'erro','']);
     }
+    for(const q of d.academic?.records||[])rows.push(['permanente','todas','histologia_academica',q.id,q.mastered?'dominado':'rever',0]);
     return '\uFEFF'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
   }
   function download(type){
