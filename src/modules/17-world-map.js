@@ -6,13 +6,13 @@
  let adapter={},ready=false,opened=false,previousFocus=null,timer=0,selected=null;
  let mini,miniCanvas,miniRegion,miniTarget,overlay,fullCanvas,currentLabel,selectionLabel,clearButton,list;
  let base=null,baseMap=null,baseObjects=null,baseSeason='',places=[],lastInfo=null,lastMiniView=null;
- const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul'};
+ const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul',highlands:'Serra dos Ecos',meadow:'Campos do Vento',coast:'Costa das Conchas'};
  const ROOM_NAMES={house:'Casa',barn:'Celeiro',greenhouse:'Estufa'};
  const COLORS={ink:'#213f36',paper:'#f4ecd7',gold:'#ffdc67',teal:'#60d0bd',pin:'#bb537b',water:'#3c8790'};
  const element=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
  const button=(label,fn,cls='fm-button')=>{const n=element('button',cls,label);n.type='button';n.addEventListener('click',fn);return n;};
  const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
- const regionAt=(y,x=0)=>window.FarmOpenWorld?.regionAt(x/16,y/16)||(y<42*16?'mountain':y>=90*16?'desert':'farm');
+ const regionAt=(y,x=0)=>window.FarmExpeditionWorld?.regionAt(x/16,y/16)||window.FarmOpenWorld?.regionAt(x/16,y/16)||(y<42*16?'mountain':y>=90*16?'desert':'farm');
  function read(){
   if(typeof scenes==='undefined'||!scenes.main||typeof player==='undefined')return null;
   const main=scenes.main,scene=typeof currentScene==='string'?currentScene:'main',inside=scene!=='main';
@@ -29,7 +29,8 @@
   return !!read()?.active&&!(typeof cutsceneActive!=='undefined'&&cutsceneActive)&&!(typeof tutorialActive!=='undefined'&&tutorialActive)&&!(typeof histologyMissionOpen!=='undefined'&&histologyMissionOpen)&&!window.FarmStoryUI?.isOpen?.();
  }
  function localName(info){return info.inside?'Dentro de '+(ROOM_NAMES[info.scene]||'um abrigo')+' · entrada no mapa':WORLD_NAMES[info.region]||'Vale';}
- function terrainColor(tile,cold){
+ function terrainColor(tile,cold,x,y){
+  if(!cold&&x>=96&&[T.GRASS,T.GRASS2,T.FLOWER].includes(tile)){const r=window.FarmExpeditionWorld?.regionAt(x,y);if(r==='meadow')return '#b0a166';if(r==='coast')return '#8d9b77';}
   switch(tile){
    case T.WATER:case T.RIVER:case T.OASIS:return COLORS.water;
    case T.PATH:case T.WOOD:return '#c7ac75';
@@ -54,7 +55,7 @@
   for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y,o.x),number:places.length+1});}
   const fruit=objects.find(o=>o.type==='fx_fruittree'&&o.x>45*TS);
   if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y,fruit.x),number:places.length+1});
-  for(const p of window.FarmOpenWorld?.landmarks||[])places.push({id:'place:'+p.id,name:p.title,kind:'place',x:p.x,y:p.y,description:p.description,region:p.region,number:places.length+1});
+  for(const p of [...(window.FarmOpenWorld?.landmarks||[]),...(window.FarmExpeditionWorld?.landmarks||[])])places.push({id:'place:'+p.id,name:p.title,kind:'place',x:p.x,y:p.y,description:p.description,region:p.region,number:places.length+1});
   const farm=window.FarmLife?.snapshot?.();
   for(const station of farm?.stations||[]){
    places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y,station.x),number:places.length+1});
@@ -69,7 +70,7 @@
   if(fullCanvas&&(fullCanvas.width!==mapWidth||fullCanvas.height!==mapHeight)){fullCanvas.width=mapWidth;fullCanvas.height=mapHeight;}
   base=document.createElement('canvas');base.width=info.main.MW*8;base.height=info.main.MH*8;const g=base.getContext('2d');
   for(let y=0;y<info.main.MH;y++)for(let x=0;x<info.main.MW;x++){
-   g.fillStyle=terrainColor(info.main.map[y]?.[x],info.season==='cold');g.fillRect(x*8,y*8,8,8);
+   g.fillStyle=terrainColor(info.main.map[y]?.[x],info.season==='cold',x,y);g.fillRect(x*8,y*8,8,8);
    if(((x*17+y*13)%11)===0){g.fillStyle='rgba(27,62,47,.07)';g.fillRect(x*8+2,y*8+2,3,2);}
   }
   const scale=base.width/info.width;
@@ -106,7 +107,7 @@
   if(full){
    g.textAlign='center';g.font='bold 19px Georgia';g.fillStyle='rgba(29,61,53,.75)';
    for(const [name,y]of [['MONTANHA',5*TS],['FAZENDA',44*TS],['OÁSIS',96*TS]])g.fillText(name,30*TS/info.width*w,y/info.height*h);
-   g.font='bold 15px Georgia';for(const region of Object.values(window.FarmOpenWorld?.regions||{}))g.fillText(region.mapLabel,region.mapX*TS/info.width*w,region.mapY*TS/info.height*h);
+   g.font='bold 15px Georgia';for(const region of Object.values({...window.FarmOpenWorld?.regions,...window.FarmExpeditionWorld?.regions}))g.fillText(region.mapLabel,region.mapX*TS/info.width*w,region.mapY*TS/info.height*h);
   }
   const chosen=target(info),pos=pointOnMap(info,view,w,h);
   if(chosen){const p=pointOnMap(chosen,view,w,h);g.strokeStyle='#f9dc85';g.lineWidth=full?3:2;g.setLineDash([8,7]);g.beginPath();g.moveTo(pos.x,pos.y);g.lineTo(p.x,p.y);g.stroke();g.setLineDash([]);}
@@ -153,7 +154,7 @@
   const legendHeight=overlay?.querySelector('.fm-map-key')?.getBoundingClientRect().height||18;
   const height=mobile?Math.min(390,Math.max(220,window.innerHeight-280)):Math.min(600,Math.max(150,available-legendHeight-18));
   const info=lastInfo||read(),ratio=info?info.width/info.height:60/124;
-  fullCanvas.style.width=Math.min(mobile?width-72:300,height*ratio)+'px';fullCanvas.style.height='auto';
+  fullCanvas.style.width=Math.min(mobile?width-72:420,height*ratio)+'px';fullCanvas.style.height='auto';
  }
  function resize(){if(opened)refresh();else layoutMap();}
  function focusables(){return Array.from(overlay.querySelectorAll('button,[tabindex="0"]')).filter(n=>!n.disabled&&!n.hidden&&n.getClientRects().length);}
@@ -170,7 +171,7 @@
   #worldMapMini[hidden],#worldMapOverlay[hidden],#worldMapClear[hidden]{display:none!important}#worldMapMini:focus-visible{outline:3px solid #ffe27b;outline-offset:3px}#worldMapMini:hover{border-color:#ffdf7c;background:#264a3bea}
   #worldMapMini .fm-mini-heading{display:flex;align-items:center;justify-content:space-between;font:bold 12px Georgia,serif;margin-bottom:7px;color:#ffe3a1}#worldMapMini kbd{font:11px monospace;border:1px solid #b4b789;border-radius:3px;padding:1px 5px;color:#ede4c7}#worldMapMini canvas{display:block;width:100%;height:auto;image-rendering:pixelated;border:1px solid #75977a;box-sizing:border-box;border-radius:3px}#worldMapMini .fm-mini-region{font:bold 10px Georgia,serif;margin-top:6px;display:block}#worldMapMini .fm-mini-target{display:block;font:9px/1.3 Georgia,serif;color:#d4ddbe;margin-top:3px;max-height:2.6em;overflow:hidden;overflow-wrap:anywhere}
   #worldMapOverlay{position:fixed;inset:0;z-index:1720;background:#071e21bf;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}#worldMapOverlay *{box-sizing:border-box}.fm-card{width:min(930px,100%);max-height:calc(100dvh - 36px);border:3px solid #685333;box-shadow:0 0 0 2px #c4a96f,0 20px 70px #031815b3;border-radius:6px;background:#f4ecd7;padding:22px;color:#213f36;display:flex;flex-direction:column;overflow:hidden;font-family:Georgia,serif}.fm-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.fm-header h2{font:700 29px/1.15 Georgia,serif;margin:4px 0}.fm-eyebrow{font:10px/1.3 monospace;letter-spacing:1.5px;text-transform:uppercase;color:#827547}.fm-current{margin:4px 0 0;font:13px/1.5 Georgia,serif;color:#53644e}.fm-button{border:1px solid #a69a70;background:#e7dfc5;color:#264437;padding:9px 13px;min-height:40px;font:13px Georgia,serif;border-radius:4px;cursor:pointer}.fm-button:hover{background:#d4dabe}.fm-button:focus-visible,.fm-destination:focus-visible{outline:3px solid #426b4a;outline-offset:2px}.fm-close{flex:0 0 auto}
-  .fm-body{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:22px;min-height:0;overflow:auto;padding:3px}.fm-map-column{display:flex;flex-direction:column;align-items:center;gap:10px}.fm-full-canvas{display:block;max-width:100%;image-rendering:pixelated;cursor:crosshair;border-radius:3px;touch-action:manipulation}.fm-map-key{display:flex;justify-content:center;flex-wrap:wrap;gap:7px 12px;font:11px/1.5 Georgia,serif;color:#4c644d}.fm-key-player{color:#8c6c1c;font-weight:bold}.fm-key-npc{color:#316e5a;font-weight:bold}.fm-key-pin{color:#a53b69;font-weight:bold}.fm-list h3{font:700 16px Georgia,serif;margin:8px 0 10px}.fm-list h3:not(:first-child){margin-top:20px}.fm-destinations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fm-destination{display:flex;align-items:center;gap:9px;text-align:left;min-width:0;min-height:48px;border:1px solid #c0bda1;background:#e8e3cf;color:#253f34;padding:8px;border-radius:4px;cursor:pointer}.fm-destination strong{display:block;font:700 13px/1.25 Georgia,serif;overflow-wrap:anywhere}.fm-destination small{display:block;color:#61735a;font:11px/1.35 Georgia,serif;margin-top:3px}.fm-destination:hover{background:#d8dfc2}.fm-destination[aria-pressed=true]{border:2px solid #a1456c;padding:7px;background:#f0deca}.fm-marker{display:flex;align-items:center;justify-content:center;flex:0 0 22px;width:22px;height:22px;border:1px solid #8f7c52;background:#f6e7b8;color:#3d5137;border-radius:50%;font:700 11px Georgia,serif}.fm-marker.fm-npc{background:#bbd9c2;color:#287c67;border-color:#709f82;font-size:15px}
+  .fm-body{display:grid;grid-template-columns:minmax(220px,420px) minmax(0,1fr);gap:22px;min-height:0;overflow:auto;padding:3px}.fm-map-column{display:flex;flex-direction:column;align-items:center;gap:10px}.fm-full-canvas{display:block;max-width:100%;image-rendering:pixelated;cursor:crosshair;border-radius:3px;touch-action:manipulation}.fm-map-key{display:flex;justify-content:center;flex-wrap:wrap;gap:7px 12px;font:11px/1.5 Georgia,serif;color:#4c644d}.fm-key-player{color:#8c6c1c;font-weight:bold}.fm-key-npc{color:#316e5a;font-weight:bold}.fm-key-pin{color:#a53b69;font-weight:bold}.fm-list h3{font:700 16px Georgia,serif;margin:8px 0 10px}.fm-list h3:not(:first-child){margin-top:20px}.fm-destinations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fm-destination{display:flex;align-items:center;gap:9px;text-align:left;min-width:0;min-height:48px;border:1px solid #c0bda1;background:#e8e3cf;color:#253f34;padding:8px;border-radius:4px;cursor:pointer}.fm-destination strong{display:block;font:700 13px/1.25 Georgia,serif;overflow-wrap:anywhere}.fm-destination small{display:block;color:#61735a;font:11px/1.35 Georgia,serif;margin-top:3px}.fm-destination:hover{background:#d8dfc2}.fm-destination[aria-pressed=true]{border:2px solid #a1456c;padding:7px;background:#f0deca}.fm-marker{display:flex;align-items:center;justify-content:center;flex:0 0 22px;width:22px;height:22px;border:1px solid #8f7c52;background:#f6e7b8;color:#3d5137;border-radius:50%;font:700 11px Georgia,serif}.fm-marker.fm-npc{background:#bbd9c2;color:#287c67;border-color:#709f82;font-size:15px}
   .fm-footer{border-top:1px solid #c6c7aa;margin-top:15px;padding-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}.fm-selection{font:13px/1.4 Georgia,serif;margin:0;min-height:18px}.fm-map-note{font:10px/1.5 Georgia,serif;margin:0;color:#6c775c}.fm-footer-controls{flex:0 0 auto}.fm-card .fm-button[disabled]{opacity:.5;cursor:default}
   body.access-contrast .fm-card{background:#fff;color:#162d21;border-color:#142f23}body.access-contrast .fm-destination{background:#fff;color:#152e22;border-color:#476046}body.access-contrast .fm-current,body.access-contrast .fm-selection{color:#162d21}
   @media(min-width:681px){.fm-map-column{position:sticky;top:0;align-self:start}}
@@ -184,7 +185,7 @@
   overlay=element('div');overlay.id='worldMapOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','worldMapTitle');
   const card=element('section','fm-card'),header=element('header','fm-header'),labels=element('div');labels.append(element('span','fm-eyebrow','Encontre seu caminho'));
   const titleFull=element('h2','','Mapa do Vale');titleFull.id='worldMapTitle';currentLabel=element('p','fm-current');labels.append(titleFull,currentLabel);header.append(labels,button('Fechar · Esc',close,'fm-button fm-close'));card.append(header);
-  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro, oásis ao sul e mata e veredas a leste. Escolha um local na lista para marcar o destino.');
+  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro, oásis ao sul e mata, veredas, serra, campos e costa a leste. Escolha um local na lista para marcar o destino.');
   const key=element('div','fm-map-key');key.append(element('span','fm-key-player','▲ Você'),element('span','fm-key-npc','● Moradores'),element('span','fm-key-pin','⚑ Destino'));mapColumn.append(fullCanvas,key);list=element('section','fm-list');body.append(mapColumn,list);card.append(body);
   const footer=element('footer','fm-footer'),description=element('div');selectionLabel=element('p','fm-selection');selectionLabel.setAttribute('aria-live','polite');description.append(selectionLabel,element('p','fm-map-note','Marcar um lugar ajuda a se orientar. O percurso é feito caminhando.'));
   const controls=element('div','fm-footer-controls');clearButton=button('Limpar marca',()=>{selected=null;refresh();});clearButton.id='worldMapClear';clearButton.hidden=true;controls.append(clearButton);footer.append(description,controls);card.append(footer);overlay.append(card);document.body.append(mini,overlay);

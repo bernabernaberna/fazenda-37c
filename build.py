@@ -87,6 +87,8 @@ MODULE_ORDER = [
     "44-frontier-story.js",  # novos moradores, missões e cuidados renováveis
     "45-item-art.js",       # ícones originais para ferramentas, provisões e produtos
     "48-village-stories.js", # vínculos pessoais, etapas e novas conversas
+    "49-expedition-world.js", # novos biomas, trilhas e locais de descoberta
+    "50-expedition-story.js", # expedicoes e continuacoes das historias
     "47-animal-care.js",     # cuidados individuais do curral
     "46-inventory.js",      # mochila acessível, detalhes e atalhos explícitos
     "50-window-glow.js",      # warm halos from house/barn windows at night

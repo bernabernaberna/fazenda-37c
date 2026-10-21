@@ -4248,7 +4248,7 @@ body.hud-game #legend{display:none !important;}
   function ctx(value){
     const s=plain(value)?value:(typeof adapter.readState==='function'?adapter.readState():{});
     return {season:season(s?.season),timeOfDay:Number.isFinite(s?.timeOfDay)?Math.max(0,Math.min(24,s.timeOfDay)):12,
-      region:['farm','mountain','desert'].includes(s?.region)?s.region:'farm',scene:text(s?.scene,24)||'main',
+      region:['farm','mountain','desert','forest','wetland','highlands','meadow','coast'].includes(s?.region)?s.region:'farm',scene:text(s?.scene,24)||'main',
       playerName:text(s?.playerName,40)||'viajante',activities:plain(s?.activities)?s.activities:{},
       energy:Number.isFinite(s?.energy)?Math.max(0,Math.min(100,s.energy)):100,resting:s?.resting===true};
   }
@@ -4282,7 +4282,7 @@ body.hud-game #legend{display:none !important;}
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});emit('onDialogue',null);return null;}
+  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});window.FarmExpeditionStory?.close?.({silent:true});emit('onDialogue',null);return null;}
   // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
   // save da nova investigação permanecem separados dos seis capítulos legados.
   function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
@@ -4351,11 +4351,11 @@ body.hud-game #legend{display:none !important;}
         status:q.status==='offered'?'available':q.status,completed:q.status==='completed',accepted:q.acceptedAt!==null,objectives:list,
         progress:list.reduce((n,o)=>n+o.n,0),goal:list.reduce((n,o)=>n+o.goal,0),coins:d.coins};
     });
-    const frontier=window.FarmFrontierStory?.diaryView?.(),village=window.FarmVillageStories?.diaryView?.();
-    return {version:VERSION,chapter:chapterView,quests:quests.concat(frontier?.quests||[],village?.quests||[]),friendships:{...clone(state.friendships),...frontier?.friendships},memories:clone(state.memories).concat(frontier?.memories||[],village?.memories||[]),
+    const frontier=window.FarmFrontierStory?.diaryView?.(),village=window.FarmVillageStories?.diaryView?.(),expedition=window.FarmExpeditionStory?.diaryView?.();
+    return {version:VERSION,chapter:chapterView,quests:quests.concat(frontier?.quests||[],village?.quests||[],expedition?.quests||[]),friendships:{...clone(state.friendships),...frontier?.friendships},memories:clone(state.memories).concat(frontier?.memories||[],village?.memories||[],expedition?.memories||[]),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letterView()),
       coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
-      discoveries:discoveryViews().concat(frontier?.discoveries||[],village?.discoveries||[]),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0)+(village?.discoveryTotal||0),
+      discoveries:discoveryViews().concat(frontier?.discoveries||[],village?.discoveries||[],expedition?.discoveries||[]),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0)+(village?.discoveryTotal||0)+(expedition?.discoveryTotal||0),
       relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
         discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length})).concat(frontier?.relationships||[])};
   }
@@ -4431,6 +4431,8 @@ body.hud-game #legend{display:none !important;}
     if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
     const frontierResponse=window.FarmFrontierStory?.conversationResponse?.(npcId);
     if(frontierResponse)message+='\n\n'+frontierResponse;
+    const expeditionResponse=window.FarmExpeditionStory?.conversationResponse?.(npcId);
+    if(expeditionResponse)message+='\n\n'+expeditionResponse;
     const villageResponse=window.FarmVillageStories?.conversationResponse?.(npcId);
     if(villageResponse)message+='\n\n'+villageResponse;
     const activity=text(s.activities[npcId],180);
@@ -4455,6 +4457,7 @@ body.hud-game #legend{display:none !important;}
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
     else message+='\n\nSeu pedido desta estação já foi entregue. Na próxima estação combinamos outro.';
+    if(window.FarmExpeditionStory?.hasCharacter(npcId))choices.push({id:'expedition:menu',label:window.FarmExpeditionStory.menuLabel(npcId)});
     if(window.FarmVillageStories?.hasCharacter(npcId))choices.push({id:'village:menu',label:window.FarmVillageStories.menuLabel(npcId)});
     if(window.FarmValleySaga)choices.push({id:'saga:menu',label:window.FarmValleySaga.menuLabel(npcId)});
     const pending=lore[npcId].find(scene=>state.discoveries.includes(scene.id)&&state.decisions[scene.id]===undefined);
@@ -4466,20 +4469,21 @@ body.hud-game #legend{display:none !important;}
     return show(npcId,message,'menu',choices);
   }
   function interact(npcId){
-    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
+    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});window.FarmExpeditionStory?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
     if(npcId==='letter'){const savedLetter=letterView();return show('rosa',savedLetter.text,'letter',[{id:'close',label:'Guardar a carta'}],savedLetter.title);}
     if(!byId[npcId])return null;
-    window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});
+    window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});window.FarmExpeditionStory?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
     state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
-    window.FarmVillageStories?.record('talk',{npcId});
+    window.FarmVillageStories?.record('talk',{npcId});window.FarmExpeditionStory?.record('talk',{npcId});
     record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});window.FarmFrontierStory?.record?.('talk',{npcId});
     return menu(npcId,first?(window.FarmValleySaga?.greeting?.(npcId,{first:true})||chats[npcId].first):undefined);
   }
   function choose(choiceId){
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
+    if(choiceId.startsWith('expedition:')){if(choiceId==='expedition:menu'&&!window.FarmExpeditionStory?.isOpen())return window.FarmExpeditionStory?.interact(npcId)||currentDialogue();return window.FarmExpeditionStory?.choose(choiceId)||currentDialogue();}
     if(choiceId.startsWith('village:')){if(choiceId==='village:menu'&&!window.FarmVillageStories?.isOpen())return window.FarmVillageStories?.interact(npcId)||currentDialogue();return window.FarmVillageStories?.choose(choiceId)||currentDialogue();}
     if(choiceId.startsWith('frontier:'))return window.FarmFrontierStory?.choose?.(choiceId)||currentDialogue();
     if(choiceId==='back')return menu(npcId);
@@ -4925,7 +4929,7 @@ body.hud-game #legend{display:none !important;}
 (function(){
   'use strict';
   let active=false, restoring=false, pendingSave=false, dialogueSoundNpc='';
-  let cinematicReady=false,lastStory=null,lastSaga=null,lastFrontier=null,lastVillage=null;
+  let cinematicReady=false,lastStory=null,lastSaga=null,lastFrontier=null,lastVillage=null,lastExpedition=null;
   const cinematicQueue=[];
   const chapterScenes={1:'horta',2:'rio',3:'abrigo',4:'oasis'};
   const actors=[];
@@ -5016,10 +5020,10 @@ body.hud-game #legend{display:none !important;}
   function record(type,payload={}){
     if(!active||!gameStarted||player.dead)return false;
     // Eventos novos (estudo, oficina, produção) também chegam à saga quando o legado não os usa.
-    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);window.FarmFrontierStory?.record?.(type,payload);window.FarmVillageStories?.record?.(type,payload);
+    FarmStoryWorld.record(type,payload);window.FarmValleySaga?.record?.(type,payload);window.FarmFrontierStory?.record?.(type,payload);window.FarmVillageStories?.record?.(type,payload);window.FarmExpeditionStory?.record?.(type,payload);
     // O cuidado coletivo só é emitido depois de alimentar de fato o curral.
     // Conta um cuidado, sem inferir quantos animais estavam com fome.
-    if(type==='care'&&payload.kind==='curral')window.FarmVillageStories?.record('care',{kind:'animal',action:'feed'});
+    if(type==='care'&&payload.kind==='curral'){window.FarmVillageStories?.record('care',{kind:'animal',action:'feed'});window.FarmExpeditionStory?.record('care',{kind:'animal',action:'feed'});}
     return true;
   }
   function reward(event){
@@ -5063,15 +5067,22 @@ body.hud-game #legend{display:none !important;}
       if(completed.has(scene.villageMission)&&!lastVillage.has(scene.villageMission))queueScene(scene.id);
     lastVillage=completed;
   }
+  function observeExpedition(snapshot){
+    const completed=new Set(snapshot?.completedQuestIds||[]);
+    if(lastExpedition&&gameStarted&&!restoring)for(const scene of window.FarmExpeditionStory?.cinematicScenes?.()||[])
+      if(completed.has(scene.expeditionMission)&&!lastExpedition.has(scene.expeditionMission))queueScene(scene.id);
+    lastExpedition=completed;
+  }
   function initializeCinematics(){
     if(cinematicReady||!window.FarmStoryCinematics)return;cinematicReady=true;
-    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),frontier:window.FarmFrontierStory?.snapshot?.(),village:window.FarmVillageStories?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
+    FarmStoryCinematics.init({readState:()=>({...read(),story:FarmStoryWorld.snapshot(),saga:window.FarmValleySaga?.snapshot?.(),frontier:window.FarmFrontierStory?.snapshot?.(),village:window.FarmVillageStories?.snapshot?.(),expedition:window.FarmExpeditionStory?.snapshot?.(),reducedMotion:!!A11Y.reduceMotion}),
       beforeOpen(){window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();beforeOpen();},
       onClose(){document.getElementById('game')?.focus({preventScroll:true});refreshNarrative();},
       onChange(){refreshNarrative();scheduleSave();},
       drawWorld(g,view){return window.drawCinematicWorld?.(g,view)===true;}
     });
     if(window.FarmValleySaga?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmValleySaga.cinematicScenes());
+    if(window.FarmExpeditionStory?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmExpeditionStory.cinematicScenes());
     if(window.FarmVillageStories?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmVillageStories.cinematicScenes());
     if(window.FarmFrontierStory?.cinematicScenes)FarmStoryCinematics.registerScenes?.(FarmFrontierStory.cinematicScenes());
   }
@@ -5150,6 +5161,12 @@ body.hud-game #legend{display:none !important;}
       onChange(snapshot){observeVillage(snapshot);refreshNarrative();scheduleSave();},
       onClose(value){if(value?.returnToMenu)FarmStoryWorld.returnToMenu(value.npcId);else FarmStoryWorld.close();}
     });
+    window.FarmExpeditionStory?.init({readState:()=>({...frontierRead(),paused:isPaused||skinOpen||histologyMissionOpen||cutsceneActive||(!window.FarmExpeditionStory?.isOpen()&&isOpen())}),reward,
+      onDialogue(d){FarmStoryWorld.presentSaga(d);},
+      onChange(snapshot){observeExpedition(snapshot);refreshNarrative();scheduleSave();},
+      onClose(value){if(value?.returnToMenu)FarmStoryWorld.returnToMenu(value.npcId);else FarmStoryWorld.close();}
+    });
+    observeExpedition(window.FarmExpeditionStory?.snapshot());
     observeVillage(window.FarmVillageStories?.snapshot());
     observeFrontier(window.FarmFrontierStory?.snapshot?.());
     for(const def of FarmStoryWorld.characters)place(def);
@@ -5159,6 +5176,7 @@ body.hud-game #legend{display:none !important;}
     for(const bridge of objects.filter(o=>o.type==='bridge'))bridge.interactionHint='observar as marcas da ponte';
     FarmBiomes.registerInteraction('bridge',()=>{if(!gameStarted||player.dead)return false;return window.FarmVillageStories?.inspectBridge?.()!==false;});
     FarmBiomes.registerInteraction('story_npc',o=>{if(!gameStarted||player.dead||!reachableNpc(o))return false;FarmStoryWorld.interact(o.npcId);return true;});
+    FarmBiomes.registerInteraction('expedition_landmark',o=>{if(!gameStarted||player.dead)return false;return !!window.FarmExpeditionStory?.inspect?.(o.landmarkId);});
     FarmBiomes.registerInteraction('open_world_landmark',o=>{if(!gameStarted||player.dead)return false;return window.FarmFrontierStory?.inspect?.(o.landmarkId)!==false;});
     document.getElementById('game').tabIndex=-1;
     FarmStoryUI.refresh();
@@ -5225,7 +5243,7 @@ body.hud-game #legend{display:none !important;}
   }
   function update(dt){
     if(!active||!gameStarted||player.dead||document.hidden||!Number.isFinite(dt)||dt<=0||isPaused||skinOpen||histologyMissionOpen||cutsceneActive||isOpen())return;
-    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);window.FarmFrontierStory?.update?.(dt,frontierRead());window.FarmVillageStories?.update?.(dt,read());
+    FarmStoryWorld.update(dt,read());window.FarmValleySaga?.update?.(dt,read());window.FarmLife?.update?.(dt);window.FarmFrontierStory?.update?.(dt,frontierRead());window.FarmVillageStories?.update?.(dt,read());window.FarmExpeditionStory?.update?.(dt,frontierRead());
     const sagaWorld=window.FarmValleySaga?.worldState?.(),world={...FarmStoryWorld.worldState(),sagaGathering:!!sagaWorld?.festival&&timeOfDay>=16&&timeOfDay<20};
     // Rotinas também avançam ao entrar em casa; não somem nem teleportam na volta.
     for(let i=0;i<actors.length;i++){
@@ -5268,8 +5286,8 @@ body.hud-game #legend{display:none !important;}
     if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.y))return false;
     community={x:point.x,y:point.y};navigation=null;for(const o of actors)o._routineKey='';return true;
   }
-  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;lastVillage=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
-  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;lastVillage=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());observeVillage(window.FarmVillageStories?.snapshot());observeFrontier(window.FarmFrontierStory?.snapshot?.());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
+  function reset(){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;lastVillage=null;lastExpedition=null;window.FarmValleyPanels?.reset?.();FarmStoryUI.close();FarmStoryWorld.reset();for(const o of actors){Object.assign(o,homes[o.npcId],{dir:0,anim:0,moving:false,gaitBlend:0,gaitRunBlend:0,_npcTime:0,activityPhase:0,_routineKey:'',_route:[],npcActivity:'talk'});}refreshNarrative();}
+  function restore(data){if(!active)return;cinematicQueue.length=0;lastStory=null;lastSaga=null;lastFrontier=null;lastVillage=null;lastExpedition=null;restoring=true;try{window.FarmValleyPanels?.close?.(false);FarmStoryUI.close();FarmStoryWorld.restore(data,read());observeExpedition(window.FarmExpeditionStory?.snapshot());observeVillage(window.FarmVillageStories?.snapshot());observeFrontier(window.FarmFrontierStory?.snapshot?.());if(window.FarmValleySaga)observeSaga(FarmValleySaga.snapshot());}finally{restoring=false;}for(const o of actors){Object.assign(o,homes[o.npcId],{moving:false,anim:0,gaitBlend:0,gaitRunBlend:0,_routineKey:'',_route:[],activityPhase:0});}refreshNarrative();}
   function isOpen(){return !!window.FarmStoryUI?.isOpen()||!!window.FarmStoryCinematics?.isOpen?.()||!!window.FarmValleyPanels?.isOpen?.();}
   window.FarmStoryIntegration={init,update,visualUpdate,notifyNewGame,initializeCinematics,reset,restore,read,configureCommunity,conversationPose,
     cinematicQueue:()=>cinematicQueue.slice(),
@@ -5288,13 +5306,13 @@ body.hud-game #legend{display:none !important;}
  let adapter={},ready=false,opened=false,previousFocus=null,timer=0,selected=null;
  let mini,miniCanvas,miniRegion,miniTarget,overlay,fullCanvas,currentLabel,selectionLabel,clearButton,list;
  let base=null,baseMap=null,baseObjects=null,baseSeason='',places=[],lastInfo=null,lastMiniView=null;
- const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul'};
+ const WORLD_NAMES={farm:'Fazenda',mountain:'Montanha',desert:'Oásis',forest:'Mata das Nascentes',wetland:'Veredas do Sul',highlands:'Serra dos Ecos',meadow:'Campos do Vento',coast:'Costa das Conchas'};
  const ROOM_NAMES={house:'Casa',barn:'Celeiro',greenhouse:'Estufa'};
  const COLORS={ink:'#213f36',paper:'#f4ecd7',gold:'#ffdc67',teal:'#60d0bd',pin:'#bb537b',water:'#3c8790'};
  const element=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
  const button=(label,fn,cls='fm-button')=>{const n=element('button',cls,label);n.type='button';n.addEventListener('click',fn);return n;};
  const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
- const regionAt=(y,x=0)=>window.FarmOpenWorld?.regionAt(x/16,y/16)||(y<42*16?'mountain':y>=90*16?'desert':'farm');
+ const regionAt=(y,x=0)=>window.FarmExpeditionWorld?.regionAt(x/16,y/16)||window.FarmOpenWorld?.regionAt(x/16,y/16)||(y<42*16?'mountain':y>=90*16?'desert':'farm');
  function read(){
   if(typeof scenes==='undefined'||!scenes.main||typeof player==='undefined')return null;
   const main=scenes.main,scene=typeof currentScene==='string'?currentScene:'main',inside=scene!=='main';
@@ -5311,7 +5329,8 @@ body.hud-game #legend{display:none !important;}
   return !!read()?.active&&!(typeof cutsceneActive!=='undefined'&&cutsceneActive)&&!(typeof tutorialActive!=='undefined'&&tutorialActive)&&!(typeof histologyMissionOpen!=='undefined'&&histologyMissionOpen)&&!window.FarmStoryUI?.isOpen?.();
  }
  function localName(info){return info.inside?'Dentro de '+(ROOM_NAMES[info.scene]||'um abrigo')+' · entrada no mapa':WORLD_NAMES[info.region]||'Vale';}
- function terrainColor(tile,cold){
+ function terrainColor(tile,cold,x,y){
+  if(!cold&&x>=96&&[T.GRASS,T.GRASS2,T.FLOWER].includes(tile)){const r=window.FarmExpeditionWorld?.regionAt(x,y);if(r==='meadow')return '#b0a166';if(r==='coast')return '#8d9b77';}
   switch(tile){
    case T.WATER:case T.RIVER:case T.OASIS:return COLORS.water;
    case T.PATH:case T.WOOD:return '#c7ac75';
@@ -5336,7 +5355,7 @@ body.hud-game #legend{display:none !important;}
   for(const [id,name,type,description]of definitions){const o=find(type);if(!o)continue;places.push({id:'place:'+id,name,kind:'place',x:o.x,y:o.y,description,region:regionAt(o.y,o.x),number:places.length+1});}
   const fruit=objects.find(o=>o.type==='fx_fruittree'&&o.x>45*TS);
   if(fruit)places.push({id:'place:orchard',name:'Pomar',kind:'place',x:fruit.x,y:fruit.y,description:'Árvores e frutas além da ponte',region:regionAt(fruit.y,fruit.x),number:places.length+1});
-  for(const p of window.FarmOpenWorld?.landmarks||[])places.push({id:'place:'+p.id,name:p.title,kind:'place',x:p.x,y:p.y,description:p.description,region:p.region,number:places.length+1});
+  for(const p of [...(window.FarmOpenWorld?.landmarks||[]),...(window.FarmExpeditionWorld?.landmarks||[])])places.push({id:'place:'+p.id,name:p.title,kind:'place',x:p.x,y:p.y,description:p.description,region:p.region,number:places.length+1});
   const farm=window.FarmLife?.snapshot?.();
   for(const station of farm?.stations||[]){
    places.push({id:'farm:'+station.id,name:station.name,kind:'place',x:station.x,y:station.y,description:station.kind==='clue'?'Pista encontrada · releia o registro':'Vida na fazenda · '+station.name,region:regionAt(station.y,station.x),number:places.length+1});
@@ -5351,7 +5370,7 @@ body.hud-game #legend{display:none !important;}
   if(fullCanvas&&(fullCanvas.width!==mapWidth||fullCanvas.height!==mapHeight)){fullCanvas.width=mapWidth;fullCanvas.height=mapHeight;}
   base=document.createElement('canvas');base.width=info.main.MW*8;base.height=info.main.MH*8;const g=base.getContext('2d');
   for(let y=0;y<info.main.MH;y++)for(let x=0;x<info.main.MW;x++){
-   g.fillStyle=terrainColor(info.main.map[y]?.[x],info.season==='cold');g.fillRect(x*8,y*8,8,8);
+   g.fillStyle=terrainColor(info.main.map[y]?.[x],info.season==='cold',x,y);g.fillRect(x*8,y*8,8,8);
    if(((x*17+y*13)%11)===0){g.fillStyle='rgba(27,62,47,.07)';g.fillRect(x*8+2,y*8+2,3,2);}
   }
   const scale=base.width/info.width;
@@ -5388,7 +5407,7 @@ body.hud-game #legend{display:none !important;}
   if(full){
    g.textAlign='center';g.font='bold 19px Georgia';g.fillStyle='rgba(29,61,53,.75)';
    for(const [name,y]of [['MONTANHA',5*TS],['FAZENDA',44*TS],['OÁSIS',96*TS]])g.fillText(name,30*TS/info.width*w,y/info.height*h);
-   g.font='bold 15px Georgia';for(const region of Object.values(window.FarmOpenWorld?.regions||{}))g.fillText(region.mapLabel,region.mapX*TS/info.width*w,region.mapY*TS/info.height*h);
+   g.font='bold 15px Georgia';for(const region of Object.values({...window.FarmOpenWorld?.regions,...window.FarmExpeditionWorld?.regions}))g.fillText(region.mapLabel,region.mapX*TS/info.width*w,region.mapY*TS/info.height*h);
   }
   const chosen=target(info),pos=pointOnMap(info,view,w,h);
   if(chosen){const p=pointOnMap(chosen,view,w,h);g.strokeStyle='#f9dc85';g.lineWidth=full?3:2;g.setLineDash([8,7]);g.beginPath();g.moveTo(pos.x,pos.y);g.lineTo(p.x,p.y);g.stroke();g.setLineDash([]);}
@@ -5435,7 +5454,7 @@ body.hud-game #legend{display:none !important;}
   const legendHeight=overlay?.querySelector('.fm-map-key')?.getBoundingClientRect().height||18;
   const height=mobile?Math.min(390,Math.max(220,window.innerHeight-280)):Math.min(600,Math.max(150,available-legendHeight-18));
   const info=lastInfo||read(),ratio=info?info.width/info.height:60/124;
-  fullCanvas.style.width=Math.min(mobile?width-72:300,height*ratio)+'px';fullCanvas.style.height='auto';
+  fullCanvas.style.width=Math.min(mobile?width-72:420,height*ratio)+'px';fullCanvas.style.height='auto';
  }
  function resize(){if(opened)refresh();else layoutMap();}
  function focusables(){return Array.from(overlay.querySelectorAll('button,[tabindex="0"]')).filter(n=>!n.disabled&&!n.hidden&&n.getClientRects().length);}
@@ -5452,7 +5471,7 @@ body.hud-game #legend{display:none !important;}
   #worldMapMini[hidden],#worldMapOverlay[hidden],#worldMapClear[hidden]{display:none!important}#worldMapMini:focus-visible{outline:3px solid #ffe27b;outline-offset:3px}#worldMapMini:hover{border-color:#ffdf7c;background:#264a3bea}
   #worldMapMini .fm-mini-heading{display:flex;align-items:center;justify-content:space-between;font:bold 12px Georgia,serif;margin-bottom:7px;color:#ffe3a1}#worldMapMini kbd{font:11px monospace;border:1px solid #b4b789;border-radius:3px;padding:1px 5px;color:#ede4c7}#worldMapMini canvas{display:block;width:100%;height:auto;image-rendering:pixelated;border:1px solid #75977a;box-sizing:border-box;border-radius:3px}#worldMapMini .fm-mini-region{font:bold 10px Georgia,serif;margin-top:6px;display:block}#worldMapMini .fm-mini-target{display:block;font:9px/1.3 Georgia,serif;color:#d4ddbe;margin-top:3px;max-height:2.6em;overflow:hidden;overflow-wrap:anywhere}
   #worldMapOverlay{position:fixed;inset:0;z-index:1720;background:#071e21bf;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}#worldMapOverlay *{box-sizing:border-box}.fm-card{width:min(930px,100%);max-height:calc(100dvh - 36px);border:3px solid #685333;box-shadow:0 0 0 2px #c4a96f,0 20px 70px #031815b3;border-radius:6px;background:#f4ecd7;padding:22px;color:#213f36;display:flex;flex-direction:column;overflow:hidden;font-family:Georgia,serif}.fm-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.fm-header h2{font:700 29px/1.15 Georgia,serif;margin:4px 0}.fm-eyebrow{font:10px/1.3 monospace;letter-spacing:1.5px;text-transform:uppercase;color:#827547}.fm-current{margin:4px 0 0;font:13px/1.5 Georgia,serif;color:#53644e}.fm-button{border:1px solid #a69a70;background:#e7dfc5;color:#264437;padding:9px 13px;min-height:40px;font:13px Georgia,serif;border-radius:4px;cursor:pointer}.fm-button:hover{background:#d4dabe}.fm-button:focus-visible,.fm-destination:focus-visible{outline:3px solid #426b4a;outline-offset:2px}.fm-close{flex:0 0 auto}
-  .fm-body{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:22px;min-height:0;overflow:auto;padding:3px}.fm-map-column{display:flex;flex-direction:column;align-items:center;gap:10px}.fm-full-canvas{display:block;max-width:100%;image-rendering:pixelated;cursor:crosshair;border-radius:3px;touch-action:manipulation}.fm-map-key{display:flex;justify-content:center;flex-wrap:wrap;gap:7px 12px;font:11px/1.5 Georgia,serif;color:#4c644d}.fm-key-player{color:#8c6c1c;font-weight:bold}.fm-key-npc{color:#316e5a;font-weight:bold}.fm-key-pin{color:#a53b69;font-weight:bold}.fm-list h3{font:700 16px Georgia,serif;margin:8px 0 10px}.fm-list h3:not(:first-child){margin-top:20px}.fm-destinations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fm-destination{display:flex;align-items:center;gap:9px;text-align:left;min-width:0;min-height:48px;border:1px solid #c0bda1;background:#e8e3cf;color:#253f34;padding:8px;border-radius:4px;cursor:pointer}.fm-destination strong{display:block;font:700 13px/1.25 Georgia,serif;overflow-wrap:anywhere}.fm-destination small{display:block;color:#61735a;font:11px/1.35 Georgia,serif;margin-top:3px}.fm-destination:hover{background:#d8dfc2}.fm-destination[aria-pressed=true]{border:2px solid #a1456c;padding:7px;background:#f0deca}.fm-marker{display:flex;align-items:center;justify-content:center;flex:0 0 22px;width:22px;height:22px;border:1px solid #8f7c52;background:#f6e7b8;color:#3d5137;border-radius:50%;font:700 11px Georgia,serif}.fm-marker.fm-npc{background:#bbd9c2;color:#287c67;border-color:#709f82;font-size:15px}
+  .fm-body{display:grid;grid-template-columns:minmax(220px,420px) minmax(0,1fr);gap:22px;min-height:0;overflow:auto;padding:3px}.fm-map-column{display:flex;flex-direction:column;align-items:center;gap:10px}.fm-full-canvas{display:block;max-width:100%;image-rendering:pixelated;cursor:crosshair;border-radius:3px;touch-action:manipulation}.fm-map-key{display:flex;justify-content:center;flex-wrap:wrap;gap:7px 12px;font:11px/1.5 Georgia,serif;color:#4c644d}.fm-key-player{color:#8c6c1c;font-weight:bold}.fm-key-npc{color:#316e5a;font-weight:bold}.fm-key-pin{color:#a53b69;font-weight:bold}.fm-list h3{font:700 16px Georgia,serif;margin:8px 0 10px}.fm-list h3:not(:first-child){margin-top:20px}.fm-destinations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fm-destination{display:flex;align-items:center;gap:9px;text-align:left;min-width:0;min-height:48px;border:1px solid #c0bda1;background:#e8e3cf;color:#253f34;padding:8px;border-radius:4px;cursor:pointer}.fm-destination strong{display:block;font:700 13px/1.25 Georgia,serif;overflow-wrap:anywhere}.fm-destination small{display:block;color:#61735a;font:11px/1.35 Georgia,serif;margin-top:3px}.fm-destination:hover{background:#d8dfc2}.fm-destination[aria-pressed=true]{border:2px solid #a1456c;padding:7px;background:#f0deca}.fm-marker{display:flex;align-items:center;justify-content:center;flex:0 0 22px;width:22px;height:22px;border:1px solid #8f7c52;background:#f6e7b8;color:#3d5137;border-radius:50%;font:700 11px Georgia,serif}.fm-marker.fm-npc{background:#bbd9c2;color:#287c67;border-color:#709f82;font-size:15px}
   .fm-footer{border-top:1px solid #c6c7aa;margin-top:15px;padding-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}.fm-selection{font:13px/1.4 Georgia,serif;margin:0;min-height:18px}.fm-map-note{font:10px/1.5 Georgia,serif;margin:0;color:#6c775c}.fm-footer-controls{flex:0 0 auto}.fm-card .fm-button[disabled]{opacity:.5;cursor:default}
   body.access-contrast .fm-card{background:#fff;color:#162d21;border-color:#142f23}body.access-contrast .fm-destination{background:#fff;color:#152e22;border-color:#476046}body.access-contrast .fm-current,body.access-contrast .fm-selection{color:#162d21}
   @media(min-width:681px){.fm-map-column{position:sticky;top:0;align-self:start}}
@@ -5466,7 +5485,7 @@ body.hud-game #legend{display:none !important;}
   overlay=element('div');overlay.id='worldMapOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','worldMapTitle');
   const card=element('section','fm-card'),header=element('header','fm-header'),labels=element('div');labels.append(element('span','fm-eyebrow','Encontre seu caminho'));
   const titleFull=element('h2','','Mapa do Vale');titleFull.id='worldMapTitle';currentLabel=element('p','fm-current');labels.append(titleFull,currentLabel);header.append(labels,button('Fechar · Esc',close,'fm-button fm-close'));card.append(header);
-  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro, oásis ao sul e mata e veredas a leste. Escolha um local na lista para marcar o destino.');
+  const body=element('div','fm-body'),mapColumn=element('div','fm-map-column');fullCanvas=element('canvas','fm-full-canvas');fullCanvas.id='worldMapCanvas';fullCanvas.width=600;fullCanvas.height=1240;fullCanvas.setAttribute('aria-label','Mapa completo: montanha ao norte, fazenda no centro, oásis ao sul e mata, veredas, serra, campos e costa a leste. Escolha um local na lista para marcar o destino.');
   const key=element('div','fm-map-key');key.append(element('span','fm-key-player','▲ Você'),element('span','fm-key-npc','● Moradores'),element('span','fm-key-pin','⚑ Destino'));mapColumn.append(fullCanvas,key);list=element('section','fm-list');body.append(mapColumn,list);card.append(body);
   const footer=element('footer','fm-footer'),description=element('div');selectionLabel=element('p','fm-selection');selectionLabel.setAttribute('aria-live','polite');description.append(selectionLabel,element('p','fm-map-note','Marcar um lugar ajuda a se orientar. O percurso é feito caminhando.'));
   const controls=element('div','fm-footer-controls');clearButton=button('Limpar marca',()=>{selected=null;refresh();});clearButton.id='worldMapClear';clearButton.hidden=true;controls.append(clearButton);footer.append(description,controls);card.append(footer);overlay.append(card);document.body.append(mini,overlay);
@@ -6757,6 +6776,7 @@ body.hud-game #legend{display:none !important;}
       terrainEdge(g,px,py,x,y,t,cold);
       if(API.rawScene==='main'&&(t===T.GRASS||t===T.GRASS2))
         window.FarmOpenWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
+      if(API.rawScene==='main')window.FarmExpeditionWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
     });
 
     /* ---------- Vegetação: massas recortadas, folhas em agrupamentos ---------- */
@@ -8311,6 +8331,7 @@ body.hud-game #legend{display:none !important;}
 
   function footprint(o){
    switch(o.type){
+    case 'expedition_landmark':case 'expedition_scenery':return window.FarmExpeditionWorld?.footprint(o)||null;
     case 'farm_life_project':case 'farm_life_clue':case 'farm_life_station':return window.FarmLife?.footprint(o)||null;
     case 'house':case 'barn':case 'story_seed_house':return{x:o.x-3,y:o.y+4,w:o.w+6,h:o.h-7};
     case 'mtn_cabin':return{x:o.x-33,y:o.y-35,w:64,h:38};
@@ -8328,7 +8349,7 @@ body.hud-game #legend{display:none !important;}
   function isBlocked(x,y,from){
    const m=API.scenes.main;if(!m||x<8||y<8||x>m.MW*S-8||y>m.MH*S-8)return true;
    if([undefined,T.WATER,T.RIVER,T.OASIS].includes(m.map[Math.floor(y/S)]?.[Math.floor(x/S)]))return true;
-   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project','farm_life_clue','farm_life_station']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
+   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project','farm_life_clue','farm_life_station','expedition_landmark','expedition_scenery']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
      // Saves anteriores podem começar dentro de um novo tronco/volume.
      // Permite somente sair em direção à borda, nunca atravessar o obstáculo.
      if(from&&contains(b,from.x,from.y+7)){
@@ -8344,6 +8365,7 @@ body.hud-game #legend{display:none !important;}
    }return false;
   }
   function depth(o){
+   if(o.type==='expedition_landmark'||o.type==='expedition_scenery')return window.FarmExpeditionWorld?.depth(o)??o.y;
    if(o.type==='player'||o.type==='story_npc')return o.y+10;
    if(o.type==='world_pen_rail')return o.y;
    if(o.type==='world_bridge_rail')return o.y+2;
@@ -8444,7 +8466,7 @@ body.hud-game #legend{display:none !important;}
      count++;
     }
    }finally{g.restore();}
-   return count;
+   return count+(window.FarmExpeditionWorld?.drawGroundShadows?.(g,visible,sun)||0);
   }
   function windowLights(o){
    if(o.type==='mtn_cabin')return[{x:o.x,y:o.y-10,r:17}];
@@ -9207,9 +9229,10 @@ body.hud-game #legend{display:none !important;}
   function registerScenes(definitions){
     if(!Array.isArray(definitions))return 0;let count=0;
     for(const def of definitions.slice(0,16)){
-      if(!def||!/^(saga|frontier|village)-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
+      if(!def||!/^(saga|frontier|village|expedition)-[a-z0-9-]+$/.test(def.id)||byId.has(def.id)||!Array.isArray(def.shots)||!def.shots.length)continue;
       if(def.id.startsWith('frontier-')&&(typeof def.frontierMission!=='string'||!/^helena-[a-z-]+$/.test(def.frontierMission)))continue;
       if(def.id.startsWith('village-')&&(typeof def.villageMission!=='string'||!window.FarmVillageStories?.missionCatalogue()?.some(q=>q.id===def.villageMission)))continue;
+      if(def.id.startsWith('expedition-')&&(typeof def.expeditionMission!=='string'||!window.FarmExpeditionStory?.missionCatalogue()?.some(q=>q.id===def.expeditionMission)))continue;
       if(!def.shots.every(s=>s&&names[s.speaker]&&typeof s.line==='string'&&s.line.length<1800))continue;
       const film={...def,shots:def.shots.map(s=>({...s,focus:Number(s.focus)||0})),cast:Array.isArray(def.cast)?def.cast.filter(id=>names[id]):['player'],sagaEpisode:def.id.startsWith('saga-')?def.id.slice(5):null};
       films.push(film);byId.set(film.id,film);count++;
@@ -9218,6 +9241,7 @@ body.hud-game #legend{display:none !important;}
   }
   function available(film){
     if(seen.has(film.id))return true;
+    if(film.expeditionMission)return !!read().expedition?.completedQuestIds?.includes(film.expeditionMission);
     if(film.villageMission)return !!read().village?.completedQuestIds?.includes(film.villageMission);
     if(film.frontierMission)return !!read().frontier?.arcs?.some(a=>a.missions?.some(m=>m.id==='frontier:'+film.frontierMission&&m.completed));
     if(!film.sagaEpisode)return film.chapter<=chapterIndex();
@@ -9248,7 +9272,7 @@ body.hud-game #legend{display:none !important;}
     install();safely(adapter.beforeOpen);previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';root.setAttribute('aria-hidden','false');reduced=isReduced();
   }
   function play(id,opts={}){
-    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||(film.sagaEpisode||film.frontierMission||film.villageMission)&&!available(film))return false;
+    const film=byId.get(id);if(!film||active||seen.has(id)&&!opts.replay||(film.sagaEpisode||film.frontierMission||film.villageMission||film.expeditionMission)&&!available(film))return false;
     showOverlay();const state=read();active={kind:'film',film,index:0,elapsed:0,speech:0,reveal:0,replay:!!opts.replay,player:{name:typeof state.name==='string'?state.name.slice(0,40):'Você',gender:state.gender==='f'?'f':'m'},backdrop:null};
     root.querySelector('.vc-gallery').hidden=true;stage.hidden=false;root.querySelector('.vc-dialogue').hidden=false;root.querySelector('.vc-controls').hidden=false;root.querySelector('.vc-skip').textContent='Pular cena';
     heading.textContent=film.title;subheading.textContent='Uma lembrança do vale · avance no seu ritmo';enterShot();nextButton.focus({preventScroll:true});return true;
@@ -10167,10 +10191,12 @@ body.hud-game #legend{display:none !important;}
   const farm=()=>window.FarmLife?.snapshot?.()||{};
   const village=()=>window.FarmVillageStories?.snapshot?.()||{};
   const villageDiary=()=>window.FarmVillageStories?.diaryView?.()||{};
-  const titleOf=id=>names[id]||id||'um morador';
+  const expedition=()=>window.FarmExpeditionStory?.snapshot?.()||{};
+  const expeditionDiary=()=>window.FarmExpeditionStory?.diaryView?.()||{};
+  const titleOf=id=>id==='player'?(read().name||read().player?.name||'Alex'):names[id]||id||'um morador';
   function storyText(text){const info=read(),name=info.name||info.player?.name||'Alex';return String(text||'').replace(/\bAlex\b/g,()=>name);}
   function location(id){const info=read(),n=(info.npcs||[]).find(n=>n.npcId===id);if(!n)return 'Procure no mapa do vale.';return direction(n.x,n.y);}
-  function direction(x,y){const info=read(),dx=x-(info.x||0),dy=y-(info.y||0),steps=Math.round(Math.hypot(dx,dy)/16),east=window.FarmOpenWorld?.regionAt?.(x/16,y/16),region=window.FarmOpenWorld?.regions?.[east]?.name||(y<42*16?'Montanha':y>=90*16?'Oásis':'Fazenda');return region+' · '+(steps<=2?'perto de você':steps+' passos ao '+(Math.abs(dx)>Math.abs(dy)?dx<0?'oeste':'leste':dy<0?'norte':'sul'));}
+  function direction(x,y){const info=read(),dx=x-(info.x||0),dy=y-(info.y||0),steps=Math.round(Math.hypot(dx,dy)/16),east=window.FarmExpeditionWorld?.regionAt?.(x/16,y/16)||window.FarmOpenWorld?.regionAt?.(x/16,y/16),region=window.FarmExpeditionWorld?.regions?.[east]?.name||window.FarmOpenWorld?.regions?.[east]?.name||(y<42*16?'Montanha':y>=90*16?'Oásis':'Fazenda');return region+' · '+(steps<=2?'perto de você':steps+' passos ao '+(Math.abs(dx)>Math.abs(dy)?dx<0?'oeste':'leste':dy<0?'norte':'sul'));}
   function destination(id,x,y){close(false);adapter.focusGame?.();if(window.FarmWorldMap?.open?.()===true)FarmWorldMap.setDestination(id?'npc:'+id:{x,y});}
   function npcGuide(npcId){const box=el('div','v6-guide');box.append(el('strong','',titleOf(npcId)+' espera sua conversa'),el('p','',location(npcId)+' Aproxime-se e pressione E. O combinado e a entrega acontecem com este morador.'),button('Encontrar '+titleOf(npcId)+' no mapa',()=>destination(npcId),'map:npc:'+npcId));return box;}
   function objectives(list){const ul=el('ul','v6-objectives');for(const o of list||[]){const n=Math.max(0,Number(o.n)||0),goal=Math.max(1,Number(o.goal)||1);ul.append(el('li',n>=goal?'v6-done':'',(n>=goal?'✓ ':'')+(o.text||'Objetivo')+' · '+n+' / '+goal));}return ul;}
@@ -10204,27 +10230,54 @@ body.hud-game #legend{display:none !important;}
     for(const arc of active){const item=el('details','v6-memory');item.open=active.length===1;item.append(el('summary','',titleOf(arc.npcId)+' · '+arc.title),el('p','v6-kicker',villageStatus(arc)),el('p','v6-voice',arc.stageTitle),objectives(arc.objectives));item.append(button('Encontrar '+titleOf(arc.npcId)+' no mapa',()=>destination(arc.npcId),'map:village:'+arc.npcId));card.append(item);}
     card.append(button('Ver histórias dos moradores',()=>{section='people';selectedId='';body.scrollTop=0;refresh();},'village:people'));body.append(card);
   }
+  function expeditionPlaces(card,arc){
+    const places=window.FarmExpeditionWorld?.landmarks||[],seen=new Set();
+    for(const goal of arc.objectives||[]){
+      if(Number(goal.n)>=Number(goal.goal))continue;
+      const match=goal.match||{},id=match.landmarkId||match.clueId,point=id?places.find(p=>p.id===id):goal.event==='visit'?places.find(p=>p.region===match.region):null;
+      if(match.npcId&&match.npcId!==arc.npcId&&!seen.has('npc:'+match.npcId)){seen.add('npc:'+match.npcId);card.append(button('Encontrar '+titleOf(match.npcId)+' no mapa',()=>destination(match.npcId),'map:expedition:'+arc.id+':npc:'+match.npcId));}
+      if(!point||seen.has(point.id))continue;seen.add(point.id);
+      card.append(el('p','v6-reason',direction(point.x,point.y)),button('Marcar '+point.title+' no mapa',()=>destination('',point.x,point.y),'map:expedition:'+arc.id+':'+point.id));
+    }
+  }
+  function renderExpeditionSummary(){
+    const s=expedition(),arcs=s.arcs||[];if(!arcs.length)return;
+    const active=arcs.filter(a=>a.status==='active'||a.status==='ready'),completed=arcs.filter(a=>a.completed||a.status==='completed').length;
+    const card=block(s.title||'Além dos caminhos conhecidos',storyText(s.description||'Novas trilhas aproximam Alex das lembranças de Rosa, das perguntas de Lia e das viagens de Inês. Cada expedição começa em uma conversa e continua nos lugares encontrados.'));
+    card.dataset.valleyItem='expeditions';card.append(el('p','v6-reason',completed+' / '+arcs.length+' expedições concluídas'));
+    for(const arc of arcs){const item=el('details','v6-memory');item.open=active.length===1&&active[0].id===arc.id;item.append(el('summary','',titleOf(arc.npcId)+' · '+arc.title),el('p','v6-kicker',villageStatus(arc)));
+      if(arc.status==='active'||arc.status==='ready'){item.append(el('p','v6-voice',arc.stageTitle),objectives(arc.objectives));expeditionPlaces(item,arc);}
+      else if(arc.completed||arc.status==='completed'){if(arc.consequence)item.append(el('p','v6-voice',storyText(arc.consequence)));}
+      else item.append(el('p','v6-reason','Converse com '+titleOf(arc.npcId)+' sobre esta viagem. Ações anteriores ao combinado não avançam a expedição.'));
+      item.append(button('Encontrar '+titleOf(arc.npcId)+' no mapa',()=>destination(arc.npcId),'map:expedition:'+arc.id+':leader'));card.append(item);
+    }body.append(card);
+  }
   function renderSaga(){const s=saga(),p=s.protagonist||{},info=read(),hero=block(p.name||info.name||'Alex Vale',p.description||'Um retorno ao vale, uma pergunta antiga e um lugar para construir aos poucos.','v6-hero');
     hero.prepend(el('span','v6-kicker',p.role||'Uma aventura acolhedora com mistério'));
     if(p.voice)hero.append(el('p','v6-voice',p.voice));if(p.innerVoice)hero.append(el('blockquote','v6-inner',p.innerVoice));body.append(hero);
     const act=s.act;if(act){const card=block(act.title,act.description);card.prepend(el('span','v6-kicker',(s.completed?'A vida continua no vale':'Página '+((act.index||0)+1)+' / '+(s.episodes?.length||8))+' · '+(({available:'Converse para combinar',active:'Em andamento',ready:'Volte para conversar',completed:'Concluída'})[act.status]||'Por descobrir')));card.append(objectives(act.objectives));if(act.coins)card.append(el('p','v6-reason',act.coins+' moedas ao concluir; ações anteriores ao combinado não contam.'));if((act.objectives||[]).some(o=>/pele|histologia|epiderme|derme|vasos/i.test(o.text||'')))card.append(button('Investigar a pele',()=>{close(false);adapter.focusGame?.();adapter.openSkin?.();},'skin:study'));if(!s.completed)card.append(npcGuide(act.npcId));body.append(card);}
     if(s.completed)body.append(block('Uma casa não termina quando se abre','O mistério deixa marcas nas relações. Cultive, produza, visite os moradores e leve novas entregas ao quadro. O vale continua depois da última página.'));
     renderVillageSummary();
+    renderExpeditionSummary();
     const completed=(s.episodes||[]).filter(e=>e.status==='completed');if(completed.length){const history=block('O caminho até aqui');for(const e of completed){const item=el('details','v6-memory');item.append(el('summary','',e.title),el('p','',e.description||''));if(e.decision)item.append(el('p','v6-voice',typeof e.decision==='string'?e.decision:e.decision.consequence||e.decision.label||''));history.append(item);}body.append(history);}
     body.append(button('Jornada das sementes, carta e mapa social',()=>{close(false);window.FarmStoryUI?.open?.();},'legacy:journey'));
   }
-  function renderPeople(){const s=saga(),stories=village(),diary=villageDiary(),grid=el('div','v6-grid');body.append(el('p','v6-intro','Cada morador tem um plano próprio, algo que evita dizer e um trabalho que precisa de companhia. Os vínculos avançam com combinados cumpridos e decisões lembradas.'));
+  function renderPeople(){const s=saga(),stories=village(),diary=villageDiary(),journeys=expedition(),journeyDiary=expeditionDiary(),grid=el('div','v6-grid');body.append(el('p','v6-intro','Cada morador tem um plano próprio, algo que evita dizer e um trabalho que precisa de companhia. Os vínculos avançam com combinados cumpridos e decisões lembradas.'));
     for(const arc of s.arcs||[]){const relation=(s.relationships||[]).find(r=>r.npcId===arc.npcId),card=block(titleOf(arc.npcId)+' · '+arc.title,arc.agenda);const c=el('canvas','v6-face');c.width=96;c.height=96;c.setAttribute('aria-label','Retrato de '+titleOf(arc.npcId));window.FarmCharacterArt?.drawPortrait(c,arc.npcId,{reducedMotion:true});card.prepend(c);
       card.append(el('p','v6-voice',relation?.label||'Um vínculo por descobrir'),el('p','',relation?.consequence||arc.flaw||''),el('p','v6-reason','Encontros concluídos: '+(arc.step||0)+' / '+(arc.total||2)));
       if(arc.objective)card.append(el('p','',arc.objective));card.append(objectives(arc.objectives));
       appendVillageArc(card,(stories.arcs||[]).find(a=>a.npcId===arc.npcId),(diary.discoveries||[]).find(a=>a.npcId===arc.npcId));
+      const journey=(journeys.arcs||[]).find(a=>a.npcId===arc.npcId);if(journey){appendVillageArc(card,journey,(journeyDiary.discoveries||[]).find(a=>a.npcId===arc.npcId));if(journey.status==='active'||journey.status==='ready')expeditionPlaces(card,journey);}
       card.dataset.valleyItem='person:'+arc.npcId;card.append(el('p','v6-reason',location(arc.npcId)),button('Encontrar no mapa',()=>destination(arc.npcId),'map:npc:'+arc.npcId));grid.append(card);
     }body.append(grid);if(!grid.children.length)body.append(block('Seis vozes do vale','Rosa, Lia, Tomás, Inês, Caio e Nico estão no mapa. A primeira conversa abre espaço para os próximos encontros.'));
   }
-  function renderJournal(){const s=saga(),stories=village();body.append(el('p','v6-intro','Páginas escritas depois dos encontros. Carregar o jogo preserva lembranças e escolhas, sem conceder recompensas outra vez.'));
+  function renderJournal(){const s=saga(),stories=village(),journeys=expedition();body.append(el('p','v6-intro','Páginas escritas depois dos encontros. Carregar o jogo preserva lembranças e escolhas, sem conceder recompensas outra vez.'));
+    const found=(journeys.clues||[]).filter(c=>c&&typeof c==='object'&&c.found!==false);
+    if(found.length){const card=block('Lugares encontrados na expedição');for(const clue of found){const item=el('details','v6-memory');item.append(el('summary','',clue.title),el('p','',storyText(clue.text||clue.description||'')));const observation=journeys.surveys?.[clue.id],method=(clue.actions||[]).find(a=>a.id===observation?.lastMethod);if(observation?.rounds>0)item.append(el('p','v6-reason',observation.rounds+(observation.rounds===1?' observação registrada':' observações registradas')+(method?' · '+method.label:'')));stationMap(item,clue);card.append(item);}body.append(card);}
+    for(const entry of (journeys.journal||[]).filter(e=>!String(e.id).startsWith('clue:')).slice().reverse()){const card=block(entry.title,storyText(entry.text));card.prepend(el('span','v6-kicker','Expedições do vale'+(entry.npcId?' · '+titleOf(entry.npcId):'')));const text=card.querySelector('p');if(text)text.style.whiteSpace='pre-line';body.append(card);}
     for(const entry of (stories.journal||[]).slice().reverse()){const card=block(entry.title,storyText(entry.text));card.prepend(el('span','v6-kicker','Vozes do vale · '+titleOf(entry.npcId)));const text=card.querySelector('p');if(text)text.style.whiteSpace='pre-line';body.append(card);}
     for(const e of (s.journal||[]).slice().reverse()){const card=block(e.title,e.text);if(e.npcId)card.prepend(el('span','v6-kicker',titleOf(e.npcId)));body.append(card);}
-    if(!s.journal?.length&&!stories.journal?.length)body.append(block('Uma primeira página em branco','Converse com Rosa para começar. As anotações de Alex aparecem depois de escolhas e experiências reais.'));
+    if(!s.journal?.length&&!stories.journal?.length&&!journeys.journal?.length&&!found.length)body.append(block('Uma primeira página em branco','Converse com Rosa para começar. As anotações de Alex aparecem depois de escolhas e experiências reais.'));
     if(s.decisionHistory?.length){const choices=block('As escolhas que ficaram');for(const d of s.decisionHistory)choices.append(el('h4','',d.label),el('p','',d.consequence));body.append(choices);}
     if(s.clues?.length){const clues=block('O que já sabemos');for(const c of s.clues)clues.append(el('h4','',c.title),el('p','',c.text));body.append(clues);}
   }
@@ -10958,6 +11011,7 @@ body.hud-game #legend{display:none !important;}
    g.restore();
   }
   API.registerTileDrawer(T.WOOD,(g,px,py,x,y)=>{
+   if(window.FarmExpeditionWorld?.drawWoodTile?.(g,px,py,x,y))return;
    if(API.rawScene!=='main'||x<ORIGINAL_WIDTH){API.drawBaseTile(g,px,py,x,y,T.WOOD);return;}
    // Tábuas contínuas e gastas no cache estático. A antiga textura de piso
    // interno formava tijolos laranja e repetia nós em cada quadrado de16px.
@@ -11013,7 +11067,7 @@ body.hud-game #legend{display:none !important;}
    os atos da saga nem o inventário. Diálogos usam a apresentação já existente. */
 (function(){
   'use strict';
-  const VERSION=1,LIMIT=1000000,IDS=['helena','davi','bia'],REGIONS=['farm','mountain','desert','forest','wetland'];
+  const VERSION=1,LIMIT=1000000,IDS=['helena','davi','bia'],REGIONS=['farm','mountain','desert','forest','wetland','highlands','meadow','coast'];
   const clone=v=>JSON.parse(JSON.stringify(v)),plain=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
   const number=(v,max=LIMIT)=>Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
   const text=(v,max=100)=>typeof v==='string'?v.slice(0,max):'';
@@ -11122,8 +11176,8 @@ body.hud-game #legend{display:none !important;}
   function close(options={}){dialogue=null;if(!options.silent)emit('onDialogue',null);return null;}
   function greeting(npcId){const voice=voices[npcId],def=next(npcId);if(!voice)return'';const r=def&&state.missions[def.id];if(r?.status==='ready')return'Você voltou com o combinado pronto. Quero ouvir o que encontrou antes de abrir outra página.\n\n'+objectiveLine(def,r);if(r?.status==='active')return def.choices[r.choice].reply+'\n\n'+objectiveLine(def,r);const finished=[...arcs[npcId]].reverse().find(d=>state.missions[d.id].status==='completed');if(finished)return finished.choices[state.missions[finished.id].choice].echo;if(state.visits[npcId]<=1)return voice.first;const hour=context().timeOfDay;return hour<6||hour>=20?voice.night:voice.day[state.visits[npcId]%voice.day.length];}
   function conversationResponse(npcId){const lines=[];for(const def of missions){const r=state.missions[def.id];if(r.acceptedAt===null||!['active','ready'].includes(r.status))continue;if(objectives(def,r).some(g=>g.event==='talk'&&g.match.npcId===npcId)&&talkResponses[def.id]?.[npcId])lines.push(talkResponses[def.id][npcId]);}return lines.join('\n\n');}
-  function menu(npcId){if(!Object.hasOwn(byId,npcId))return null;const def=next(npcId),choices=[];if(def)choices.push({id:'frontier:mission:'+def.id+':offer',label:(state.missions[def.id].status==='ready'?'Concluir: ':'Nosso próximo passo: ')+def.title});else choices.push({id:'frontier:memory',label:'O que ficou do nosso combinado?'});const r=state.recurring[npcId],job=recurring[npcId];choices.push({id:'frontier:job:'+npcId+':offer',label:r?.status==='completed'?'Nosso pedido desta estação foi cumprido':r?.status==='ready'?'Entregar: '+job.title:'Pedido da estação: '+job.title},{id:'frontier:past',label:'Posso ouvir um pouco da sua história?'},{id:'frontier:quiet:home',label:'O que faz você ficar neste lugar?'},{id:'frontier:quiet:plans',label:'O que você quer fazer daqui para frente?'},{id:'frontier:journal',label:'Relembrar os caminhos da água'},{id:'frontier:close',label:'Até depois'});const response=[conversationResponse(npcId),window.FarmVillageStories?.conversationResponse?.(npcId)].filter(Boolean).join('\n\n');return display(npcId,(response?response+'\n\n':'')+greeting(npcId),choices);}
-  function interact(npcId){if(!Object.hasOwn(byId,npcId))return null;state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);if(!state.met.includes(npcId))state.met.push(npcId);record('talk',{npcId});window.FarmVillageStories?.record('talk',{npcId});changed();return menu(npcId);}
+  function menu(npcId){if(!Object.hasOwn(byId,npcId))return null;const def=next(npcId),choices=[];if(def)choices.push({id:'frontier:mission:'+def.id+':offer',label:(state.missions[def.id].status==='ready'?'Concluir: ':'Nosso próximo passo: ')+def.title});else choices.push({id:'frontier:memory',label:'O que ficou do nosso combinado?'});const r=state.recurring[npcId],job=recurring[npcId];choices.push({id:'frontier:job:'+npcId+':offer',label:r?.status==='completed'?'Nosso pedido desta estação foi cumprido':r?.status==='ready'?'Entregar: '+job.title:'Pedido da estação: '+job.title},{id:'frontier:past',label:'Posso ouvir um pouco da sua história?'},{id:'frontier:quiet:home',label:'O que faz você ficar neste lugar?'},{id:'frontier:quiet:plans',label:'O que você quer fazer daqui para frente?'},{id:'frontier:journal',label:'Relembrar os caminhos da água'},{id:'frontier:close',label:'Até depois'});const response=[conversationResponse(npcId),window.FarmVillageStories?.conversationResponse?.(npcId),window.FarmExpeditionStory?.conversationResponse?.(npcId)].filter(Boolean).join('\n\n');return display(npcId,(response?response+'\n\n':'')+greeting(npcId),choices);}
+  function interact(npcId){if(!Object.hasOwn(byId,npcId))return null;state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);if(!state.met.includes(npcId))state.met.push(npcId);record('talk',{npcId});window.FarmVillageStories?.record('talk',{npcId});window.FarmExpeditionStory?.record('talk',{npcId});changed();return menu(npcId);}
   function validTarget(kind,key){if(kind==='mission'){if(!Object.hasOwn(missionById,key))return false;return next(missionById[key].npcId)?.id===key;}return kind==='job'&&Object.hasOwn(recurring,key);}
   function target(kind,key){return kind==='mission'?{def:missionById[key],record:state.missions[key]}:{def:recurring[key],record:state.recurring[key]||freshRecord()};}
   function offer(kind,key){if(!validTarget(kind,key))return menu(dialogue?.npcId);const {def,record:r}=target(kind,key),prefix='frontier:'+kind+':'+key,choices=[];let message=def.offer;if(r.status==='offered'){if(def.choices)def.choices.forEach((c,i)=>choices.push({id:prefix+':accept:'+i,label:c.label}));else choices.push({id:prefix+':accept:0',label:'Aceitar o pedido desta estação'});}else if(r.status==='ready'){message=objectiveLine(def,r)+'\n\nEstá pronto. Vamos conferir e concluir o combinado?';choices.push({id:prefix+':claim',label:'Concluir e contar o resultado'});}else if(r.status==='completed')message=def.ending+'\n\nNa próxima estação podemos combinar outra rodada.';else message=(def.choices?.[r.choice]?.reply||def.offer)+'\n\n'+objectiveLine(def,r);choices.push({id:'frontier:menu',label:'Voltar à conversa'},{id:'frontier:close',label:'Continuar pelo mundo'});return display(def.npcId,message,choices,def.title);}
@@ -11490,7 +11544,7 @@ body.hud-game #legend{display:none !important;}
   };
   let adapter={},dialogue=null,revision=0,state;
   const freshRecord=()=>({status:'offered',choice:null,stage:0,acceptedAt:null,counts:{},paid:false});
-  const REGIONS=['farm','mountain','desert','forest','wetland'];
+  const REGIONS=['farm','mountain','desert','forest','wetland','highlands','meadow','coast'];
   const fresh=()=>({version:VERSION,sequence:0,met:[],visits:Object.fromEntries(IDS.map(id=>[id,0])),arcs:Object.fromEntries(arcs.map(def=>[def.id,freshRecord()])),journal:[],recentEventIds:[],lastRegion:null});
   function context(value){let raw=value;try{if(!plain(raw))raw=adapter.readState?.();}catch(_){raw=null;}return {name:text(own(raw,'playerName')||own(raw,'name'),40)||'Alex',timeOfDay:Number.isFinite(own(raw,'timeOfDay'))?raw.timeOfDay:12,region:REGIONS.includes(own(raw,'region'))?raw.region:'farm',scene:text(own(raw,'scene'),24)||'main',active:own(raw,'active')!==false,paused:own(raw,'paused')===true};}
   function emit(name,...args){try{return adapter[name]?.(...args);}catch(error){if(typeof console!=='undefined')console.warn('[Vozes do vale] '+name,error);}}
@@ -11541,6 +11595,451 @@ body.hud-game #legend{display:none !important;}
   ];}
   state=fresh();
   window.FarmVillageStories={init(api={}){adapter=plain(api)?api:{};return snapshot();},hasCharacter:id=>Object.hasOwn(byNpc,id),menuLabel,interact,choose,close,currentDialogue,isOpen:()=>!!dialogue,record,update,inspectBridge,cinematicScenes,serialize:()=>clone(state),restore,reset(){state=fresh();close();changed();return snapshot();},snapshot,diaryView,conversationResponse,missionCatalogue:()=>clone(arcs),revision:()=>revision};
+})();
+
+/* ==================================
+   src/modules/49-expedition-world.js
+   ================================== */
+/* A leste do vale: três paisagens contíguas, sem mover o mundo já salvo.
+   Somente expand escreve tiles; pintura e animação nunca alteram a navegação. */
+(function(){
+ (window.__farmBiomes=window.__farmBiomes||[]).push(function(API){
+  'use strict';
+  const T=API.T,S=API.TS,ORIGINAL_WIDTH=96,WIDTH=144,HEIGHT=124;
+  const clamp=v=>Math.max(0,Math.min(1,v)),smooth=v=>{v=clamp(v);return v*v*(3-2*v);};
+  const hash=(x,y)=>(Math.imul(x^4831,73856093)^Math.imul(y^9277,19349663))>>>0;
+  const pixel=(x,y)=>({tileX:x,tileY:y,x:x*S+8,y:y*S+8});
+  const regions=Object.freeze({
+   highlands:Object.freeze({id:'highlands',name:'Serra dos Ecos',mapLabel:'SERRA DOS ECOS',label:'serra',tempDelta:-.035,hydDelta:-.06,sweatBoost:0,thermalCause:'vento frio e altitude da serra',mapX:119,mapY:12}),
+   meadow:Object.freeze({id:'meadow',name:'Campos do Vento',mapLabel:'CAMPOS DO VENTO',label:'campos',tempDelta:.006,hydDelta:-.08,sweatBoost:.1,thermalCause:'brisa dos campos abertos',mapX:120,mapY:54}),
+   coast:Object.freeze({id:'coast',name:'Costa das Conchas',mapLabel:'COSTA DAS CONCHAS',label:'costa',tempDelta:.018,hydDelta:-.20,sweatBoost:.55,thermalCause:'maresia e umidade da costa',mapX:118,mapY:119})
+  });
+  const landmarks=Object.freeze([
+   {id:'exp_observatory',...pixel(112,24),title:'Observatório dos Ventos',region:'highlands',description:'Um telescópio antigo ainda aponta para as marcas deixadas nas pedras.'},
+   {id:'exp_echo_stones',...pixel(130,34),title:'Pedras do Eco',region:'highlands',description:'Três pedras guardam inscrições sobre o caminho da água.'},
+   {id:'exp_high_camp',...pixel(111,43),title:'Acampamento da Serra',region:'highlands',description:'O caderno de um abrigo de caminhada conserva relatos da antiga expedição.'},
+   {id:'exp_windmill',...pixel(111,58),title:'Moinho do Vento',region:'meadow',description:'As pás gastas giram sobre o mecanismo que movia o antigo canal.'},
+   {id:'exp_seed_orchard',...pixel(130,69),title:'Pomar das Sementes',region:'meadow',description:'Etiquetas de um pomar comunitário ligam as famílias do vale à expedição.'},
+   {id:'exp_post_shelter',...pixel(124,80),title:'Abrigo das Cartas',region:'meadow',description:'A caixa postal do caminho conserva mensagens que nunca chegaram à fazenda.'},
+   {id:'exp_channel_lock',...pixel(111,96),title:'Comporta Antiga',region:'coast',description:'A régua da comporta liga o canal da serra às marcas da maré.'},
+   {id:'exp_post_pier',...pixel(130,104),title:'Cais das Correspondências',region:'coast',description:'Uma mesa de navegação e um sino aguardam notícias do outro lado da baía.'},
+   {id:'exp_tide_stones',...pixel(119,116),title:'Pedras da Maré',region:'coast',description:'Conchas, marcas de água e sinais gravados completam a rota do antigo mapa.'}
+  ].map(Object.freeze));
+  const routes=Object.freeze([
+   [[95,60],[103,60],[111,58],[129,60],[136,70],[130,80],[124,80],[105,83],[103,60]],
+   [[103,60],[102,44],[111,43],[112,24],[128,20],[137,28],[130,34],[124,44],[111,43]],
+   [[112,24],[121,27],[130,34]],[[129,60],[130,69],[130,80]],
+   [[105,83],[105,96],[111,96],[119,98],[130,104],[134,114],[119,116],[106,115],[105,96]],
+   [[124,80],[126,89],[119,98]],[[111,96],[112,106],[119,116]]
+  ].map(route=>Object.freeze(route.map(p=>Object.freeze(p)))));
+  const sprites=new Map(),woodTiles=new Map();let bridgeSections=0,trailTiles=0,mainWorld=null;
+  const isWater=t=>t===T.WATER||t===T.RIVER||t===T.OASIS;
+  function localWeights(y){const high=1-smooth((y-45)/6),shore=smooth((y-83)/6);return[['highlands',high],['meadow',(1-high)*(1-shore)],['coast',(1-high)*shore]].filter(([,w])=>w>1e-9);}
+  function blendWeights(x,y,base){
+   if(!Number.isFinite(x)||!Number.isFinite(y)||x<ORIGINAL_WIDTH||x>=WIDTH||y<0||y>=HEIGHT)return base;
+   const east=smooth((x-ORIGINAL_WIDTH)/6);if(east<=0)return base;
+   return base.map(([id,w])=>[id,w*(1-east)]).filter(([,w])=>w>1e-9).concat(localWeights(y).map(([id,w])=>[id,w*east]));
+  }
+  function regionAt(x,y){if(!Number.isFinite(x)||!Number.isFinite(y)||x<ORIGINAL_WIDTH||x>=WIDTH||y<0||y>=HEIGHT)return null;return y<48?'highlands':y<86?'meadow':'coast';}
+  function prepareWood(map){
+   woodTiles.clear();bridgeSections=0;const seen=new Set();
+   for(let y=0;y<HEIGHT;y++)for(let x=ORIGINAL_WIDTH;x<WIDTH;x++){
+    const key=y*WIDTH+x;if(map[y][x]!==T.WOOD||seen.has(key))continue;
+    const pending=[[x,y]],tiles=[];let l=x,r=x,t=y,b=y;seen.add(key);
+    for(let i=0;i<pending.length;i++){
+     const [xx,yy]=pending[i];tiles.push([xx,yy]);l=Math.min(l,xx);r=Math.max(r,xx);t=Math.min(t,yy);b=Math.max(b,yy);
+     for(const [dx,dy]of [[0,1],[1,0],[0,-1],[-1,0]]){const nx=xx+dx,ny=yy+dy,nk=ny*WIDTH+nx;if(nx>=ORIGINAL_WIDTH&&nx<WIDTH&&ny>=0&&ny<HEIGHT&&map[ny][nx]===T.WOOD&&!seen.has(nk)){seen.add(nk);pending.push([nx,ny]);}}
+    }
+    for(const [xx,yy]of tiles)woodTiles.set(yy*WIDTH+xx,r-l>=b-t);bridgeSections++;
+   }
+  }
+  function expand(main){
+   if(main?._expeditionV612){mainWorld=main;prepareWood(main.map);return main.MW;}
+   if(!main||main.MW!==ORIGINAL_WIDTH||main.MH!==HEIGHT)throw Error('A expedição espera o mundo de96×124.');
+   const map=main.map.map((row,y)=>{
+    const next=row.slice();
+    for(let x=ORIGINAL_WIDTH;x<WIDTH;x++){
+     const n=(Math.sin(x*.24+y*.13)+Math.cos(x*.13-y*.20)+2)/4,edge=smooth((x-96)/6),base=row[95];
+     let t;
+     const choose=hash(x*3,y*5)%1024/1024,weights=localWeights(y);let terrain=weights[weights.length-1][0],sum=0;
+     for(const [id,w]of weights){sum+=w;if(choose<=sum){terrain=id;break;}}
+     if(terrain==='highlands'){
+      // Bancadas baixas, neve nas cotas altas e corredores de relva nas baixas.
+      const snow=1-smooth((y-20)/19);t=n<snow?T.SNOW:n>.70?T.STONE:n>.48?T.GRASS2:T.GRASS;
+      if(y<4)t=T.SNOWROCK;
+     }else if(terrain==='meadow'){t=n<.22?T.PATH:n>.74?T.GRASS2:T.GRASS;}
+     else{
+      const coastLine=134+Math.sin(y*.17)*2.5+Math.cos(y*.31)*1.2;
+      t=x>coastLine?T.WATER:x>coastLine-2?T.SAND:n>.87?T.STONE:n<.32?T.GRASS2:T.SAND;
+     }
+     // Seis colunas de transição determinística; o tile96 prolonga a margem
+     // antiga, sem escrever em95 nem introduzir um paredão no encontro.
+     if(x<102&&hash(x,y)%1024>edge*1024)t=base;
+     next.push(t);
+    }return next;
+   });
+   const paint=(x,y,t)=>{if(x>=ORIGINAL_WIDTH&&x<WIDTH&&y>=0&&y<HEIGHT)map[y][x]=t;};
+   const pool=(cx,cy,rx,ry,type)=>{for(let y=Math.floor(cy-ry);y<=cy+ry;y++)for(let x=Math.floor(cx-rx);x<=cx+rx;x++)if(((x-cx)/rx)**2+((y-cy)/ry)**2<1+.06*Math.sin(x+y*.7))paint(x,y,type);};
+   pool(126,12,5,3,T.ICE);pool(135,42,4,2.8,T.WATER);
+   pool(124,106,5.6,5.2,T.WATER);
+   // Canal acompanha o relevo. A trilha, pintada depois, faz a passagem.
+   for(let y=29;y<114;y++){
+    const x=Math.round(118+Math.sin(y/12)*2+Math.cos(y/21));paint(x,y,T.RIVER);
+    if(y>88)paint(x+1,y,T.RIVER);
+   }
+   // O ramal passa sob a comporta, em vez de deixar o mecanismo isolado
+   // sobre terra seca. As trilhas seguintes fazem decks no cruzamento,
+   // enquanto a água permanece visível a montante e na saída do canal.
+   for(let y=90;y<=102;y++){paint(111,y,T.RIVER);paint(112,y,T.RIVER);}
+   for(let x=111;x<=121;x++){paint(x,101,T.RIVER);paint(x,102,T.RIVER);}
+   for(let x=124;x<139;x++){const y=110+Math.round(Math.sin(x*.3));paint(x,y,T.WATER);paint(x,y+1,T.WATER);}
+   const wet=map.map(row=>row.map(isWater)),trail=new Set();
+   const putTrail=(x,y)=>{if(x<ORIGINAL_WIDTH||x>=WIDTH||y<0||y>=HEIGHT)return;paint(x,y,wet[y][x]?T.WOOD:T.PATH);trail.add(x+','+y);};
+   for(const points of routes)for(let p=1;p<points.length;p++){
+    const a=points[p-1],b=points[p],steps=Math.max(Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1]));
+    for(let i=0;i<=steps;i++){
+     const x=Math.round(a[0]+(b[0]-a[0])*i/steps),y=Math.round(a[1]+(b[1]-a[1])*i/steps);
+     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)putTrail(x+dx,y+dy);
+    }
+   }
+   for(const p of landmarks)for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)putTrail(p.tileX+dx,p.tileY+dy);
+   // Uma passarela é um conjunto contínuo apoiado em terra, sem lascas de
+   // madeira isoladas nas diagonais ou tábuas que escondem água bloqueada.
+   const crossings=[...trail].map(k=>k.split(',').map(Number)).filter(([x,y])=>wet[y][x]);
+   for(const [x,y]of crossings)for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)if(trail.has((x+dx)+','+(y+dy)))paint(x+dx,y+dy,T.WOOD);
+   // O cais ocupa terraços de madeira fisicamente caminháveis junto à baía.
+   for(let y=102;y<=106;y++)for(let x=127;x<=133;x++){paint(x,y,T.WOOD);trail.add(x+','+y);}
+   main.map=map;main.MW=WIDTH;mainWorld=main;prepareWood(map);trailTiles=trail.size;
+   const added=[],add=o=>{o._world=true;o._expedition=true;o.id=o.id||'exp_'+o.type+'_'+Math.floor(o.x/S)+'_'+Math.floor(o.y/S);added.push(o);main.objects.push(o);};
+   const clear=p=>landmarks.every(l=>Math.hypot(l.tileX-p[0],l.tileY-p[1])>4);
+   const room=(x,y,r=1)=>{
+    if(x<99||x>141||y<7||y>120||!clear([x,y]))return false;
+    for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++)if(trail.has(xx+','+yy)||isWater(map[yy]?.[xx])||map[yy]?.[xx]===T.WOOD)return false;
+    return true;
+   };
+   // Pinheiros e contrafortes em grupos assimétricos, com amplas clareiras.
+   for(const [x,y]of [[105,12],[108,14],[115,9],[117,10],[135,13],[138,15],[106,28],[104,31],[136,36],[139,38],[128,43],[101,18]])if(room(x,y))add({type:'mtn_pine',x:x*S+8,y:y*S+12});
+   for(const [x,y,w]of [[103,19,44],[135,20,54],[123,39,48],[109,36,30],[138,47,34]])if(room(x,y))add({type:'expedition_scenery',kind:'terrace',x:x*S+8,y:y*S+8,w,h:9,variant:hash(x,y)%3});
+   for(const [x,y]of [[105,52],[126,52],[135,56],[102,72],[107,74],[137,78]])if(room(x,y))add({type:'tree',x:x*S+8,y:y*S+12,s:1,shadeR:27});
+   for(const [x,y]of [[126,65],[134,65],[126,73],[134,73]])if(room(x,y,0))add({type:'fx_fruittree',x:x*S+8,y:y*S+12,kind:(x+y)%2,_pickT:0});
+   for(const [x,y]of [[115,52],[136,81],[110,87]])if(room(x,y,0))add({type:'fx_berry',x:x*S+8,y:y*S+12,_pickT:0});
+   for(const [x,y,kind]of [[102,88,'driftwood'],[135,94,'shore_rocks'],[106,107,'shore_rocks'],[128,118,'driftwood'],[139,88,'shore_rocks'],[113,112,'shells'],[132,98,'shells']])if(room(x,y,0))add({type:'expedition_scenery',kind,x:x*S+8,y:y*S+10,variant:hash(x,y)%3});
+   // O centro de interação é estável; o volume de cada ponto fica ao norte.
+   for(const l of landmarks)add({type:'expedition_landmark',landmarkId:l.id,x:l.x,y:l.y,interactionHint:l.title});
+   main._expeditionV612={width:WIDTH,originalWidth:ORIGINAL_WIDTH,addedObjects:added.length};return main.MW;
+  }
+  const R=(g,c,x,y,w,h)=>{g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
+  function sprite(key,w,h,paint){let c=sprites.get(key);if(!c){c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.imageSmoothingEnabled=false;paint(g);sprites.set(key,c);}return c;}
+  const P={ink:'#364d48',stone:'#748982',stoneHi:'#acb5a1',stoneDark:'#50655f',wood:'#927052',woodHi:'#c1a277',woodDark:'#5e5143',cream:'#e6d3a1',roof:'#776653',teal:'#638f82',rust:'#aa7258',leaf:'#7b8c57'};
+  function contact(g,x,y,w){R(g,'rgba(31,50,42,.19)',x-w/2,y,w,3);}
+  function boards(g,x,y,w,h){R(g,P.woodDark,x,y,w,h);for(let yy=0;yy<h;yy+=4){R(g,P.wood,x+1,y+yy,w-2,3);R(g,P.woodHi,x+2,y+yy,w-4,1);}for(let xx=x+4;xx<x+w;xx+=10)R(g,P.ink,xx,y+2,1,1);}
+  function stone(g,x,y,w,h){R(g,P.stoneDark,x,y+2,w,h-2);R(g,P.stone,x+2,y,w-4,h-2);R(g,P.stoneHi,x+3,y,w-7,2);R(g,'#85958a',x+w-5,y+4,3,h-5);}
+  function book(g,x,y){R(g,P.woodDark,x,y,10,6);R(g,P.cream,x+1,y,8,4);R(g,'#a98d60',x+5,y,1,4);R(g,P.teal,x+2,y+1,2,1);}
+  function landmarkArt(g,id,cold){
+   const x=56,y=88;contact(g,x,y+3,60);
+   if(id==='exp_observatory'){
+    // Pedra em semicírculo e telescópio baixo; vista aberta para a chegada.
+    for(const [dx,dy]of [[-28,-9],[-23,-18],[-13,-24],[0,-26],[14,-24],[24,-18],[28,-9]])stone(g,x+dx-5,y+dy,10,12);
+    R(g,P.woodDark,x-2,y-32,4,33);R(g,P.woodHi,x-1,y-31,1,29);
+    R(g,P.woodDark,x-13,y-1,27,3);R(g,P.woodDark,x-12,y-1,3,7);R(g,P.woodDark,x+10,y-1,3,7);
+    R(g,P.ink,x-10,y-39,26,9);R(g,P.teal,x-8,y-38,22,6);R(g,'#a4b5a4',x-7,y-38,18,2);R(g,P.ink,x+13,y-42,5,15);R(g,P.stoneHi,x+15,y-40,2,10);
+    book(g,x-26,y-5);
+   }else if(id==='exp_echo_stones'){
+    for(const [dx,dy,h]of [[-22,-4,30],[0,-15,42],[23,-3,26]]){
+     stone(g,x+dx-6,y+dy-h,13,h);for(let yy=8;yy<h-5;yy+=7){R(g,'#466c63',x+dx-3,y+dy-h+yy,5,1);R(g,'#91b0a1',x+dx-2,y+dy-h+yy+1,2,1);}
+    }
+    R(g,'#a3a681',x-29,y+1,8,2);R(g,'#a3a681',x+20,y+2,10,2);
+   }else if(id==='exp_high_camp'){
+    boards(g,x-26,y-9,52,12);R(g,P.woodDark,x-23,y-34,3,30);R(g,P.woodDark,x+21,y-34,3,30);
+    R(g,'#6a8071',x-28,y-33,57,5);R(g,'#94a18b',x-25,y-37,51,4);R(g,'#bcc4a0',x-16,y-40,33,3);
+    R(g,P.cream,x-19,y-28,11,17);R(g,P.teal,x-17,y-26,7,3);R(g,P.rust,x+8,y-15,10,8);book(g,x-5,y-14);
+   }else if(id==='exp_windmill'){
+    stone(g,x-19,y-14,38,18);R(g,P.woodDark,x-14,y-48,28,35);R(g,P.wood,x-12,y-46,24,32);
+    for(let yy=y-44;yy<y-15;yy+=6)R(g,P.woodHi,x-11,yy,22,1);
+    R(g,P.roof,x-18,y-52,36,5);R(g,P.roof,x-13,y-57,26,5);R(g,P.woodHi,x-8,y-60,16,3);
+    R(g,P.ink,x-5,y-18,10,17);R(g,P.cream,x+6,y-39,5,8);R(g,P.teal,x+7,y-38,3,5);book(g,x-29,y-3);
+   }else if(id==='exp_seed_orchard'){
+    boards(g,x-24,y-3,48,7);R(g,P.woodDark,x-21,y-1,3,8);R(g,P.woodDark,x+18,y-1,3,8);
+    for(const [dx,dy,c]of [[-18,-14,P.teal],[-5,-12,P.rust],[8,-15,P.stoneHi]]){R(g,P.woodDark,x+dx,y+dy,10,12);R(g,c,x+dx+1,y+dy+1,8,8);R(g,P.cream,x+dx+3,y+dy+3,4,3);}
+    R(g,P.woodDark,x+24,y-22,3,28);R(g,P.woodHi,x+20,y-25,16,10);R(g,P.leaf,x+22,y-23,4,3);R(g,P.cream,x+27,y-23,6,1);
+   }else if(id==='exp_post_shelter'){
+    R(g,P.woodDark,x-24,y-34,4,39);R(g,P.woodDark,x+21,y-34,4,39);boards(g,x-25,y-13,50,8);
+    R(g,P.roof,x-29,y-37,59,5);R(g,P.woodHi,x-23,y-41,47,4);R(g,P.wood,x-16,y-44,33,3);
+    R(g,P.teal,x-17,y-28,17,14);R(g,'#9bb3a0',x-16,y-28,15,3);R(g,P.ink,x-14,y-23,10,2);R(g,P.cream,x+6,y-24,12,8);R(g,P.rust,x+8,y-21,7,1);book(g,x-9,y-12);
+   }else if(id==='exp_channel_lock'){
+    stone(g,x-29,y-22,10,28);stone(g,x+20,y-22,10,28);boards(g,x-21,y-14,43,10);
+    R(g,P.ink,x-2,y-39,4,28);R(g,P.woodHi,x-2,y-35,4,2);R(g,P.woodDark,x-13,y-32,26,3);R(g,P.woodDark,x-10,y-39,3,17);R(g,P.woodDark,x+8,y-39,3,17);
+    R(g,P.cream,x+26,y-31,2,29);for(let yy=0;yy<25;yy+=5)R(g,P.ink,x+26,y-30+yy,4,1);
+   }else if(id==='exp_post_pier'){
+    // O piso pertence aos tiles WOOD; apenas mesa, amarração e sino são props.
+    boards(g,x-22,y-10,43,8);R(g,P.woodDark,x-20,y-2,3,10);R(g,P.woodDark,x+16,y-2,3,10);book(g,x-17,y-13);
+    R(g,P.cream,x-3,y-14,16,7);R(g,P.teal,x+1,y-12,7,1);R(g,P.woodDark,x+28,y-40,4,47);R(g,P.woodHi,x+25,y-40,10,3);R(g,'#c3a164',x+26,y-33,8,8);R(g,P.woodDark,x+25,y-25,10,2);
+    R(g,P.woodHi,x-30,y-2,6,8);R(g,P.cream,x-31,y,8,2);
+   }else{
+    for(const [dx,dy,w,h]of [[-22,-5,18,18],[0,-12,19,27],[24,-2,14,16]]){stone(g,x+dx-w/2,y+dy-h,w,h);for(let yy=7;yy<h;yy+=7)R(g,P.teal,x+dx-w/2+3,y+dy-h+yy,w-6,1);}
+    for(const [dx,dy]of [[-28,2],[-9,4],[12,2],[30,3]]){R(g,P.cream,x+dx,y+dy,4,2);R(g,'#b59b7d',x+dx+1,y+dy+2,2,1);}
+   }
+   if(cold){R(g,'#b7cec1',x-20,y+1,8,1);R(g,'#d0ded0',x+12,y+2,7,1);}
+  }
+  function pixelQuad(g,color,points){
+   // Rasterização em linhas inteiras: girar retângulos no Canvas suavizava
+   // as pás, deixando uma mancha enquanto o restante do jogo é pixel art.
+   const top=Math.min(...points.map(p=>p[1])),bottom=Math.max(...points.map(p=>p[1]));g.fillStyle=color;
+   for(let y=top;y<bottom;y++){
+    const hits=[],scan=y+.5;
+    for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];if((a[1]<=scan&&b[1]>scan)||(b[1]<=scan&&a[1]>scan))hits.push(a[0]+(scan-a[1])*(b[0]-a[0])/(b[1]-a[1]));}
+    if(hits.length<2)continue;const left=Math.ceil(Math.min(...hits)),right=Math.floor(Math.max(...hits));if(right>=left)g.fillRect(left,y,right-left+1,1);
+   }
+  }
+  function drawRotor(g,x,y,angle){
+   for(let i=0;i<4;i++){
+    const a=angle+i*Math.PI/2,c=Math.cos(a),s=Math.sin(a),turn=(u,v)=>[Math.round(x+u*c-v*s),Math.round(y+u*s+v*c)];
+    const quad=(color,l,t,r,b)=>pixelQuad(g,color,[turn(l,t),turn(r,t),turn(r,b),turn(l,b)]);
+    quad(P.woodDark,0,-2,28,1);quad(P.woodHi,12,-9,26,-1);quad(P.cream,13,-8,25,-7);
+    for(let k=16;k<27;k+=4)quad(P.woodDark,k,-8,k+1,-1);
+   }
+  }
+  function drawLandmark(o,g){
+   const cold=!!API.isFrio(),c=sprite(o.landmarkId+':'+cold,112,104,q=>landmarkArt(q,o.landmarkId,cold));g.drawImage(c,Math.round(o.x-56),Math.round(o.y-88));
+   if(o.landmarkId==='exp_windmill'){
+    // Giro lento, quatro pás com eixo fixo. Reduzir movimento congela o rotor.
+    const move=typeof motionOk!=='function'||motionOk(),now=move?performance.now():0,angle=Math.floor(now/170)*Math.PI/96;
+    drawRotor(g,Math.round(o.x),Math.round(o.y-43),angle);R(g,P.ink,o.x-3,o.y-46,6,6);R(g,P.woodHi,o.x-1,o.y-44,2,2);
+   }
+  }
+  function sceneryArt(g,o){
+   const x=40,y=34;contact(g,x,y+4,50);
+   if(o.kind==='terrace'){
+    const w=o.w||44;stone(g,x-w/2,y-12,w,17);R(g,'#788c70',x-w/2+3,y-14,w-6,2);R(g,P.stoneDark,x-w/2+6,y-6,w-12,1);R(g,P.stoneHi,x-w/2+4,y-10,Math.floor(w*.5),1);
+   }else if(o.kind==='shore_rocks'){
+    stone(g,x-23,y-7,23,12);stone(g,x-4,y-14,24,19);stone(g,x+14,y-3,13,9);R(g,P.teal,x-19,y+3,13,2);R(g,P.teal,x+2,y+2,17,2);
+   }else if(o.kind==='driftwood'){
+    R(g,P.woodDark,x-24,y-1,48,5);R(g,'#a99a7a',x-22,y-3,43,5);R(g,'#c3b58d',x-18,y-3,32,1);R(g,P.woodDark,x+7,y-8,3,8);R(g,P.woodHi,x+8,y-10,2,7);R(g,'#77816a',x-11,y+2,15,1);
+   }else for(const [dx,dy]of [[-14,-3],[5,-5],[15,0],[-2,4]]){R(g,P.cream,x+dx,y+dy,5,2);R(g,'#ba9c80',x+dx+1,y+dy+2,3,1);}
+  }
+  API.registerObjectDrawer('expedition_landmark',drawLandmark);
+  API.registerObjectDrawer('expedition_scenery',(o,g)=>g.drawImage(sprite(o.kind+':'+(o.w||0)+':'+(o.variant||0),80,44,q=>sceneryArt(q,o)),Math.round(o.x-40),Math.round(o.y-34)));
+  function footprint(o){
+   if(o.type==='expedition_landmark'){
+    if(o.landmarkId==='exp_echo_stones'||o.landmarkId==='exp_tide_stones')return{x:o.x-9,y:o.y-21,w:18,h:15};
+    return{x:o.x-20,y:o.y-12,w:40,h:15};
+   }
+   if(o.type==='expedition_scenery'&&['terrace','shore_rocks','driftwood'].includes(o.kind))return{x:o.x-(o.kind==='terrace'?(o.w||44)/2:23),y:o.y-6,w:o.kind==='terrace'?(o.w||44):46,h:11};
+   return null;
+  }
+  function depth(o){if(o.type==='expedition_landmark')return o.y+5;if(o.type==='expedition_scenery')return o.y+5;return null;}
+  function drawGroundShadows(g,visible,sun){
+   if(API.rawScene!=='main'||!sun||!Number.isFinite(sun.dx)||!Number.isFinite(sun.a)||sun.a<=0)return 0;
+   let count=0;const dx=Math.max(-1.6,Math.min(1.6,sun.dx));g.save();g.fillStyle='rgba(25,46,40,'+Math.min(.18,sun.a*.7)+')';
+   for(const o of visible){
+    if(o.type!=='expedition_landmark'&&o.type!=='expedition_scenery')continue;
+    const b=footprint(o);if(!b)continue;
+    const h=o.landmarkId==='exp_windmill'?54:o.type==='expedition_landmark'?29:12,reach=dx*Math.min(27,h*.45),base=o.y+3;
+    g.beginPath();g.moveTo(b.x,base);g.lineTo(b.x+b.w,base);g.lineTo(b.x+b.w+reach,base+5+Math.abs(dx)*5);g.lineTo(b.x+reach,base+8+Math.abs(dx)*5);g.closePath();g.fill();count++;
+   }g.restore();return count;
+  }
+  function drawTerrainDetails(g,px,py,x,y,t,cold){
+   if(API.rawScene!=='main'||x<ORIGINAL_WIDTH||x>=WIDTH||y<0||y>=HEIGHT||isWater(t)||t===T.WOOD)return;
+   const edge=smooth((x-96)/6);if(edge<=0)return;
+   const seed=hash(x,y),detail=hash(x*7,y*13),rx=px+2+(detail%10),ry=py+2+((detail>>>9)%10),area=regionAt(x,y);
+   g.save();g.globalAlpha*=edge;
+   if(area==='highlands'){
+    if([T.STONE,T.SNOWROCK,T.GRASS2].includes(t)&&seed%5===0){R(g,cold?'#a4bbb0':'#7d8e80',px+1,py+6,12,2);R(g,'rgba(56,78,68,.35)',px+3,py+8,10,1);R(g,'#b4bda2',px+2,py+5,7,1);}
+    if(t===T.SNOW&&seed%9===0){R(g,'#b2c6bd',rx,ry,5,1);R(g,'#91afa8',rx+2,ry+1,4,1);}
+   }else if(area==='meadow'&&[T.GRASS,T.GRASS2].includes(t)){
+    // Touceiras de palha baixas, flores e folhas em posições mundiais fixas.
+    if(seed%4===0){R(g,cold?'#9aaa8b':'#9c9d69',rx,ry,4,1);R(g,cold?'#b4bd9d':'#b6ac75',rx+1,ry-2,1,2);R(g,'#7e8d60',rx+3,ry-1,1,2);}
+    if(seed%29===0){R(g,'#8e9a69',rx+1,ry+1,1,3);R(g,detail&1?'#d9c08a':'#b49b9e',rx,ry,3,2);R(g,'#ede0b2',rx+1,ry,1,1);}
+   }else if(area==='coast'){
+    if(t===T.SAND){
+     const wet=[API.tileAt(x-1,y),API.tileAt(x+1,y),API.tileAt(x,y-1),API.tileAt(x,y+1)].some(isWater);
+     if(wet){R(g,'rgba(87,118,105,.24)',px+2,py+4,12,3);R(g,'rgba(154,160,126,.3)',px+3,py+7,9,2);}
+     if(seed%17===0){R(g,P.cream,rx,ry,3,1);R(g,'#aa9578',rx+1,ry+1,2,1);}
+    }else if(t===T.GRASS2&&seed%4===0){R(g,'#8f9872',rx,ry,4,1);R(g,'#b0aa7f',rx+2,ry-2,1,2);}
+   }
+   g.restore();
+  }
+  function drawWoodTile(g,px,py,x,y){
+   if(API.rawScene!=='main'||x<ORIGINAL_WIDTH||x>=WIDTH)return false;
+   const horizontal=woodTiles.get(y*WIDTH+x)??true,seed=hash(x,y);R(g,'#8b8069',px,py,S,S);
+   for(let n=0;n<S;n+=4){if(horizontal){R(g,'#655e4f',px+n+3,py,1,S);R(g,'#ae9b78',px+n,py,1,S);}else{R(g,'#655e4f',px,py+n+3,S,1);R(g,'#ae9b78',px,py+n,S,1);}}
+   const map=mainWorld?.map,west=map?.[y]?.[x-1]!==T.WOOD,east=map?.[y]?.[x+1]!==T.WOOD,north=map?.[y-1]?.[x]!==T.WOOD,south=map?.[y+1]?.[x]!==T.WOOD;
+   if(west)R(g,P.woodDark,px,py,2,S);if(east)R(g,P.woodDark,px+S-2,py,2,S);if(north)R(g,'#b5a17b',px,py,S,2);if(south)R(g,P.woodDark,px,py+S-2,S,2);
+   if((north||south)&&horizontal){R(g,P.ink,px+5,py+(north?2:S-4),1,1);R(g,P.ink,px+13,py+(north?2:S-4),1,1);}
+   if(seed%4===0)R(g,'#777d61',px+5,py+8,3,1);return true;
+  }
+  window.FarmExpeditionWorld=Object.freeze({expand,blendWeights,regionAt,regions,landmarks,routes,footprint,depth,drawGroundShadows,drawTerrainDetails,drawWoodTile,
+   artInfo:()=>({sprites:sprites.size,maxSprites:40,bridgeSections,bridgeTiles:woodTiles.size,trailTiles}),
+   dimensions:Object.freeze({originalWidth:ORIGINAL_WIDTH,width:WIDTH,height:HEIGHT})});
+ });
+})();
+
+/* ==================================
+   src/modules/50-expedition-story.js
+   ================================== */
+/* Além das três margens: expedições opcionais, com decisões e três retornos.
+   Só ações posteriores ao combinado contam. Descobrir um lugar não paga;
+   moedas chegam uma vez, ao conferir a última etapa com o morador. */
+(function(){
+  'use strict';
+  const VERSION=1,MAX=1000000,SEQUENCE=Number.MAX_SAFE_INTEGER;
+  const NAMES={rosa:'Rosa',lia:'Lia',tomas:'Tomás',ines:'Inês',caio:'Caio',nico:'Nico',helena:'Helena',davi:'Davi',bia:'Bia'};
+  const ROLES={rosa:'Guardiã das sementes',lia:'Pesquisadora dos cuidados do vale',ines:'Guardiã das rotas de retorno'};
+  const IDS=Object.keys(NAMES),LEADERS=['rosa','lia','ines'];
+  const REGIONS=['farm','mountain','desert','forest','wetland','highlands','meadow','coast'];
+  const EVENTS=['talk','visit','inspect','survey','collect','water','harvest','rest','produce','care'];
+  const clone=v=>JSON.parse(JSON.stringify(v)),plain=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+  const own=(v,k)=>plain(v)&&Object.hasOwn(v,k)?v[k]:undefined;
+  const num=(v,max=MAX)=>Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
+  const text=(v,max=120)=>typeof v==='string'?v.slice(0,max):'';
+  const goal=(id,label,event,amount=1,match={})=>({id,text:label,event,goal:amount,match});
+  const talk=id=>goal('talk-'+id,'Converse com '+NAMES[id],'talk',1,{npcId:id});
+  const clue=(id,label)=>goal('inspect-'+id,label,'inspect',1,{clueId:id});
+  const survey=(id,method,label)=>goal('survey-'+id+'-'+method,label,'survey',1,{landmarkId:id,method});
+  const work=(id,label,event,amount=1,match={})=>goal(id,label,event,amount,match);
+  const stage=(title,offer,objectives,done)=>({title,offer,objectives,done});
+  const point=(id,title,region,tx,ty,textValue,compare,compareResult,trace,traceResult)=>({id,title,region,x:tx*16+8,y:ty*16+8,text:textValue,actions:[{id:'compare',label:compare,result:compareResult},{id:'trace',label:trace,result:traceResult}]});
+  const landmarks=[
+    point('exp_observatory','O observatório de janelas abertas','highlands',112,24,
+      'O teto do antigo observatório deixou uma faixa de céu entre duas vigas. A mesa conserva um círculo com meses escritos à mão. Uma seta curta termina em “volta”, enquanto a maior aponta para o vento. A letra de Inês aparece no verso de um mapa; a medida do apoio tem a assinatura de Tomás.',
+      'Comparar as duas setas com a legenda do mapa','Você distingue duas funções: a seta grande marca de onde vinha o vento naquele registro; a pequena indica o caminho combinado de retorno. Anota ambas com a data da observação, sem transformar o desenho antigo numa previsão de hoje.',
+      'Reconstituir quem anotava e quem esperava','Você lê as iniciais por baixo do círculo dos meses. Quem saía anotava o destino; quem ficava deixava o horário combinado na outra margem. O observatório também era um lugar de espera, e seu registro passa a dizer isso.'),
+    point('exp_echo_stones','As pedras que devolvem a voz','highlands',130,34,
+      'Três pedras estreitam uma passagem protegida do vento. Sob o musgo há dois riscos e uma palavra incompleta: “respon...”. O espaço entre elas deixa o vale à vista. Não há passagem secreta: há a lembrança de um sinal que só funcionava quando alguém sabia responder.',
+      'Distinguir o eco do sinal combinado','Você compara o texto gasto com a posição das pedras. O eco repetia qualquer voz; o sinal precisava de uma resposta conhecida. Registra essa diferença, sem atribuir ao vento uma mensagem que ninguém combinou.',
+      'Seguir o recado até a margem de quem ficava','No lado protegido aparece a continuação: “responda antes da curva”. Você esboça os dois lados do ponto de encontro. A pessoa que esperava passa a ocupar o desenho, em vez de ficar escondida pela seta da viagem.'),
+    point('exp_high_camp','O abrigo da última curva','highlands',111,43,
+      'Um banco baixo guarda a marca de uma panela e duas tampas de caixa serviram de assento. No papel preso sob a prateleira lê-se: “Se mudar o plano, deixe notícia antes de seguir”. A assinatura de Nico é recente; por baixo, a letra antiga de Inês quase desapareceu.',
+      'Comparar o aviso antigo com a cópia de Nico','A cópia de Nico acrescenta uma pergunta: “E se eu quiser voltar antes?”. Você mantém as duas versões lado a lado. O novo recado explica como mudar o plano, em vez de exigir que a primeira decisão dure a viagem inteira.',
+      'Reconstituir um retorno com destino e companhia','Você organiza no caderno as informações do aviso: destino, companhia e como dar notícia. A antiga caixa vira referência de encontro, sem fingir que um abrigo substitui os cuidados de uma viagem.'),
+    point('exp_windmill','O moinho dos turnos esquecidos','meadow',111,58,
+      'O moinho ainda conserva nomes escritos perto da porta. Há dias de trabalho numa coluna e remessas de sementes noutra. As duas listas usam riscos iguais. Uma nota de Caio pede que ninguém confunda a entrega de uma caixa com o fim do cuidado de quem a recebe.',
+      'Comparar o turno do moinho com a data da remessa','Você copia as colunas separadamente. Um risco dizia quem cuidou do moinho; outro dizia quando uma caixa seguiu viagem. As datas coincidem em alguns dias, mas não significam a mesma tarefa. O registro conserva os nomes dos dois trabalhos.',
+      'Seguir a marca de quem recebeu a caixa','No verso da lista, uma seta retorna do pomar para o moinho. Você acrescenta ao desenho a notícia de quem plantou depois da entrega. O caminho da semente tem uma volta de conversa, sem obrigar que ela termine em outra caixa.'),
+    point('exp_seed_orchard','O pomar das primeiras tentativas','meadow',130,69,
+      'As árvores pequenas não formam fileiras perfeitas. Cada círculo de pedras tem duas etiquetas: “recebida de” e “plantada por”. Algumas registram que a primeira tentativa não vingou. O nome de Bia aparece numa observação recente: “Não apaguem quem tentou de novo”.',
+      'Comparar a etiqueta recebida com o canteiro atual','Você distingue a origem da amostra da experiência feita neste pomar. A segunda etiqueta conta quando houve nova tentativa; não promete que as condições daqui sejam iguais às da fazenda. A comparação fica aberta para a próxima colheita.',
+      'Ler quem tentou antes de seguir a origem','Você começa pela assinatura de quem plantou e volta à etiqueta de origem. A ordem muda a pergunta: em vez de conferir uma encomenda, acompanha o trabalho de uma pessoa. Registra também a tentativa que não vingou, sem apagar seu nome.'),
+    point('exp_post_shelter','A casa de recados do campo','meadow',124,80,
+      'O pequeno abrigo conserva divisórias para cartas e sementes. Um envelope tem um desenho de três riscos, como o de Rosa, mas o endereço foi corrigido duas vezes. A última linha não é um nome: “para quem continuar”. Uma seta retorna para o pomar.',
+      'Separar o endereço do recado do destino da semente','Você acompanha as duas correções. O recado era para Rosa; a porção de sementes continuava para outra pessoa. O envelope não se perdeu: serviu para duas viagens e guardou só um endereço no lado de fora.',
+      'Reconstituir as duas assinaturas da passagem','Uma assinatura confirma o recebimento; a outra registra a nova tentativa. Você mantém ambas na cópia, com uma linha entre elas. Não é um recibo de dívida. É a prova pequena de que alguém recebeu, cuidou e voltou a contar.'),
+    point('exp_channel_lock','A comporta das duas datas','coast',111,96,
+      'A pequena comporta liga um braço do canal à enseada. Na pedra há uma altura antiga e uma linha nova com data. A alavanca está presa em posição de descanso; nenhuma anotação autoriza movê-la. Davi deixou uma nota: “Nível de água não é ordem de abrir”.',
+      'Comparar as marcas sem mover a comporta','Você registra as duas alturas com suas datas e desenha a alavanca como a encontrou. A comparação descreve condições observadas. A comporta permanece no lugar: uma diferença entre linhas não diz, sozinha, o que fazer com a água.',
+      'Seguir a data que faltou na cópia do canal','A data apagada está repetida sob o apoio. Você liga as duas anotações no caderno e identifica a parte que faltava no mapa antigo. A seta foi copiada; a condição da água, não. Há uma pergunta concreta para levar a Helena.'),
+    point('exp_post_pier','O cais que guardava respostas','coast',130,104,
+      'No cais baixo há encaixes de caixas e uma prateleira de correspondência voltada para terra. As cartas não viajavam apenas com quem partia: quem chegava deixava notícias antes de seguir. Um envelope de Lia traz a palavra “comparar”, com uma linha vazia no lugar do resultado.',
+      'Comparar o desenho da rota com a condição da margem','Você compara a direção desenhada com o nível observado e preserva a linha do resultado em branco. A seta orienta até o lugar da observação; não prevê o que a pessoa vai encontrar. Sua nota recebe a condição de hoje.',
+      'Seguir a resposta antes da próxima remessa','Você distingue os espaços de “chegou” e “respondeu” na prateleira. As caixas podiam seguir enquanto uma pergunta ainda esperava comparação. Registra uma linha de resposta com autoria, em vez de preencher o silêncio com uma conclusão.'),
+    point('exp_tide_stones','As pedras da enseada','coast',119,116,
+      'Faixas claras e escuras percorrem as pedras acima da areia úmida. Uma pequena legenda diferencia marca antiga, observação datada e pergunta. O risco mais alto não diz até onde a água chegará hoje. Lia reconheceria o espaço deixado entre as três colunas.',
+      'Comparar a marca antiga com a faixa de hoje','Você desenha a faixa visível e conserva a marca antiga em outra linha. Um único encontro não determina um ciclo inteiro. Anota onde observou e quando, deixando a próxima comparação para quem vier depois.',
+      'Seguir a anotação até quem pode conferir','Na parte seca da legenda há três iniciais: Lia, Helena e Davi. Você copia a pergunta ao lado dos nomes. A medida ainda pertence a um lugar e uma ocasião; a conversa seguinte pode encontrar o que seu desenho deixou escapar.')
+  ];
+  const landmarkById=Object.fromEntries(landmarks.map(d=>[d.id,d]));
+  const arcs=[
+    {id:'carta-adiante',npcId:'rosa',cast:['rosa','caio','bia'],title:'A carta que seguiu adiante',coins:16,
+      offer:'Rosa desenrola uma fita que ficou presa no fundo de uma caixa. “Os três riscos apareceram num recado dos Campos do Vento. A carta não estava voltando para mim, Alex. Alguém usou o mesmo envelope para continuar uma viagem.”\n\nAlex: “Você guardou a fita.”\n\n“Guardei a dúvida. Quero descobrir o que as pessoas fizeram com a semente depois que deixei de enxergar a caixa.”',
+      choices:[
+        {label:'Começar por quem recebeu e tentou de novo.',summary:'Rosa acompanha com Bia e Caio o trabalho que continuou depois da entrega.',stages:[
+          stage('Um envelope, duas viagens','“Leia o envelope na Casa de Recados dos Campos do Vento e converse com Caio. Não precisamos cobrar uma resposta antiga; precisamos descobrir por que havia outro endereço.”',[clue('exp_post_shelter','Leia o envelope na Casa de Recados'),talk('caio')],'“Caio lembrou da segunda assinatura. Uma pessoa recebeu a caixa e outra ficou com a próxima tentativa. Eu estava procurando um único destinatário para uma história que continuou andando.”'),
+          stage('O nome de quem tentou','“No Pomar, escolha ‘Ler quem tentou antes de seguir a origem’. Depois faça duas colheitas novas na fazenda. Quero comparar o que chamamos de resultado com o trabalho que veio antes.”',[survey('exp_seed_orchard','trace','No Pomar, leia a autoria antes da origem'),work('harvest','Faça 2 colheitas novas na fazenda','harvest',2)],'“Há uma tentativa que não vingou e um nome que ficou. Acho que meu envelope era pequeno demais quando só guardava as boas notícias.”\n\nAlex: “O papel pode continuar maior por dentro.”'),
+          stage('A resposta também viaja','“No Moinho, escolha ‘Seguir a marca de quem recebeu a caixa’. Conte a Bia o que encontrou. Quero que a carta da próxima estação tenha espaço para a resposta dela.”',[survey('exp_windmill','trace','No Moinho, siga a marca de quem recebeu'),talk('bia')],'“Bia começou pelo que mudaria na próxima tentativa. Não era a resposta que eu tinha imaginado. Foi melhor poder ouvir a que ela tinha.”')],
+          ending:'Rosa escreve no alto da folha: “Para quem continuar”.\n\n“Não vou mandar esta carta junto de uma lista de resultados que espero receber. Vou contar o que tentamos e perguntar o que mudou aí.”\n\nAlex: “E se a resposta demorar?”\n\n“Deixo a divisória aberta. Você me ensinou que uma demora ainda pode chegar à mesa.”',echo:'“A carta dos Campos começa por quem plantou. A origem continua anotada. Só deixou de ocupar o lugar da pessoa que recebeu.”'},
+        {label:'Reconstituir as datas e o cuidado de cada remessa.',summary:'Rosa distingue com Caio e Bia a entrega das sementes do cuidado que ela inicia.',stages:[
+          stage('O endereço por baixo do endereço','“Leia a Casa de Recados e pergunte a Bia sobre as duas etiquetas. Talvez tenhamos tratado notícia e remessa como se precisassem chegar juntas.”',[clue('exp_post_shelter','Leia o envelope na Casa de Recados'),talk('bia')],'“Bia explicou que alguém podia continuar cuidando antes de saber escrever o resultado. Eu teria esperado uma resposta perfeita. Ela precisava de tempo para tentar.”'),
+          stage('O relógio de quem cuida','“No Moinho, escolha ‘Comparar o turno do moinho com a data da remessa’. Depois faça a primeira rega de duas plantas novas. Quero que nossa comparação diga qual trabalho está contando.”',[survey('exp_windmill','compare','No Moinho, compare turno e remessa'),work('water','Faça a primeira rega de 2 plantas','water',2)],'“A data da caixa não encerra a coluna dos cuidados. Parece uma obviedade, Alex. Ainda assim, eu tinha encerrado a história bem ali.”'),
+          stage('Uma comparação que pode discordar','“No Pomar, escolha ‘Comparar a etiqueta recebida com o canteiro atual’. Leve a pergunta a Caio. As condições dele não precisam obedecer às nossas para a conversa ser útil.”',[survey('exp_seed_orchard','compare','No Pomar, compare etiqueta e canteiro'),talk('caio')],'“Caio quer mandar a condição da tentativa junto da notícia. A semente tem origem. A experiência de quem planta tem autoria.”')],
+          ending:'“Escrevi o que fizemos, quando e onde”, diz Rosa. “A última linha pergunta o que foi diferente nos Campos. Não pede que repitam a nossa estação.”\n\nAlex: “Sobrou uma folha inteira.”\n\n“É a parte de quem responde. Desta vez não vou escrever por cima.”',echo:'“Minha próxima carta leva a data do cuidado, não só a da remessa. Bia disse que agora consegue fazer uma comparação de verdade.”'}]},
+    {id:'agua-entre-datas',npcId:'lia',cast:['lia','helena','davi'],title:'A água entre duas datas',coins:18,
+      offer:'“A cópia da minha primeira medição termina na vereda”, diz Lia. “O original continua até uma comporta na Costa das Conchas. Há outra data, e não sei por que a deixei fora.”\n\nAlex: “Podemos culpar a margem estreita?”\n\n“Podemos usar uma folha maior. Helena conhece o desenho; Davi conhece a marca. Eu gostaria de perguntar antes de tentar parecer a única pessoa que se lembra.”',
+      choices:[
+        {label:'Comparar as marcas com a água que encontramos.',summary:'Lia, Helena e Davi comparam condições sem transformar observação em previsão.',stages:[
+          stage('A linha depois da vereda','“Leia a Comporta na Costa das Conchas e converse com Helena. Não mova a alavanca. A primeira pergunta é o que foi registrado, não como consertar a água.”',[clue('exp_channel_lock','Leia as duas datas na Comporta'),talk('helena')],'“Helena reconheceu o risco. Eu copiei a medida; ela tinha escrito a condição na margem. A folha ficou mais limpa e a informação, incompleta.”'),
+          stage('Um desenho não prevê a margem','“No Cais, escolha ‘Comparar o desenho da rota com a condição da margem’. Converse com Davi sobre o que esta comparação consegue dizer.”',[survey('exp_post_pier','compare','No Cais, compare rota e condição da margem'),talk('davi')],'“Davi pediu para eu conservar a pergunta ao lado da seta. Gosto de medir. Estou aprendendo que isso não me obriga a prometer o que ainda não medi.”'),
+          stage('A próxima observação','“Nas Pedras da Enseada, escolha ‘Comparar a marca antiga com a faixa de hoje’. Depois regue duas plantas novas na fazenda. Nossa anotação precisa voltar a um cuidado que podemos acompanhar.”',[survey('exp_tide_stones','compare','Na Enseada, compare a faixa atual com a marca antiga'),work('water','Faça a primeira rega de 2 plantas','water',2)],'“A costa não explicou toda a água do vale. Deu lugar, data e uma pergunta melhor. Isso já muda como vou ler a próxima página.”')],
+          ending:'Lia separa a folha em três partes: marca, observação, pergunta.\n\n“Helena vai conferir a legenda. Davi, a próxima leitura. Eu volto ao canteiro para não esquecer de onde a pergunta saiu.”\n\nAlex: “Vai assinar embaixo?”\n\n“Vou. E deixar duas linhas do mesmo tamanho para os outros nomes.”',echo:'“O mapa da costa deixou de prometer o nível da água. Agora diz onde observar e com quem comparar. Dá menos certeza e muito mais trabalho útil.”'},
+        {label:'Seguir as respostas que ficaram fora do mapa.',summary:'Lia recupera com Davi e Helena a autoria das anotações esquecidas.',stages:[
+          stage('Quem poderia responder','“Leia a legenda nas Pedras da Enseada e converse com Davi. Quero começar pelas pessoas que ficaram fora da minha cópia.”',[clue('exp_tide_stones','Leia a legenda nas Pedras da Enseada'),talk('davi')],'“Davi lembra de uma pergunta sem resposta. Eu a copiei como se fosse uma observação concluída. Ele não estava atrasado. Eu é que tinha fechado a frase.”'),
+          stage('A data que precisava viajar','“Na Comporta, escolha ‘Seguir a data que faltou na cópia do canal’. Peça a Helena que compare a legenda. A alavanca continua como está.”',[survey('exp_channel_lock','trace','Na Comporta, siga a data omitida'),talk('helena')],'“Helena reconheceu sua letra no apoio. Mantive a anotação dela inteira, inclusive a condição que eu achara longa demais.”\n\nAlex: “A margem não reclama do tamanho da letra.”'),
+          stage('Uma notícia antes da remessa','“No Cais, escolha ‘Seguir a resposta antes da próxima remessa’. Recolha uma produção pronta na fazenda. Quero voltar contando o processo, sem esperar que a caixa dê todas as respostas.”',[survey('exp_post_pier','trace','No Cais, siga o lugar das respostas'),work('produce','Recolha 1 produção pronta da fazenda','produce')],'“Uma produção pode ficar pronta antes de uma comparação. Vou mandar a notícia sem fingir que a pergunta também terminou.”')],
+          ending:'“Vou enviar três folhas”, decide Lia. “A primeira conta o que vimos. A segunda guarda a condição. A terceira vai vazia para a resposta.”\n\nAlex: “Parece que o correio ganhou serviço.”\n\n“E eu ganhei companhia. Era a parte que meu mapa tinha esquecido.”',echo:'“As iniciais da enseada voltaram à folha. Não eram uma referência decorativa. Eram as pessoas a quem eu devia ter perguntado antes.”'}]},
+    {id:'ultimo-marco',npcId:'ines',cast:['ines','tomas','nico'],title:'Quem esperava no último marco',coins:16,
+      offer:'Inês gira uma folha até que o desenho do observatório fique de pé. “Na Serra dos Ecos, Alex, a última seta não aponta adiante. Aponta de volta. Eu costumava achar que alguém tinha desenhado errado.”\n\nAlex: “Talvez estivesse desenhando para quem voltava.”\n\n“É o que Nico perguntou. Tomás reconheceu o apoio da mesa. Vou precisar dos dois para ouvir uma história que contei sozinha por tempo demais.”',
+      choices:[
+        {label:'Escutar quem respondia do outro lado da curva.',summary:'Inês reconhece com Tomás e Nico o papel de quem espera e responde.',stages:[
+          stage('O eco não conhece o combinado','“Leia as Pedras do Eco e converse com Tomás. Não precisamos testar nossa voz no vento. Quero saber como o aviso chegava a quem estava esperando.”',[clue('exp_echo_stones','Leia o aviso nas Pedras do Eco'),talk('tomas')],'“Tomás lembrou de responder antes da curva. Eu contava a viagem do lado de quem partia. Ele guardava a hora em que ficava escutando.”'),
+          stage('O lugar da espera','“No Observatório, escolha ‘Reconstituir quem anotava e quem esperava’. Depois complete uma pausa protegida. Não quero transformar a nossa investigação numa prova de resistência.”',[survey('exp_observatory','trace','No Observatório, reconstitua os dois lados da espera'),work('rest','Complete uma pausa protegida','rest',1,{safe:true})],'“O círculo dos meses não marcava uma grande descoberta. Marcava visitas. Algumas pessoas voltaram para conversar; outras mandaram notícia. A mesa guardava lugar para todas.”'),
+          stage('O direito de mudar o plano','“No Abrigo da Última Curva, escolha ‘Comparar o aviso antigo com a cópia de Nico’. Converse com ele antes de levarmos o recado para a fazenda.”',[survey('exp_high_camp','compare','No Abrigo, compare os avisos de Inês e Nico'),talk('nico')],'“Ele acrescentou como voltar antes. Perguntei por que não me mostrou. Disse que mostrou, mas eu estava ocupada explicando o aviso antigo.”\n\nAlex: “Você ouviu desta vez.”')],
+          ending:'Inês dobra a folha sem esconder a seta de retorno.\n\n“Vou dizer que Nico mudou o recado. E que eu precisei de ajuda para entender por quê.”\n\nAlex: “Vai caber na sua história da serra?”\n\n“Vai começar por aí. Tomás pode contar a parte de quem esperava.”',echo:'“A seta de retorno continua no desenho. Quando conto a viagem, agora digo quem estava do outro lado. É uma história melhor acompanhada.”'},
+        {label:'Reconstruir um recado que qualquer viajante entenda.',summary:'Inês, Nico e Tomás tornam explícito o acordo que antes dependia de um costume.',stages:[
+          stage('A pergunta escrita por baixo','“Leia o Abrigo da Última Curva e pergunte a Nico por que acrescentou uma linha. Quero ouvir a pergunta antes de defender a minha placa.”',[clue('exp_high_camp','Leia o recado no Abrigo da Última Curva'),talk('nico')],'“Ele queria saber como avisar se mudasse de ideia. Eu lhe ensinava a sair preparado, mas deixava a volta parecendo uma obrigação de continuar.”'),
+          stage('A resposta antes da curva','“Nas Pedras do Eco, escolha ‘Seguir o recado até a margem de quem ficava’. Colete duas madeiras novas na fazenda. O material continua seu; vamos comparar a ideia de construir com a de combinar um uso.”',[survey('exp_echo_stones','trace','Nas Pedras, siga o recado de quem ficava'),work('wood','Colete 2 madeiras novas na fazenda','collect',2,{item:'wood'})],'“Uma tábua firme ajuda. Uma placa que só eu entendo pode atrapalhar. Não vou chamar a segunda parte de detalhe outra vez.”'),
+          stage('Duas setas, duas perguntas','“No Observatório, escolha ‘Comparar as duas setas com a legenda do mapa’. Leve o resultado a Tomás. Vamos distinguir o registro do vento do caminho que combinamos seguir.”',[survey('exp_observatory','compare','No Observatório, compare as duas setas'),talk('tomas')],'“Tomás pediu que eu explicasse com minhas palavras e ouviu sem completar a frase. Foi assim que descobrimos o pedaço que eu ainda estava pedindo a ele que adivinhasse.”')],
+          ending:'“Destino, companhia, notícia se o plano mudar”, lê Inês. “Nico acrescenta a pergunta de quem está começando. Tomás confere o que só parece claro para mim.”\n\nAlex: “E os dois assobios?”\n\n“Continuam na lembrança. O recado de amanhã vai poder ser entendido por quem não viveu a nossa história.”',echo:'“Levo o novo combinado nas rondas. A primeira pergunta é como vamos nos comunicar. Nico gosta da parte em que a pessoa pode mudar de ideia.”'}]}
+  ];
+  const byId=Object.fromEntries(arcs.map(d=>[d.id,d])),byNpc=Object.fromEntries(arcs.map(d=>[d.npcId,d]));
+  const replies={
+    'carta-adiante':{
+      caio:'“A segunda assinatura era de quem recebia a próxima tentativa”, diz Caio. “A caixa não precisava voltar para a viagem ter dado certo. Eu é que contava o caminho como uma dívida.”\n\nAlex: “Rosa está procurando a continuação, desta vez.”\n\n“Então conte a ela que houve cuidado do outro lado.”',
+      bia:'“No Pomar, não juntem as duas etiquetas”, pede Bia. “Uma conta de onde veio. A outra diz quem tentou. Se apagar a segunda, vira uma história em que só a semente fez alguma coisa.”\n\nAlex: “Vou levar as duas para a conversa, com os nomes.”'},
+    'agua-entre-datas':{
+      helena:'Helena compara sua pergunta com a borda do caderno. “Eu escrevi a condição aqui. Você e Lia copiaram a seta. A nossa folha ficou convincente demais para a conversa incompleta que tivemos.”\n\nAlex: “A costa guardou o espaço que cortamos.”\n\n“Então vamos copiá-lo também.”',
+      davi:'“Não mexa na alavanca por causa de um risco antigo”, diz Davi. “Olhe a data, registre a condição, procure outra pessoa para conferir. Uma anotação vale pelo que ela consegue dizer, inclusive quando termina em pergunta.”\n\nAlex: “É a pergunta que estou levando a Lia.”'},
+    'ultimo-marco':{
+      tomas:'Tomás reconhece o desenho. “Eu ficava no apoio do observatório esperando a resposta. Inês lembrava do sinal de partida. Não tínhamos histórias rivais; cada um contava só o lado da mesa que conhecia.”\n\nAlex: “Ela quer a sua parte no próximo relato.”\n\n“Finalmente posso contar que a mesa balançava.”',
+      nico:'“Acrescentei como voltar antes”, conta Nico. “A placa dizia o que fazer se tudo desse certo. Eu queria saber como avisar se o plano mudasse.”\n\nAlex: “Inês pediu para ouvir você.”\n\n“Então vou levar a pergunta, sem desenhar uma seta para fingir que já respondi.”'}
+  };
+  let adapter={},dialogue=null,revision=0;
+  const freshRecord=()=>({status:'offered',choice:null,stage:0,acceptedAt:null,counts:{},paid:false});
+  const fresh=()=>({version:VERSION,sequence:0,met:[],arcs:Object.fromEntries(arcs.map(d=>[d.id,freshRecord()])),journal:[],clues:[],surveys:Object.fromEntries(landmarks.map(d=>[d.id,{rounds:0,cooldown:0,lastMethod:null}])),recentEventIds:[],lastRegion:null});
+  let state=fresh();
+  function context(value){let c=value;try{if(!plain(c))c=adapter.readState?.();}catch(_){c=null;}return {name:text(own(c,'playerName')||own(c,'name'),40)||'Alex',scene:text(own(c,'scene'),24)||'main',region:REGIONS.includes(own(c,'region'))?c.region:'farm',active:own(c,'active')!==false,paused:own(c,'paused')===true,x:own(c,'x'),y:own(c,'y')};}
+  function emit(name,...args){try{return adapter[name]?.(...args);}catch(error){if(typeof console!=='undefined')console.warn('[Expedições] '+name,error);}}
+  function changed(){revision++;emit('onChange',snapshot());}
+  const row=d=>state.arcs[d.id],branch=(d,r)=>[0,1].includes(r.choice)?d.choices[r.choice]:null,currentStage=(d,r)=>branch(d,r)?.stages[r.stage]||null;
+  const objectives=(d,r)=>(currentStage(d,r)?.objectives||[]).map(g=>({...clone(g),n:num(r.counts[g.id],g.goal)}));
+  const complete=(d,r)=>!!currentStage(d,r)&&objectives(d,r).every(g=>g.n>=g.goal);
+  const line=(d,r)=>objectives(d,r).map(g=>(g.n>=g.goal?'✓ ':'• ')+g.text+' · '+g.n+'/'+g.goal).join('\n');
+  function journal(id,npcId,title,message){if(state.journal.some(v=>v.id===id))return;state.journal.push({id,npcId,title,text:message,sequence:state.sequence});state.journal=state.journal.slice(-48);}
+  function currentDialogue(){return dialogue?clone(dialogue):null;}
+  function display(npcId,message,choices=[],title,role){if(npcId!=='player'&&!IDS.includes(npcId))return null;const c=context();dialogue={npcId,speaker:npcId==='player'?c.name:NAMES[npcId],role:role||ROLES[npcId]||'Morador do vale',title:title||'Além das três margens',text:String(message).replace(/\bAlex\b/g,()=>c.name),kind:'expedition',choices:clone(choices),canAdvance:false,expression:npcId==='ines'?'thoughtful':'warm',gesture:npcId==='player'?'observe':'explain'};emit('onDialogue',currentDialogue());return currentDialogue();}
+  function close(options={}){const npcId=dialogue?.npcId;dialogue=null;if(!options.silent)emit('onDialogue',null);if(options.returnToMenu&&LEADERS.includes(npcId))emit('onClose',{npcId,returnToMenu:true});return null;}
+  function menuLabel(npcId){if(!Object.hasOwn(byNpc,npcId))return'';const d=byNpc[npcId],r=row(d);return (r.paid?'Relembrar a expedição: ':r.status==='ready'?'Conferir a expedição: ':r.acceptedAt!==null?'Nossa expedição: ':'Além do vale: ')+d.title;}
+  function conversationResponse(npcId){if(!IDS.includes(npcId))return'';const lines=[];for(const d of arcs){const r=row(d);if(r.paid&&d.cast.includes(npcId)){lines.push(npcId===d.npcId?branch(d,r).echo:({caio:'“A carta dos Campos não pede uma prestação de contas”, diz Caio. “Pede uma notícia. Consigo responder a isso.”',bia:'“O registro do Pomar guardou quem tentou”, diz Bia. “A próxima pessoa vai saber que pode começar de novo.”',helena:'“A data voltou ao mapa da costa”, conta Helena. “Parece pouco. Era a parte que permitia alguém discordar e conferir.”',davi:'“A comporta continua firme e a pergunta continua aberta”, diz Davi. “Tem lugar para mais uma leitura amanhã.”',tomas:'“Agora Inês me deixa contar a minha metade da mesa”, diz Tomás. “Incluí o balanço. Era importante para quem precisava segurar a outra ponta.”',nico:'“Inês guardou minha pergunta no recado”, conta Nico. “Acho que também aprendeu a deixar espaço antes de responder.”'})[npcId]||'');continue;}const s=currentStage(d,r);if(['active','ready'].includes(r.status)&&s?.objectives.some(g=>g.event==='talk'&&g.match.npcId===npcId))lines.push(replies[d.id]?.[npcId]||s.done);}return lines.filter(Boolean).slice(-2).join('\n\n').replace(/\bAlex\b/g,()=>context().name);}
+  function offer(d){const r=row(d),choices=[],s=currentStage(d,r);let message=d.offer,title=d.title;if(r.status==='offered')d.choices.forEach((pick,i)=>choices.push({id:'expedition:accept:'+d.id+':'+i,label:pick.label}));else if(r.paid)message=branch(d,r).ending;else{title+=' · '+(r.stage+1)+'/3 · '+s.title;message=(r.status==='ready'?s.done:s.offer)+'\n\n'+line(d,r);if(r.status==='ready')choices.push({id:'expedition:'+(r.stage===2?'claim:':'next:')+d.id,label:r.stage===2?'Concluir a expedição e compartilhar o resultado':'Conferir e combinar a próxima etapa'});}choices.push({id:'expedition:return',label:'Voltar aos outros assuntos'},{id:'expedition:close',label:'Continuar pelo mundo'});return display(d.npcId,message,choices,title);}
+  function interact(npcId){if(!Object.hasOwn(byNpc,npcId))return null;if(!state.met.includes(npcId)){state.met.push(npcId);changed();}return offer(byNpc[npcId]);}
+  function begin(d,r,index){r.stage=index;r.status='active';r.acceptedAt=state.sequence;r.counts=Object.fromEntries(currentStage(d,r).objectives.map(g=>[g.id,0]));journal(d.id+':stage:'+index,d.npcId,d.title+' · '+currentStage(d,r).title,branch(d,r).summary);changed();return offer(d);}
+  function claim(d){const r=row(d);if(r.status!=='ready'||r.stage!==2||r.paid||!complete(d,r))return offer(d);r.status='completed';r.paid=true;journal(d.id+':completed',d.npcId,d.title,branch(d,r).ending);changed();emit('reward',{kind:'expedition-story',id:'expedition:'+d.id,npcId:d.npcId,coins:d.coins,label:d.title});return offer(d);}
+  function placedLandmark(id){if(!Object.hasOwn(landmarkById,id))return null;const def=landmarkById[id],world=window.FarmExpeditionWorld;let list=world?.landmarks;try{if(typeof list==='function')list=list();}catch(_){list=null;}const p=Array.isArray(list)?list.find(v=>v.id===id):null;return p&&Number.isFinite(p.x)&&Number.isFinite(p.y)?{...def,x:p.x,y:p.y}:def;}
+  function near(def){const c=context();return c.active&&!c.paused&&c.scene==='main'&&Number.isFinite(c.x)&&Number.isFinite(c.y)&&Math.hypot(c.x-def.x,c.y-def.y)<=40;}
+  function observationChoices(def){const r=state.surveys[def.id];return [...def.actions.map(a=>({id:'expedition:survey:'+def.id+':'+a.id,label:r.cooldown>0?'Revisão em '+Math.ceil(r.cooldown)+' s · '+a.label:a.label})),{id:'expedition:close',label:'Guardar a observação e seguir'}];}
+  function inspect(id){const d=placedLandmark(id);if(!d||!near(d))return false;const first=!state.clues.includes(id);if(first){state.clues.push(id);journal('clue:'+id,'player',d.title,d.text);}record('inspect',{clueId:id});if(first)changed();display('player',d.text+'\n\nVocê pode comparar o registro ou seguir a autoria. A observação fica no seu caderno; nenhuma das opções altera o lugar.',observationChoices(d),d.title,'Exploração · '+({highlands:'Serra dos Ecos',meadow:'Campos do Vento',coast:'Costa das Conchas'})[d.region]);return true;}
+  function surveyLandmark(id,method){const d=placedLandmark(id),a=d?.actions.find(v=>v.id===method);if(!d||!a||!near(d)||dialogue?.npcId!=='player'||!dialogue.choices.some(v=>v.id==='expedition:survey:'+id+':'+method))return false;const r=state.surveys[id];if(r.cooldown>0){display('player','Seu registro anterior está guardado. Deixe passar '+Math.ceil(r.cooldown)+' segundos de jogo ativo antes de comparar outra vez. Ler, abrir o mapa ou carregar o save não faz esse tempo passar.',[{id:'expedition:close',label:'Continuar a exploração'}],d.title,'Observação já registrada');return false;}r.rounds=Math.min(MAX,r.rounds+1);r.cooldown=90;r.lastMethod=method;journal('survey:'+id+':'+method,'player',d.title+' · '+a.label,a.result);record('survey',{landmarkId:id,method,round:r.rounds,eventId:'expedition:survey:'+id+':'+r.rounds});changed();display('player',a.result+'\n\nO registro está no caderno. As marcas, a água e os objetos continuam como você os encontrou.',[{id:'expedition:close',label:'Guardar o registro e continuar'}],d.title,'Registro da expedição');return true;}
+  function choose(id){if(typeof id!=='string'||!dialogue?.choices.some(c=>c.id===id))return currentDialogue();if(id==='expedition:close')return close();if(id==='expedition:return')return close({returnToMenu:true});if(id==='expedition:menu')return interact(dialogue.npcId);const observation=/^expedition:survey:([a-z_]+):(compare|trace)$/.exec(id);if(observation){surveyLandmark(observation[1],observation[2]);return currentDialogue();}const match=/^expedition:(arc|accept|next|claim):([a-z-]+)(?::([01]))?$/.exec(id);if(!match||!Object.hasOwn(byId,match[2]))return currentDialogue();const d=byId[match[2]],r=row(d);if(d.npcId!==dialogue.npcId)return currentDialogue();if(match[1]==='arc')return offer(d);if(match[1]==='accept'&&r.status==='offered'&&match[3]!==undefined){r.choice=Number(match[3]);return begin(d,r,0);}if(match[1]==='next'&&r.status==='ready'&&r.stage<2&&complete(d,r))return begin(d,r,r.stage+1);if(match[1]==='claim')return claim(d);return offer(d);}
+  function record(event,payload={}){if(!EVENTS.includes(event)||!plain(payload))return false;const raw=own(payload,'amount');if(raw!==undefined&&(!Number.isFinite(raw)||raw<=0||!Number.isInteger(raw)))return false;const amount=raw===undefined?1:Math.min(50,raw),uid=text(own(payload,'eventId'));if(uid&&state.recentEventIds.includes(uid))return false;if(uid){state.recentEventIds.push(uid);state.recentEventIds=state.recentEventIds.slice(-160);}state.sequence=Math.min(SEQUENCE,state.sequence+1);let dirty=false;for(const d of arcs){const r=row(d);if(r.status!=='active'||r.acceptedAt===null||state.sequence<=r.acceptedAt)continue;for(const g of currentStage(d,r).objectives){if(g.event!==event||!Object.entries(g.match).every(([key,value])=>own(payload,key)===value))continue;const before=num(r.counts[g.id],g.goal);r.counts[g.id]=Math.min(g.goal,before+amount);dirty=dirty||r.counts[g.id]!==before;}if(complete(d,r)){r.status='ready';dirty=true;}}if(dirty)changed();return dirty;}
+  function view(d){const r=row(d),s=currentStage(d,r),list=objectives(d,r);return{id:'expedition:'+d.id,npcId:d.npcId,cast:d.cast.slice(),title:d.title,description:d.offer,status:r.status==='offered'?'available':r.status,accepted:r.acceptedAt!==null,completed:r.paid,choice:r.choice,stage:r.stage,stageTitle:s?.title||'Escolha um caminho',stageCount:3,objectives:list,objective:r.paid?'Expedição concluída':r.status==='offered'?'Converse e escolha o caminho da expedição.':(r.stage+1)+'/3 · '+s.title+'\n'+line(d,r),coins:d.coins,progress:list.reduce((n,g)=>n+g.n,0),goal:list.reduce((n,g)=>n+g.goal,0),consequence:r.paid?branch(d,r).echo:''};}
+  function diaryView(){return {quests:arcs.filter(d=>state.met.includes(d.npcId)&&!row(d).paid).map(view),discoveries:[...state.clues.map(id=>({id:'expedition:'+id,npcId:'player',title:landmarkById[id].title,text:landmarkById[id].text})),...arcs.filter(d=>row(d).paid).map(d=>({id:'expedition:'+d.id,npcId:d.npcId,title:d.title,text:branch(d,row(d)).ending,response:branch(d,row(d)).echo}))],memories:state.journal.map(v=>({id:'expedition:'+v.id,npcId:v.npcId,text:v.title+' · '+v.text})),friendships:Object.fromEntries(IDS.map(id=>[id,arcs.filter(d=>d.cast.includes(id)&&row(d).paid).length*4])),discoveryTotal:landmarks.length+arcs.length};}
+  function worldState(){return {completed:arcs.every(d=>row(d).paid),letters:row(byId['carta-adiante']).paid?['people','conditions'][row(byId['carta-adiante']).choice]:null,water:row(byId['agua-entre-datas']).paid?['observations','voices'][row(byId['agua-entre-datas']).choice]:null,returnRoute:row(byId['ultimo-marco']).paid?['waiting','agreement'][row(byId['ultimo-marco']).choice]:null};}
+  function snapshot(){return {version:VERSION,title:'Além das três margens',arcs:arcs.map(view),quests:diaryView().quests,known:state.met.slice(),completedQuestIds:arcs.filter(d=>row(d).paid).map(d=>d.id),journal:clone(state.journal),clues:state.clues.map(id=>clone(landmarkById[id])),surveys:clone(state.surveys),coinsEarned:arcs.filter(d=>row(d).paid).reduce((sum,d)=>sum+d.coins,0),world:worldState()};}
+  function update(dt,value){if(!Number.isFinite(dt)||dt<=0)return;const c=context(value);if(!c.active||c.paused||dialogue)return;let dirty=false;for(const r of Object.values(state.surveys)){const before=r.cooldown;r.cooldown=Math.max(0,before-Math.min(dt,1));if(before>0&&r.cooldown===0)dirty=true;}if(c.scene==='main'&&c.region!==state.lastRegion){state.lastRegion=c.region;record('visit',{region:c.region});}if(dirty)changed();}
+  function restore(saved){dialogue=null;state=fresh();if(!plain(saved)||own(saved,'version')!==VERSION){state.lastRegion=context().region;emit('onDialogue',null);changed();return false;}state.sequence=num(own(saved,'sequence'),SEQUENCE);state.met=[...new Set((Array.isArray(own(saved,'met'))?saved.met:[]).filter(id=>LEADERS.includes(id)))];state.recentEventIds=[...new Set((Array.isArray(own(saved,'recentEventIds'))?saved.recentEventIds:[]).slice(-160).map(v=>text(v)).filter(Boolean))];state.clues=[...new Set((Array.isArray(own(saved,'clues'))?saved.clues:[]).filter(id=>Object.hasOwn(landmarkById,id)))];for(const d of arcs){const raw=own(own(saved,'arcs'),d.id),r=row(d);if(!plain(raw)||!['active','ready','completed'].includes(own(raw,'status'))||![0,1].includes(own(raw,'choice'))||!Number.isInteger(own(raw,'stage'))||raw.stage<0||raw.stage>2||!Number.isFinite(own(raw,'acceptedAt'))||raw.acceptedAt<0)continue;r.choice=raw.choice;r.stage=raw.stage;r.acceptedAt=Math.min(state.sequence,num(raw.acceptedAt,SEQUENCE));r.paid=raw.status==='completed'&&r.stage===2;r.counts=Object.fromEntries(currentStage(d,r).objectives.map(g=>[g.id,r.paid?g.goal:num(own(own(raw,'counts'),g.id),g.goal)]));r.status=r.paid?'completed':complete(d,r)?'ready':'active';if(!state.met.includes(d.npcId))state.met.push(d.npcId);for(let i=0;i<=r.stage;i++)journal(d.id+':stage:'+i,d.npcId,d.title+' · '+branch(d,r).stages[i].title,branch(d,r).summary);if(r.paid)journal(d.id+':completed',d.npcId,d.title,branch(d,r).ending);}for(const d of landmarks){const raw=own(own(saved,'surveys'),d.id),r=state.surveys[d.id];r.rounds=num(own(raw,'rounds'));r.cooldown=Number.isFinite(own(raw,'cooldown'))?Math.max(0,Math.min(90,raw.cooldown)):0;r.lastMethod=['compare','trace'].includes(own(raw,'lastMethod'))?raw.lastMethod:null;if(state.clues.includes(d.id))journal('clue:'+d.id,'player',d.title,d.text);if(r.rounds>0&&r.lastMethod){const a=d.actions.find(v=>v.id===r.lastMethod);journal('survey:'+d.id+':'+a.id,'player',d.title+' · '+a.label,a.result);}}
+    // Reconstrói texto canônico; IDs e ordem do save não injetam falas.
+    const canonical=new Map(state.journal.map(v=>[v.id,v])),ordered=[],seen=new Set();for(const raw of (Array.isArray(own(saved,'journal'))?saved.journal:[]).slice(-48)){const id=own(raw,'id');if(seen.has(id))continue;let entry=canonical.get(id);const oldSurvey=typeof id==='string'&&/^survey:(exp_[a-z_]+):(compare|trace)$/.exec(id);if(!entry&&oldSurvey&&Object.hasOwn(landmarkById,oldSurvey[1])&&state.surveys[oldSurvey[1]].rounds>0){const d=landmarkById[oldSurvey[1]],a=d.actions.find(v=>v.id===oldSurvey[2]);entry={id,npcId:'player',title:d.title+' · '+a.label,text:a.result,sequence:0};}if(!entry)continue;seen.add(id);ordered.push({...entry,sequence:Math.min(state.sequence,num(own(raw,'sequence'),SEQUENCE))});}for(const entry of state.journal)if(!seen.has(entry.id))ordered.push(entry);state.journal=ordered.slice(-48);state.lastRegion=context().region;emit('onDialogue',null);changed();return true;}
+  function cinematicScenes(){return [
+    {id:'expedition-cartas',expeditionMission:'carta-adiante',title:'Uma carta com lugar para a resposta',description:'Rosa reconhece que a viagem da semente continua na história de quem recebe.',chapter:0,region:'meadow',scene:'main',focusX:1992,focusY:1288,cast:['rosa','bia','player'],prop:'notebook',shots:[
+      {speaker:'rosa',line:'Eu seguia a caixa até a entrega. Depois chamava o silêncio de falta de notícia.',expression:'thoughtful',gesture:'explain',focus:-1,duration:5.5},
+      {speaker:'bia',line:'Às vezes era só o tempo de tentar outra vez. Agora o nome de quem tenta fica na folha.',expression:'warm',gesture:'point',focus:1,duration:5.5},
+      {speaker:'player',line:'Passei anos pensando no que ia trazer na volta. Acabei voltando com perguntas.',expression:'warm',gesture:'shrug',focus:0,duration:5.5},
+      {speaker:'rosa',line:'São bem-vindas à mesa. Deixei a outra metade para as respostas de vocês.',expression:'warm',gesture:'invite',focus:-1,duration:5.5}]},
+    {id:'expedition-retorno',expeditionMission:'ultimo-marco',title:'A seta que olha para casa',description:'Inês e Nico incluem o direito de mudar o plano no recado de uma próxima viagem.',chapter:0,region:'highlands',scene:'main',focusX:1800,focusY:392,cast:['ines','nico','player'],prop:'notebook',shots:[
+      {speaker:'ines',line:'Achei que a seta de volta estava no lugar errado. Eu só olhava para quem partia.',expression:'thoughtful',gesture:'point',focus:-1,duration:5.5},
+      {speaker:'nico',line:'Quem espera também precisa saber que pode perguntar. Foi o que deixei na linha nova.',expression:'curious',gesture:'explain',focus:1,duration:5.5},
+      {speaker:'player',line:'Tomás vai querer contar a parte da mesa que balançava.',expression:'warm',gesture:'shrug',focus:0,duration:5.5},
+      {speaker:'ines',line:'Vai contar. Eu seguro a outra ponta e escuto. Desta vez a história volta com todo mundo.',expression:'warm',gesture:'invite',focus:-1,duration:5.5}]}
+  ];}
+  window.FarmExpeditionStory={init(api={}){adapter=plain(api)?api:{};return snapshot();},hasCharacter:id=>Object.hasOwn(byNpc,id),menuLabel,interact,choose,close,currentDialogue,isOpen:()=>!!dialogue,record,update,inspect,survey:surveyLandmark,landmarks:()=>clone(landmarks),missionCatalogue:()=>clone(arcs),snapshot,diaryView,conversationResponse,worldState,cinematicScenes,serialize:()=>clone(state),restore,reset(){state=fresh();state.lastRegion=context().region;close();changed();return snapshot();},revision:()=>revision};
 })();
 
 /* =============================
@@ -13176,7 +13675,7 @@ body.hud-game #legend{display:none !important;}
     timer=setTimeout(()=>{timer=null;scheduleCrickets();},2100+Math.random()*2300);
   }
   function mixScene(options={}){
-    const weights={farm:0,mountain:0,desert:0,forest:0,wetland:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
+    const weights={farm:0,mountain:0,desert:0,forest:0,wetland:0,highlands:0,meadow:0,coast:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
     for(const entry of input){const id=Array.isArray(entry)?entry[0]:entry.id,w=Array.isArray(entry)?entry[1]:(entry.w??entry.weight);if(id in weights)weights[id]+=clamp(w);}
     const total=Object.values(weights).reduce((a,b)=>a+b,0)||1;for(const key of Object.keys(weights))weights[key]/=total;
     const region=Object.keys(weights).reduce((a,b)=>weights[a]>=weights[b]?a:b),tod=((Number(options.timeOfDay)||0)%24+24)%24;
@@ -13193,8 +13692,8 @@ body.hud-game #legend{display:none !important;}
       result.river=.055;result.loops.room_tone=.11;result.loops.birds_loop=night||cold?0:.009;
       result.music.indoor=true;return result;
     }
-    const forest=weights.forest,wetland=weights.wetland;
-    const field=weights.farm+forest*.7+wetland*.55,mountain=weights.mountain,desert=weights.desert;
+    const forest=weights.forest,wetland=weights.wetland,highlands=weights.highlands,meadow=weights.meadow,coast=weights.coast;
+    const field=weights.farm+forest*.7+wetland*.55+meadow*.85+highlands*.18+coast*.2,mountain=weights.mountain,desert=weights.desert;
     result.loops.farm_ambience=field*(cold?.035:(night?.055:.13));
     result.loops.birds_loop=field*(cold||night?0:tod<9?.05:tod<16?.025:.017);
     result.loops.cicadas_loop=field*(cold||night?0:(tod>=11&&tod<16?.045+heat*.035:.018));
@@ -13206,6 +13705,14 @@ body.hud-game #legend{display:none !important;}
     result.loops.birds_loop+=forest*(cold||night?0:.035);
     result.river+=wetland*(cold?.04:.12)+forest*.025;
     result.crickets+=wetland*(night&&!cold?.15:0);
+    // O mesmo banco original dá identidade aos caminhos novos. O vento do
+    // alto é espaçado; o prado privilegia aves; a costa tem água e brisa.
+    // Cada parcela é ponderada antes da mistura, sem salto na fronteira.
+    result.loops.cold_wind+=highlands*(cold?.22:.13);
+    result.loops.birds_loop+=meadow*(cold||night?0:.025)+coast*(cold||night?0:.008);
+    result.loops.desert_breeze+=coast*(night?.11:.17);
+    result.river+=coast*(cold?.09:.2)+highlands*water*.07;
+    result.crickets+=meadow*(night&&!cold?.09:0);
     if(resting){
       for(const key of Object.keys(result.loops))result.loops[key]*=['birds_loop','cicadas_loop'].includes(key)?.35:.65;
       result.river*=.7;result.crickets*=.45;
@@ -13231,7 +13738,10 @@ body.hud-game #legend{display:none !important;}
     const profiles={
       farm:{scale:[261.63,293.66,329.63,392,440,523.25],beat:.62,motifs:[[0,null,2,3,null,1,0,null,3,4,null,2,null,1,0,null],[2,1,null,0,3,null,4,3,null,2,1,null,0,null,null,null],[0,3,null,2,null,4,3,null,1,null,2,0,null,null,null,null]]},
       mountain:{scale:[293.66,349.23,392,440,523.25,587.33],beat:.86,motifs:[[0,null,2,null,1,null,3,null,2,null,1,null,0,null,null,null],[1,null,null,0,2,null,4,null,3,null,1,null,0,null,null,null],[0,null,3,null,null,2,null,1,2,null,null,0,null,null,null,null]]},
-      desert:{scale:[220,261.63,293.66,329.63,392,440],beat:.74,motifs:[[0,2,null,3,null,2,1,null,0,null,4,3,null,2,0,null],[2,null,1,0,null,3,null,4,2,null,1,null,0,null,null,null],[0,null,2,null,4,3,null,2,1,null,3,null,0,null,null,null]]}
+      desert:{scale:[220,261.63,293.66,329.63,392,440],beat:.74,motifs:[[0,2,null,3,null,2,1,null,0,null,4,3,null,2,0,null],[2,null,1,0,null,3,null,4,2,null,1,null,0,null,null,null],[0,null,2,null,4,3,null,2,1,null,3,null,0,null,null,null]]},
+      highlands:{scale:[261.63,311.13,349.23,392,466.16,523.25],beat:.92,motifs:[[0,null,null,2,null,3,null,null,1,null,null,0,null,null,null,null],[2,null,1,null,null,0,null,3,null,null,4,null,2,null,null,null],[0,null,3,null,2,null,null,1,null,0,null,null,null,null,null,null]]},
+      meadow:{scale:[293.66,329.63,369.99,440,493.88,587.33],beat:.69,motifs:[[0,null,2,3,null,4,null,2,1,null,0,null,3,null,null,null],[2,1,null,0,null,3,null,4,3,null,2,null,0,null,null,null],[0,null,3,2,null,1,null,4,2,null,0,null,null,null,null,null]]},
+      coast:{scale:[246.94,293.66,329.63,369.99,440,493.88],beat:.83,motifs:[[0,null,2,null,null,3,null,2,1,null,null,0,null,null,null,null],[3,null,2,null,1,null,null,0,2,null,4,null,3,null,null,null],[0,null,null,3,2,null,1,null,0,null,null,2,null,null,null,null]]}
     };
     const notes=new Set(),toneBuffers=new Map();
     let token=0,step=0,profile={region:'farm',night:false,indoor:false,resting:false,duck:1},requestedVolume=.75;
@@ -15816,6 +16326,7 @@ function saveGame(auto=false){
       valleySaga: window.FarmValleySaga?.serialize(),
       frontierStory: window.FarmFrontierStory?.serialize(),
       villageStories: window.FarmVillageStories?.serialize(),
+      expeditionStory: window.FarmExpeditionStory?.serialize(),
       farmLife: window.FarmLife?.serialize(),
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
@@ -15903,6 +16414,7 @@ function loadGameFromData(data){
   window.FarmValleySaga?.restore(data.valleySaga);
   window.FarmFrontierStory?.restore(data.frontierStory);
   window.FarmVillageStories?.restore(data.villageStories);
+  window.FarmExpeditionStory?.restore(data.expeditionStory);
   window.FarmLife?.restore(data.farmLife);
   window.FarmSkinLearning?.restore(data.skinLearning);
   window.FarmStoryIntegration?.restore(data.storyWorld);
@@ -16486,7 +16998,7 @@ function updateBars(paintSkin=true){
   if(clockIcon) clockIcon.textContent = icon;
   if(dayLabel) dayLabel.textContent = seasonText();
   const biomeLabel=document.getElementById('biomeLabel');
-  if(biomeLabel)biomeLabel.textContent=currentScene==='main'?({mountain:'Montanha · Pinheiral da Névoa',desert:'Deserto · Caminho do Oásis',farm:'Fazenda · Vale dos Três Ventos',forest:'Mata das Nascentes',wetland:'Veredas do Sul'}[currentRegion()]||'Entre os biomas'):({house:'Interior · Casa',barn:'Interior · Celeiro',greenhouse:'Interior · Estufa'}[currentScene]||'Vale dos Três Ventos');
+  if(biomeLabel)biomeLabel.textContent=currentScene==='main'?({mountain:'Montanha · Pinheiral da Névoa',desert:'Deserto · Caminho do Oásis',farm:'Fazenda · Vale dos Três Ventos',forest:'Mata das Nascentes',wetland:'Veredas do Sul',highlands:'Serra dos Ecos',meadow:'Campos do Vento',coast:'Costa das Conchas'}[currentRegion()]||'Entre os biomas'):({house:'Interior · Casa',barn:'Interior · Celeiro',greenhouse:'Interior · Estufa'}[currentScene]||'Vale dos Três Ventos');
   if(dayPhaseLabel) dayPhaseLabel.textContent = dayPhase();
   if(clockTime) clockTime.textContent = clockLabel();
   if(nextSeasonLabel) nextSeasonLabel.textContent = nextSeasonShort();
@@ -17482,6 +17994,9 @@ function checkSceneTriggers(){
    somando 1 — então subir a montanha esfria PROGRESSIVAMENTE, em vez de saltar
    num corte de cena. É exatamente o conteúdo que o jogo ensina. */
 const REGION_THERMAL = {
+  highlands:{tempDelta:-0.035,hydDelta:-0.06,sweatBoost:0,label:'serra',thermalCause:'ar frio da serra'},
+  meadow:{tempDelta:0.006,hydDelta:-0.08,sweatBoost:0.1,label:'campos',thermalCause:'ar aberto dos campos'},
+  coast:{tempDelta:0.018,hydDelta:-0.20,sweatBoost:0.55,label:'costa',thermalCause:'calor úmido da costa'},
   mountain: { tempDelta:-0.050, hydDelta: 0.00, sweatBoost:0.0, label:'montanha' },
   farm:     { tempDelta: 0.000, hydDelta: 0.00, sweatBoost:0.0, label:null },
   desert:   { tempDelta: 0.050, hydDelta:-0.60, sweatBoost:1.4, label:'deserto' },
@@ -17506,7 +18021,9 @@ function baseRegionWeights(tileY){
 // Sem coluna, mantém a leitura histórica do gradiente norte/sul.
 function regionWeights(tileY,tileX){
   const base=baseRegionWeights(tileY);
-  return Number.isFinite(tileX)&&window.FarmOpenWorld?FarmOpenWorld.blendWeights(tileX,tileY,base):base;
+  if(!Number.isFinite(tileX))return base;
+  const previous=window.FarmOpenWorld?FarmOpenWorld.blendWeights(Math.min(tileX,95.999),tileY,base):base;
+  return window.FarmExpeditionWorld?FarmExpeditionWorld.blendWeights(tileX,tileY,previous):previous;
 }
 function currentRegion(){
   const w = regionWeights(Math.floor(player.y/TS),player.x/TS);
@@ -18731,6 +19248,7 @@ function resetSandboxRun(){
   window.FarmValleySaga?.reset();
   window.FarmFrontierStory?.reset();
   window.FarmVillageStories?.reset();
+  window.FarmExpeditionStory?.reset();
   window.FarmLife?.reset();
   window.FarmSkinLearning?.reset();
   window.FarmStoryIntegration?.reset();
@@ -24926,6 +25444,7 @@ try { drainBiomeModules(); } catch(e){ console.warn('drainBiomeModules falhou:',
 // A expansão leste é aplicada após os biomas antigos, antes de capturar o estado inicial.
 if(window.FarmOpenWorld){
   FarmOpenWorld.expand(scenes.main);
+  window.FarmExpeditionWorld?.expand(scenes.main);
   MW=scenes.main.MW;MH=scenes.main.MH;map=scenes.main.map;objects=scenes.main.objects;
   invalidateTileCache();
 }

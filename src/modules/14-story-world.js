@@ -268,7 +268,7 @@
   function ctx(value){
     const s=plain(value)?value:(typeof adapter.readState==='function'?adapter.readState():{});
     return {season:season(s?.season),timeOfDay:Number.isFinite(s?.timeOfDay)?Math.max(0,Math.min(24,s.timeOfDay)):12,
-      region:['farm','mountain','desert'].includes(s?.region)?s.region:'farm',scene:text(s?.scene,24)||'main',
+      region:['farm','mountain','desert','forest','wetland','highlands','meadow','coast'].includes(s?.region)?s.region:'farm',scene:text(s?.scene,24)||'main',
       playerName:text(s?.playerName,40)||'viajante',activities:plain(s?.activities)?s.activities:{},
       energy:Number.isFinite(s?.energy)?Math.max(0,Math.min(100,s.energy)):100,resting:s?.resting===true};
   }
@@ -302,7 +302,7 @@
     emit('onDialogue',currentDialogue());return currentDialogue();
   }
   function currentDialogue(){return dialogue?clone(dialogue):null;}
-  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});emit('onDialogue',null);return null;}
+  function close(){dialogue=null;window.FarmValleySaga?.close?.({silent:true});window.FarmFrontierStory?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});window.FarmExpeditionStory?.close?.({silent:true});emit('onDialogue',null);return null;}
   // O adaptador da saga mantém a mesma UI e barreira de leitura. O estado e o
   // save da nova investigação permanecem separados dos seis capítulos legados.
   function presentSaga(value){dialogue=plain(value)?clone(value):null;emit('onDialogue',currentDialogue());return currentDialogue();}
@@ -371,11 +371,11 @@
         status:q.status==='offered'?'available':q.status,completed:q.status==='completed',accepted:q.acceptedAt!==null,objectives:list,
         progress:list.reduce((n,o)=>n+o.n,0),goal:list.reduce((n,o)=>n+o.goal,0),coins:d.coins};
     });
-    const frontier=window.FarmFrontierStory?.diaryView?.(),village=window.FarmVillageStories?.diaryView?.();
-    return {version:VERSION,chapter:chapterView,quests:quests.concat(frontier?.quests||[],village?.quests||[]),friendships:{...clone(state.friendships),...frontier?.friendships},memories:clone(state.memories).concat(frontier?.memories||[],village?.memories||[]),
+    const frontier=window.FarmFrontierStory?.diaryView?.(),village=window.FarmVillageStories?.diaryView?.(),expedition=window.FarmExpeditionStory?.diaryView?.();
+    return {version:VERSION,chapter:chapterView,quests:quests.concat(frontier?.quests||[],village?.quests||[],expedition?.quests||[]),friendships:{...clone(state.friendships),...frontier?.friendships},memories:clone(state.memories).concat(frontier?.memories||[],village?.memories||[],expedition?.memories||[]),
       season:state.season,cycleId:state.cycleId,completed:state.chapterIndex===6,letter:clone(letterView()),
       coinsEarned:state.coinsEarned,jobsCompleted:state.jobsCompleted,chaptersCompleted:state.chaptersCompleted,world:worldState(),
-      discoveries:discoveryViews().concat(frontier?.discoveries||[],village?.discoveries||[]),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0)+(village?.discoveryTotal||0),
+      discoveries:discoveryViews().concat(frontier?.discoveries||[],village?.discoveries||[],expedition?.discoveries||[]),discoveryTotal:Object.keys(loreById).length+(frontier?.discoveryTotal||0)+(village?.discoveryTotal||0)+(expedition?.discoveryTotal||0),
       relationships:IDS.map(id=>({npcId:id,label:state.friendships[id]>=16?'Confiança':state.friendships[id]>=8?'Parceria':state.flags['met:'+id]?'Conhecidos':'Por conhecer',
         discoveries:state.discoveries.filter(k=>loreById[k].npcId===id).length,total:lore[id].length})).concat(frontier?.relationships||[])};
   }
@@ -451,6 +451,8 @@
     if(!preamble&&window.FarmValleySaga?.greeting)message=window.FarmValleySaga.greeting(npcId,{visit,night});
     const frontierResponse=window.FarmFrontierStory?.conversationResponse?.(npcId);
     if(frontierResponse)message+='\n\n'+frontierResponse;
+    const expeditionResponse=window.FarmExpeditionStory?.conversationResponse?.(npcId);
+    if(expeditionResponse)message+='\n\n'+expeditionResponse;
     const villageResponse=window.FarmVillageStories?.conversationResponse?.(npcId);
     if(villageResponse)message+='\n\n'+villageResponse;
     const activity=text(s.activities[npcId],180);
@@ -475,6 +477,7 @@
     else if(q.status==='ready')choices.push({id:'job:claim',label:'Entregar o pedido da estação'});
     else if(q.status==='active')choices.push({id:'job:hint',label:'Relembrar seu pedido'});
     else message+='\n\nSeu pedido desta estação já foi entregue. Na próxima estação combinamos outro.';
+    if(window.FarmExpeditionStory?.hasCharacter(npcId))choices.push({id:'expedition:menu',label:window.FarmExpeditionStory.menuLabel(npcId)});
     if(window.FarmVillageStories?.hasCharacter(npcId))choices.push({id:'village:menu',label:window.FarmVillageStories.menuLabel(npcId)});
     if(window.FarmValleySaga)choices.push({id:'saga:menu',label:window.FarmValleySaga.menuLabel(npcId)});
     const pending=lore[npcId].find(scene=>state.discoveries.includes(scene.id)&&state.decisions[scene.id]===undefined);
@@ -486,20 +489,21 @@
     return show(npcId,message,'menu',choices);
   }
   function interact(npcId){
-    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
+    if(window.FarmFrontierStory?.hasCharacter?.(npcId)){window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});window.FarmExpeditionStory?.close?.({silent:true});return window.FarmFrontierStory.interact(npcId);}
     if(npcId==='letter'){const savedLetter=letterView();return show('rosa',savedLetter.text,'letter',[{id:'close',label:'Guardar a carta'}],savedLetter.title);}
     if(!byId[npcId])return null;
-    window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});
+    window.FarmValleySaga?.close?.({silent:true});window.FarmVillageStories?.close?.({silent:true});window.FarmExpeditionStory?.close?.({silent:true});
     const first=!state.flags['met:'+npcId];
     if(first){state.flags['met:'+npcId]=true;friendship(npcId,2);remember('met:'+npcId,npcId,'Você conheceu '+byId[npcId].name+' no Vale dos Três Ventos.');changed();}
     state.visits[npcId]=Math.min(LIMIT,state.visits[npcId]+1);noticeActivity(npcId);changed();
-    window.FarmVillageStories?.record('talk',{npcId});
+    window.FarmVillageStories?.record('talk',{npcId});window.FarmExpeditionStory?.record('talk',{npcId});
     record('talk',{npcId});window.FarmValleySaga?.record?.('talk',{npcId});window.FarmFrontierStory?.record?.('talk',{npcId});
     return menu(npcId,first?(window.FarmValleySaga?.greeting?.(npcId,{first:true})||chats[npcId].first):undefined);
   }
   function choose(choiceId){
     if(!dialogue || !dialogue.choices.some(c=>c.id===choiceId))return currentDialogue();
     const npcId=dialogue.npcId;if(choiceId==='close')return close();
+    if(choiceId.startsWith('expedition:')){if(choiceId==='expedition:menu'&&!window.FarmExpeditionStory?.isOpen())return window.FarmExpeditionStory?.interact(npcId)||currentDialogue();return window.FarmExpeditionStory?.choose(choiceId)||currentDialogue();}
     if(choiceId.startsWith('village:')){if(choiceId==='village:menu'&&!window.FarmVillageStories?.isOpen())return window.FarmVillageStories?.interact(npcId)||currentDialogue();return window.FarmVillageStories?.choose(choiceId)||currentDialogue();}
     if(choiceId.startsWith('frontier:'))return window.FarmFrontierStory?.choose?.(choiceId)||currentDialogue();
     if(choiceId==='back')return menu(npcId);

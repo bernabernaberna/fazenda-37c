@@ -6017,6 +6017,7 @@ function saveGame(auto=false){
       valleySaga: window.FarmValleySaga?.serialize(),
       frontierStory: window.FarmFrontierStory?.serialize(),
       villageStories: window.FarmVillageStories?.serialize(),
+      expeditionStory: window.FarmExpeditionStory?.serialize(),
       farmLife: window.FarmLife?.serialize(),
       skinLearning: window.FarmSkinLearning?.serialize(),
       homeostasisTimer, hotExposureTimer,
@@ -6104,6 +6105,7 @@ function loadGameFromData(data){
   window.FarmValleySaga?.restore(data.valleySaga);
   window.FarmFrontierStory?.restore(data.frontierStory);
   window.FarmVillageStories?.restore(data.villageStories);
+  window.FarmExpeditionStory?.restore(data.expeditionStory);
   window.FarmLife?.restore(data.farmLife);
   window.FarmSkinLearning?.restore(data.skinLearning);
   window.FarmStoryIntegration?.restore(data.storyWorld);
@@ -6687,7 +6689,7 @@ function updateBars(paintSkin=true){
   if(clockIcon) clockIcon.textContent = icon;
   if(dayLabel) dayLabel.textContent = seasonText();
   const biomeLabel=document.getElementById('biomeLabel');
-  if(biomeLabel)biomeLabel.textContent=currentScene==='main'?({mountain:'Montanha · Pinheiral da Névoa',desert:'Deserto · Caminho do Oásis',farm:'Fazenda · Vale dos Três Ventos',forest:'Mata das Nascentes',wetland:'Veredas do Sul'}[currentRegion()]||'Entre os biomas'):({house:'Interior · Casa',barn:'Interior · Celeiro',greenhouse:'Interior · Estufa'}[currentScene]||'Vale dos Três Ventos');
+  if(biomeLabel)biomeLabel.textContent=currentScene==='main'?({mountain:'Montanha · Pinheiral da Névoa',desert:'Deserto · Caminho do Oásis',farm:'Fazenda · Vale dos Três Ventos',forest:'Mata das Nascentes',wetland:'Veredas do Sul',highlands:'Serra dos Ecos',meadow:'Campos do Vento',coast:'Costa das Conchas'}[currentRegion()]||'Entre os biomas'):({house:'Interior · Casa',barn:'Interior · Celeiro',greenhouse:'Interior · Estufa'}[currentScene]||'Vale dos Três Ventos');
   if(dayPhaseLabel) dayPhaseLabel.textContent = dayPhase();
   if(clockTime) clockTime.textContent = clockLabel();
   if(nextSeasonLabel) nextSeasonLabel.textContent = nextSeasonShort();
@@ -7683,6 +7685,9 @@ function checkSceneTriggers(){
    somando 1 — então subir a montanha esfria PROGRESSIVAMENTE, em vez de saltar
    num corte de cena. É exatamente o conteúdo que o jogo ensina. */
 const REGION_THERMAL = {
+  highlands:{tempDelta:-0.035,hydDelta:-0.06,sweatBoost:0,label:'serra',thermalCause:'ar frio da serra'},
+  meadow:{tempDelta:0.006,hydDelta:-0.08,sweatBoost:0.1,label:'campos',thermalCause:'ar aberto dos campos'},
+  coast:{tempDelta:0.018,hydDelta:-0.20,sweatBoost:0.55,label:'costa',thermalCause:'calor úmido da costa'},
   mountain: { tempDelta:-0.050, hydDelta: 0.00, sweatBoost:0.0, label:'montanha' },
   farm:     { tempDelta: 0.000, hydDelta: 0.00, sweatBoost:0.0, label:null },
   desert:   { tempDelta: 0.050, hydDelta:-0.60, sweatBoost:1.4, label:'deserto' },
@@ -7707,7 +7712,9 @@ function baseRegionWeights(tileY){
 // Sem coluna, mantém a leitura histórica do gradiente norte/sul.
 function regionWeights(tileY,tileX){
   const base=baseRegionWeights(tileY);
-  return Number.isFinite(tileX)&&window.FarmOpenWorld?FarmOpenWorld.blendWeights(tileX,tileY,base):base;
+  if(!Number.isFinite(tileX))return base;
+  const previous=window.FarmOpenWorld?FarmOpenWorld.blendWeights(Math.min(tileX,95.999),tileY,base):base;
+  return window.FarmExpeditionWorld?FarmExpeditionWorld.blendWeights(tileX,tileY,previous):previous;
 }
 function currentRegion(){
   const w = regionWeights(Math.floor(player.y/TS),player.x/TS);
@@ -8932,6 +8939,7 @@ function resetSandboxRun(){
   window.FarmValleySaga?.reset();
   window.FarmFrontierStory?.reset();
   window.FarmVillageStories?.reset();
+  window.FarmExpeditionStory?.reset();
   window.FarmLife?.reset();
   window.FarmSkinLearning?.reset();
   window.FarmStoryIntegration?.reset();
@@ -15127,6 +15135,7 @@ try { drainBiomeModules(); } catch(e){ console.warn('drainBiomeModules falhou:',
 // A expansão leste é aplicada após os biomas antigos, antes de capturar o estado inicial.
 if(window.FarmOpenWorld){
   FarmOpenWorld.expand(scenes.main);
+  window.FarmExpeditionWorld?.expand(scenes.main);
   MW=scenes.main.MW;MH=scenes.main.MH;map=scenes.main.map;objects=scenes.main.objects;
   invalidateTileCache();
 }

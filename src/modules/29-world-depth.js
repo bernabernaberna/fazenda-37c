@@ -153,6 +153,7 @@
 
   function footprint(o){
    switch(o.type){
+    case 'expedition_landmark':case 'expedition_scenery':return window.FarmExpeditionWorld?.footprint(o)||null;
     case 'farm_life_project':case 'farm_life_clue':case 'farm_life_station':return window.FarmLife?.footprint(o)||null;
     case 'house':case 'barn':case 'story_seed_house':return{x:o.x-3,y:o.y+4,w:o.w+6,h:o.h-7};
     case 'mtn_cabin':return{x:o.x-33,y:o.y-35,w:64,h:38};
@@ -170,7 +171,7 @@
   function isBlocked(x,y,from){
    const m=API.scenes.main;if(!m||x<8||y<8||x>m.MW*S-8||y>m.MH*S-8)return true;
    if([undefined,T.WATER,T.RIVER,T.OASIS].includes(m.map[Math.floor(y/S)]?.[Math.floor(x/S)]))return true;
-   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project','farm_life_clue','farm_life_station']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
+   for(const o of (window.FarmObjectQueries?FarmObjectQueries.of(m.objects,['house','barn','story_seed_house','mtn_cabin','tree','fx_fruittree','mtn_pine','des_palm','mtn_rock','des_mesa','des_cactus','world_ridge','pen','farm_life_project','farm_life_clue','farm_life_station','expedition_landmark','expedition_scenery']):m.objects)){const b=footprint(o);if(b&&contains(b,x,y+7)){
      // Saves anteriores podem começar dentro de um novo tronco/volume.
      // Permite somente sair em direção à borda, nunca atravessar o obstáculo.
      if(from&&contains(b,from.x,from.y+7)){
@@ -186,6 +187,7 @@
    }return false;
   }
   function depth(o){
+   if(o.type==='expedition_landmark'||o.type==='expedition_scenery')return window.FarmExpeditionWorld?.depth(o)??o.y;
    if(o.type==='player'||o.type==='story_npc')return o.y+10;
    if(o.type==='world_pen_rail')return o.y;
    if(o.type==='world_bridge_rail')return o.y+2;
@@ -286,7 +288,7 @@
      count++;
     }
    }finally{g.restore();}
-   return count;
+   return count+(window.FarmExpeditionWorld?.drawGroundShadows?.(g,visible,sun)||0);
   }
   function windowLights(o){
    if(o.type==='mtn_cabin')return[{x:o.x,y:o.y-10,r:17}];

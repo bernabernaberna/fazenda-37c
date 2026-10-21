@@ -51,6 +51,8 @@ Os **animais do curral** têm nomes e cuidados individuais: aproxime-se e pressi
 
 **Vozes do vale:** seis histórias pessoais com dois caminhos e três encontros por personagem, novos assuntos para os nove moradores e duas cenas de conclusão. As tarefas avançam com ações feitas depois do combinado e ficam registradas no caderno. A ponte ganhou piso e corrimãos em camadas; mata, veredas, gelo e margens têm novos detalhes, com animações discretas e opção de reduzir movimento.
 
+**Além das três margens:** o vale cresceu 50%, para 144×124 tiles. Explore a Serra dos Ecos, os Campos do Vento e a Costa das Conchas: nove lugares, seis passarelas e três expedições com dois caminhos e três encontros cada. Rosa, Lia e Inês iniciam os combinados; os nove moradores participam das descobertas. Os lugares têm observações registradas no caderno, recursos renováveis, destinos no mapa e duas cenas novas. Saves antigos continuam compatíveis.
+
 **Jogar online:** [Fazenda 37 °C](https://fazenda-37c.bernaberna.chatgpt.site)
 
 ## Jogar

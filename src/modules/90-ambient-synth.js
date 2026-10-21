@@ -52,7 +52,7 @@
     timer=setTimeout(()=>{timer=null;scheduleCrickets();},2100+Math.random()*2300);
   }
   function mixScene(options={}){
-    const weights={farm:0,mountain:0,desert:0,forest:0,wetland:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
+    const weights={farm:0,mountain:0,desert:0,forest:0,wetland:0,highlands:0,meadow:0,coast:0},input=Array.isArray(options.weights)?options.weights:Object.entries(options.weights||{farm:1});
     for(const entry of input){const id=Array.isArray(entry)?entry[0]:entry.id,w=Array.isArray(entry)?entry[1]:(entry.w??entry.weight);if(id in weights)weights[id]+=clamp(w);}
     const total=Object.values(weights).reduce((a,b)=>a+b,0)||1;for(const key of Object.keys(weights))weights[key]/=total;
     const region=Object.keys(weights).reduce((a,b)=>weights[a]>=weights[b]?a:b),tod=((Number(options.timeOfDay)||0)%24+24)%24;
@@ -69,8 +69,8 @@
       result.river=.055;result.loops.room_tone=.11;result.loops.birds_loop=night||cold?0:.009;
       result.music.indoor=true;return result;
     }
-    const forest=weights.forest,wetland=weights.wetland;
-    const field=weights.farm+forest*.7+wetland*.55,mountain=weights.mountain,desert=weights.desert;
+    const forest=weights.forest,wetland=weights.wetland,highlands=weights.highlands,meadow=weights.meadow,coast=weights.coast;
+    const field=weights.farm+forest*.7+wetland*.55+meadow*.85+highlands*.18+coast*.2,mountain=weights.mountain,desert=weights.desert;
     result.loops.farm_ambience=field*(cold?.035:(night?.055:.13));
     result.loops.birds_loop=field*(cold||night?0:tod<9?.05:tod<16?.025:.017);
     result.loops.cicadas_loop=field*(cold||night?0:(tod>=11&&tod<16?.045+heat*.035:.018));
@@ -82,6 +82,14 @@
     result.loops.birds_loop+=forest*(cold||night?0:.035);
     result.river+=wetland*(cold?.04:.12)+forest*.025;
     result.crickets+=wetland*(night&&!cold?.15:0);
+    // O mesmo banco original dá identidade aos caminhos novos. O vento do
+    // alto é espaçado; o prado privilegia aves; a costa tem água e brisa.
+    // Cada parcela é ponderada antes da mistura, sem salto na fronteira.
+    result.loops.cold_wind+=highlands*(cold?.22:.13);
+    result.loops.birds_loop+=meadow*(cold||night?0:.025)+coast*(cold||night?0:.008);
+    result.loops.desert_breeze+=coast*(night?.11:.17);
+    result.river+=coast*(cold?.09:.2)+highlands*water*.07;
+    result.crickets+=meadow*(night&&!cold?.09:0);
     if(resting){
       for(const key of Object.keys(result.loops))result.loops[key]*=['birds_loop','cicadas_loop'].includes(key)?.35:.65;
       result.river*=.7;result.crickets*=.45;
@@ -107,7 +115,10 @@
     const profiles={
       farm:{scale:[261.63,293.66,329.63,392,440,523.25],beat:.62,motifs:[[0,null,2,3,null,1,0,null,3,4,null,2,null,1,0,null],[2,1,null,0,3,null,4,3,null,2,1,null,0,null,null,null],[0,3,null,2,null,4,3,null,1,null,2,0,null,null,null,null]]},
       mountain:{scale:[293.66,349.23,392,440,523.25,587.33],beat:.86,motifs:[[0,null,2,null,1,null,3,null,2,null,1,null,0,null,null,null],[1,null,null,0,2,null,4,null,3,null,1,null,0,null,null,null],[0,null,3,null,null,2,null,1,2,null,null,0,null,null,null,null]]},
-      desert:{scale:[220,261.63,293.66,329.63,392,440],beat:.74,motifs:[[0,2,null,3,null,2,1,null,0,null,4,3,null,2,0,null],[2,null,1,0,null,3,null,4,2,null,1,null,0,null,null,null],[0,null,2,null,4,3,null,2,1,null,3,null,0,null,null,null]]}
+      desert:{scale:[220,261.63,293.66,329.63,392,440],beat:.74,motifs:[[0,2,null,3,null,2,1,null,0,null,4,3,null,2,0,null],[2,null,1,0,null,3,null,4,2,null,1,null,0,null,null,null],[0,null,2,null,4,3,null,2,1,null,3,null,0,null,null,null]]},
+      highlands:{scale:[261.63,311.13,349.23,392,466.16,523.25],beat:.92,motifs:[[0,null,null,2,null,3,null,null,1,null,null,0,null,null,null,null],[2,null,1,null,null,0,null,3,null,null,4,null,2,null,null,null],[0,null,3,null,2,null,null,1,null,0,null,null,null,null,null,null]]},
+      meadow:{scale:[293.66,329.63,369.99,440,493.88,587.33],beat:.69,motifs:[[0,null,2,3,null,4,null,2,1,null,0,null,3,null,null,null],[2,1,null,0,null,3,null,4,3,null,2,null,0,null,null,null],[0,null,3,2,null,1,null,4,2,null,0,null,null,null,null,null]]},
+      coast:{scale:[246.94,293.66,329.63,369.99,440,493.88],beat:.83,motifs:[[0,null,2,null,null,3,null,2,1,null,null,0,null,null,null,null],[3,null,2,null,1,null,null,0,2,null,4,null,3,null,null,null],[0,null,null,3,2,null,1,null,0,null,null,2,null,null,null,null]]}
     };
     const notes=new Set(),toneBuffers=new Map();
     let token=0,step=0,profile={region:'farm',night:false,indoor:false,resting:false,duck:1},requestedVolume=.75;

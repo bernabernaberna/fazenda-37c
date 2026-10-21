@@ -163,7 +163,7 @@
   };
   let adapter={},dialogue=null,revision=0,state;
   const freshRecord=()=>({status:'offered',choice:null,stage:0,acceptedAt:null,counts:{},paid:false});
-  const REGIONS=['farm','mountain','desert','forest','wetland'];
+  const REGIONS=['farm','mountain','desert','forest','wetland','highlands','meadow','coast'];
   const fresh=()=>({version:VERSION,sequence:0,met:[],visits:Object.fromEntries(IDS.map(id=>[id,0])),arcs:Object.fromEntries(arcs.map(def=>[def.id,freshRecord()])),journal:[],recentEventIds:[],lastRegion:null});
   function context(value){let raw=value;try{if(!plain(raw))raw=adapter.readState?.();}catch(_){raw=null;}return {name:text(own(raw,'playerName')||own(raw,'name'),40)||'Alex',timeOfDay:Number.isFinite(own(raw,'timeOfDay'))?raw.timeOfDay:12,region:REGIONS.includes(own(raw,'region'))?raw.region:'farm',scene:text(own(raw,'scene'),24)||'main',active:own(raw,'active')!==false,paused:own(raw,'paused')===true};}
   function emit(name,...args){try{return adapter[name]?.(...args);}catch(error){if(typeof console!=='undefined')console.warn('[Vozes do vale] '+name,error);}}

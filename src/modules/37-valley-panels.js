@@ -14,10 +14,12 @@
   const farm=()=>window.FarmLife?.snapshot?.()||{};
   const village=()=>window.FarmVillageStories?.snapshot?.()||{};
   const villageDiary=()=>window.FarmVillageStories?.diaryView?.()||{};
-  const titleOf=id=>names[id]||id||'um morador';
+  const expedition=()=>window.FarmExpeditionStory?.snapshot?.()||{};
+  const expeditionDiary=()=>window.FarmExpeditionStory?.diaryView?.()||{};
+  const titleOf=id=>id==='player'?(read().name||read().player?.name||'Alex'):names[id]||id||'um morador';
   function storyText(text){const info=read(),name=info.name||info.player?.name||'Alex';return String(text||'').replace(/\bAlex\b/g,()=>name);}
   function location(id){const info=read(),n=(info.npcs||[]).find(n=>n.npcId===id);if(!n)return 'Procure no mapa do vale.';return direction(n.x,n.y);}
-  function direction(x,y){const info=read(),dx=x-(info.x||0),dy=y-(info.y||0),steps=Math.round(Math.hypot(dx,dy)/16),east=window.FarmOpenWorld?.regionAt?.(x/16,y/16),region=window.FarmOpenWorld?.regions?.[east]?.name||(y<42*16?'Montanha':y>=90*16?'Oásis':'Fazenda');return region+' · '+(steps<=2?'perto de você':steps+' passos ao '+(Math.abs(dx)>Math.abs(dy)?dx<0?'oeste':'leste':dy<0?'norte':'sul'));}
+  function direction(x,y){const info=read(),dx=x-(info.x||0),dy=y-(info.y||0),steps=Math.round(Math.hypot(dx,dy)/16),east=window.FarmExpeditionWorld?.regionAt?.(x/16,y/16)||window.FarmOpenWorld?.regionAt?.(x/16,y/16),region=window.FarmExpeditionWorld?.regions?.[east]?.name||window.FarmOpenWorld?.regions?.[east]?.name||(y<42*16?'Montanha':y>=90*16?'Oásis':'Fazenda');return region+' · '+(steps<=2?'perto de você':steps+' passos ao '+(Math.abs(dx)>Math.abs(dy)?dx<0?'oeste':'leste':dy<0?'norte':'sul'));}
   function destination(id,x,y){close(false);adapter.focusGame?.();if(window.FarmWorldMap?.open?.()===true)FarmWorldMap.setDestination(id?'npc:'+id:{x,y});}
   function npcGuide(npcId){const box=el('div','v6-guide');box.append(el('strong','',titleOf(npcId)+' espera sua conversa'),el('p','',location(npcId)+' Aproxime-se e pressione E. O combinado e a entrega acontecem com este morador.'),button('Encontrar '+titleOf(npcId)+' no mapa',()=>destination(npcId),'map:npc:'+npcId));return box;}
   function objectives(list){const ul=el('ul','v6-objectives');for(const o of list||[]){const n=Math.max(0,Number(o.n)||0),goal=Math.max(1,Number(o.goal)||1);ul.append(el('li',n>=goal?'v6-done':'',(n>=goal?'✓ ':'')+(o.text||'Objetivo')+' · '+n+' / '+goal));}return ul;}
@@ -51,27 +53,54 @@
     for(const arc of active){const item=el('details','v6-memory');item.open=active.length===1;item.append(el('summary','',titleOf(arc.npcId)+' · '+arc.title),el('p','v6-kicker',villageStatus(arc)),el('p','v6-voice',arc.stageTitle),objectives(arc.objectives));item.append(button('Encontrar '+titleOf(arc.npcId)+' no mapa',()=>destination(arc.npcId),'map:village:'+arc.npcId));card.append(item);}
     card.append(button('Ver histórias dos moradores',()=>{section='people';selectedId='';body.scrollTop=0;refresh();},'village:people'));body.append(card);
   }
+  function expeditionPlaces(card,arc){
+    const places=window.FarmExpeditionWorld?.landmarks||[],seen=new Set();
+    for(const goal of arc.objectives||[]){
+      if(Number(goal.n)>=Number(goal.goal))continue;
+      const match=goal.match||{},id=match.landmarkId||match.clueId,point=id?places.find(p=>p.id===id):goal.event==='visit'?places.find(p=>p.region===match.region):null;
+      if(match.npcId&&match.npcId!==arc.npcId&&!seen.has('npc:'+match.npcId)){seen.add('npc:'+match.npcId);card.append(button('Encontrar '+titleOf(match.npcId)+' no mapa',()=>destination(match.npcId),'map:expedition:'+arc.id+':npc:'+match.npcId));}
+      if(!point||seen.has(point.id))continue;seen.add(point.id);
+      card.append(el('p','v6-reason',direction(point.x,point.y)),button('Marcar '+point.title+' no mapa',()=>destination('',point.x,point.y),'map:expedition:'+arc.id+':'+point.id));
+    }
+  }
+  function renderExpeditionSummary(){
+    const s=expedition(),arcs=s.arcs||[];if(!arcs.length)return;
+    const active=arcs.filter(a=>a.status==='active'||a.status==='ready'),completed=arcs.filter(a=>a.completed||a.status==='completed').length;
+    const card=block(s.title||'Além dos caminhos conhecidos',storyText(s.description||'Novas trilhas aproximam Alex das lembranças de Rosa, das perguntas de Lia e das viagens de Inês. Cada expedição começa em uma conversa e continua nos lugares encontrados.'));
+    card.dataset.valleyItem='expeditions';card.append(el('p','v6-reason',completed+' / '+arcs.length+' expedições concluídas'));
+    for(const arc of arcs){const item=el('details','v6-memory');item.open=active.length===1&&active[0].id===arc.id;item.append(el('summary','',titleOf(arc.npcId)+' · '+arc.title),el('p','v6-kicker',villageStatus(arc)));
+      if(arc.status==='active'||arc.status==='ready'){item.append(el('p','v6-voice',arc.stageTitle),objectives(arc.objectives));expeditionPlaces(item,arc);}
+      else if(arc.completed||arc.status==='completed'){if(arc.consequence)item.append(el('p','v6-voice',storyText(arc.consequence)));}
+      else item.append(el('p','v6-reason','Converse com '+titleOf(arc.npcId)+' sobre esta viagem. Ações anteriores ao combinado não avançam a expedição.'));
+      item.append(button('Encontrar '+titleOf(arc.npcId)+' no mapa',()=>destination(arc.npcId),'map:expedition:'+arc.id+':leader'));card.append(item);
+    }body.append(card);
+  }
   function renderSaga(){const s=saga(),p=s.protagonist||{},info=read(),hero=block(p.name||info.name||'Alex Vale',p.description||'Um retorno ao vale, uma pergunta antiga e um lugar para construir aos poucos.','v6-hero');
     hero.prepend(el('span','v6-kicker',p.role||'Uma aventura acolhedora com mistério'));
     if(p.voice)hero.append(el('p','v6-voice',p.voice));if(p.innerVoice)hero.append(el('blockquote','v6-inner',p.innerVoice));body.append(hero);
     const act=s.act;if(act){const card=block(act.title,act.description);card.prepend(el('span','v6-kicker',(s.completed?'A vida continua no vale':'Página '+((act.index||0)+1)+' / '+(s.episodes?.length||8))+' · '+(({available:'Converse para combinar',active:'Em andamento',ready:'Volte para conversar',completed:'Concluída'})[act.status]||'Por descobrir')));card.append(objectives(act.objectives));if(act.coins)card.append(el('p','v6-reason',act.coins+' moedas ao concluir; ações anteriores ao combinado não contam.'));if((act.objectives||[]).some(o=>/pele|histologia|epiderme|derme|vasos/i.test(o.text||'')))card.append(button('Investigar a pele',()=>{close(false);adapter.focusGame?.();adapter.openSkin?.();},'skin:study'));if(!s.completed)card.append(npcGuide(act.npcId));body.append(card);}
     if(s.completed)body.append(block('Uma casa não termina quando se abre','O mistério deixa marcas nas relações. Cultive, produza, visite os moradores e leve novas entregas ao quadro. O vale continua depois da última página.'));
     renderVillageSummary();
+    renderExpeditionSummary();
     const completed=(s.episodes||[]).filter(e=>e.status==='completed');if(completed.length){const history=block('O caminho até aqui');for(const e of completed){const item=el('details','v6-memory');item.append(el('summary','',e.title),el('p','',e.description||''));if(e.decision)item.append(el('p','v6-voice',typeof e.decision==='string'?e.decision:e.decision.consequence||e.decision.label||''));history.append(item);}body.append(history);}
     body.append(button('Jornada das sementes, carta e mapa social',()=>{close(false);window.FarmStoryUI?.open?.();},'legacy:journey'));
   }
-  function renderPeople(){const s=saga(),stories=village(),diary=villageDiary(),grid=el('div','v6-grid');body.append(el('p','v6-intro','Cada morador tem um plano próprio, algo que evita dizer e um trabalho que precisa de companhia. Os vínculos avançam com combinados cumpridos e decisões lembradas.'));
+  function renderPeople(){const s=saga(),stories=village(),diary=villageDiary(),journeys=expedition(),journeyDiary=expeditionDiary(),grid=el('div','v6-grid');body.append(el('p','v6-intro','Cada morador tem um plano próprio, algo que evita dizer e um trabalho que precisa de companhia. Os vínculos avançam com combinados cumpridos e decisões lembradas.'));
     for(const arc of s.arcs||[]){const relation=(s.relationships||[]).find(r=>r.npcId===arc.npcId),card=block(titleOf(arc.npcId)+' · '+arc.title,arc.agenda);const c=el('canvas','v6-face');c.width=96;c.height=96;c.setAttribute('aria-label','Retrato de '+titleOf(arc.npcId));window.FarmCharacterArt?.drawPortrait(c,arc.npcId,{reducedMotion:true});card.prepend(c);
       card.append(el('p','v6-voice',relation?.label||'Um vínculo por descobrir'),el('p','',relation?.consequence||arc.flaw||''),el('p','v6-reason','Encontros concluídos: '+(arc.step||0)+' / '+(arc.total||2)));
       if(arc.objective)card.append(el('p','',arc.objective));card.append(objectives(arc.objectives));
       appendVillageArc(card,(stories.arcs||[]).find(a=>a.npcId===arc.npcId),(diary.discoveries||[]).find(a=>a.npcId===arc.npcId));
+      const journey=(journeys.arcs||[]).find(a=>a.npcId===arc.npcId);if(journey){appendVillageArc(card,journey,(journeyDiary.discoveries||[]).find(a=>a.npcId===arc.npcId));if(journey.status==='active'||journey.status==='ready')expeditionPlaces(card,journey);}
       card.dataset.valleyItem='person:'+arc.npcId;card.append(el('p','v6-reason',location(arc.npcId)),button('Encontrar no mapa',()=>destination(arc.npcId),'map:npc:'+arc.npcId));grid.append(card);
     }body.append(grid);if(!grid.children.length)body.append(block('Seis vozes do vale','Rosa, Lia, Tomás, Inês, Caio e Nico estão no mapa. A primeira conversa abre espaço para os próximos encontros.'));
   }
-  function renderJournal(){const s=saga(),stories=village();body.append(el('p','v6-intro','Páginas escritas depois dos encontros. Carregar o jogo preserva lembranças e escolhas, sem conceder recompensas outra vez.'));
+  function renderJournal(){const s=saga(),stories=village(),journeys=expedition();body.append(el('p','v6-intro','Páginas escritas depois dos encontros. Carregar o jogo preserva lembranças e escolhas, sem conceder recompensas outra vez.'));
+    const found=(journeys.clues||[]).filter(c=>c&&typeof c==='object'&&c.found!==false);
+    if(found.length){const card=block('Lugares encontrados na expedição');for(const clue of found){const item=el('details','v6-memory');item.append(el('summary','',clue.title),el('p','',storyText(clue.text||clue.description||'')));const observation=journeys.surveys?.[clue.id],method=(clue.actions||[]).find(a=>a.id===observation?.lastMethod);if(observation?.rounds>0)item.append(el('p','v6-reason',observation.rounds+(observation.rounds===1?' observação registrada':' observações registradas')+(method?' · '+method.label:'')));stationMap(item,clue);card.append(item);}body.append(card);}
+    for(const entry of (journeys.journal||[]).filter(e=>!String(e.id).startsWith('clue:')).slice().reverse()){const card=block(entry.title,storyText(entry.text));card.prepend(el('span','v6-kicker','Expedições do vale'+(entry.npcId?' · '+titleOf(entry.npcId):'')));const text=card.querySelector('p');if(text)text.style.whiteSpace='pre-line';body.append(card);}
     for(const entry of (stories.journal||[]).slice().reverse()){const card=block(entry.title,storyText(entry.text));card.prepend(el('span','v6-kicker','Vozes do vale · '+titleOf(entry.npcId)));const text=card.querySelector('p');if(text)text.style.whiteSpace='pre-line';body.append(card);}
     for(const e of (s.journal||[]).slice().reverse()){const card=block(e.title,e.text);if(e.npcId)card.prepend(el('span','v6-kicker',titleOf(e.npcId)));body.append(card);}
-    if(!s.journal?.length&&!stories.journal?.length)body.append(block('Uma primeira página em branco','Converse com Rosa para começar. As anotações de Alex aparecem depois de escolhas e experiências reais.'));
+    if(!s.journal?.length&&!stories.journal?.length&&!journeys.journal?.length&&!found.length)body.append(block('Uma primeira página em branco','Converse com Rosa para começar. As anotações de Alex aparecem depois de escolhas e experiências reais.'));
     if(s.decisionHistory?.length){const choices=block('As escolhas que ficaram');for(const d of s.decisionHistory)choices.append(el('h4','',d.label),el('p','',d.consequence));body.append(choices);}
     if(s.clues?.length){const clues=block('O que já sabemos');for(const c of s.clues)clues.append(el('h4','',c.title),el('p','',c.text));body.append(clues);}
   }

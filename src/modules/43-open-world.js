@@ -165,6 +165,7 @@
    g.restore();
   }
   API.registerTileDrawer(T.WOOD,(g,px,py,x,y)=>{
+   if(window.FarmExpeditionWorld?.drawWoodTile?.(g,px,py,x,y))return;
    if(API.rawScene!=='main'||x<ORIGINAL_WIDTH){API.drawBaseTile(g,px,py,x,y,T.WOOD);return;}
    // Tábuas contínuas e gastas no cache estático. A antiga textura de piso
    // interno formava tijolos laranja e repetia nós em cada quadrado de16px.

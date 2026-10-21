@@ -321,6 +321,7 @@
       terrainEdge(g,px,py,x,y,t,cold);
       if(API.rawScene==='main'&&(t===T.GRASS||t===T.GRASS2))
         window.FarmOpenWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
+      if(API.rawScene==='main')window.FarmExpeditionWorld?.drawTerrainDetails?.(g,px,py,x,y,t,cold);
     });
 
     /* ---------- Vegetação: massas recortadas, folhas em agrupamentos ---------- */
